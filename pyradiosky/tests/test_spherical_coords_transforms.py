@@ -9,22 +9,15 @@ from astropy.coordinates import SkyCoord, EarthLocation
 from astropy.time import Time
 from scipy.linalg import orthogonal_procrustes as ortho_procr
 
-from pyuvsim import spherical_coordinates_basis_transformation as scbt
-import pyuvsim.tests as simtest
+from pyradiosky import spherical_coords_transforms as sct
 
 
-def test_hat_errors():
-    simtest.assert_raises_message(
-        ValueError, 'theta and phi must have the same shape',
-        scbt.r_hat, [0, 0], [0])
+@pytest.mark.parametrize('func_name', ['r_hat', 'theta_hat', 'phi_hat'])
+def test_hat_errors(func_name):
 
-    simtest.assert_raises_message(
-        ValueError, 'theta and phi must have the same shape',
-        scbt.theta_hat, [0, 0], [0])
-
-    simtest.assert_raises_message(
-        ValueError, 'theta and phi must have the same shape',
-        scbt.phi_hat, [0, 0], [0])
+    with pytest.raises(ValueError) as cm:
+        getattr(sct, func_name)([0, 0], [0])
+    assert str(cm.value).startswith('theta and phi must have the same shape')
 
 
 @pytest.mark.skip()
@@ -79,35 +72,35 @@ def test_spherical_coordinates_map():
         R_screwy = axes_altaz.cartesian.xyz
         R_avg, _ = ortho_procr(R_screwy, np.eye(3))
 
-        # Note the transpose, to be consistent with calculation in scbt
+        # Note the transpose, to be consistent with calculation in sct
         R_avg = np.array(R_avg).T
 
         # Find mathematical points and vectors for RA/Dec
         theta_radec = np.pi / 2. - src_astropy.dec.radian
         phi_radec = src_astropy.ra.radian
-        radec_vec = scbt.r_hat(theta_radec, phi_radec)
+        radec_vec = sct.r_hat(theta_radec, phi_radec)
         assert radec_vec.shape == (3,)
 
         # Find mathematical points and vectors for Alt/Az
         theta_altaz = np.pi / 2. - alts[ti]
         phi_altaz = azs[ti]
-        altaz_vec = scbt.r_hat(theta_altaz, phi_altaz)
+        altaz_vec = sct.r_hat(theta_altaz, phi_altaz)
         assert altaz_vec.shape == (3,)
 
         intermediate_vec = np.matmul(R_avg, radec_vec)
 
-        R_perturb = scbt.vecs2rot(r1=intermediate_vec, r2=altaz_vec)
+        R_perturb = sct.vecs2rot(r1=intermediate_vec, r2=altaz_vec)
 
-        intermediate_theta, intermediate_phi = scbt.spherical_coordinates_map(
+        intermediate_theta, intermediate_phi = sct.spherical_coordinates_map(
             R_avg, theta_radec, phi_radec)
-        R_perturb_pts = scbt.vecs2rot(theta1=intermediate_theta, phi1=intermediate_phi,
-                                      theta2=theta_altaz, phi2=phi_altaz)
+        R_perturb_pts = sct.vecs2rot(theta1=intermediate_theta, phi1=intermediate_phi,
+                                     theta2=theta_altaz, phi2=phi_altaz)
 
         assert np.allclose(R_perturb, R_perturb_pts)
 
         R_exact = np.matmul(R_perturb, R_avg)
 
-        calc_theta_altaz, calc_phi_altaz = scbt.spherical_coordinates_map(
+        calc_theta_altaz, calc_phi_altaz = sct.spherical_coordinates_map(
             R_exact, theta_radec, phi_radec)
 
         if ti == zero_indx:
@@ -120,15 +113,15 @@ def test_spherical_coordinates_map():
         else:
             assert np.isclose(calc_phi_altaz, phi_altaz)
 
-        v1 = scbt.r_hat(theta_radec, phi_radec)
-        v2 = scbt.r_hat(theta_altaz, phi_altaz)
+        v1 = sct.r_hat(theta_radec, phi_radec)
+        v2 = sct.r_hat(theta_altaz, phi_altaz)
         Rv1 = np.matmul(R_exact, v1)
         assert np.allclose(Rv1, v2)
 
-        coherency_rot_matrix_two_pt = scbt.spherical_basis_vector_rotation_matrix(
+        coherency_rot_matrix_two_pt = sct.spherical_basis_vector_rotation_matrix(
             theta_radec, phi_radec, R_exact, theta_altaz, phi_altaz)
 
-        coherency_rot_matrix_one_pt = scbt.spherical_basis_vector_rotation_matrix(
+        coherency_rot_matrix_one_pt = sct.spherical_basis_vector_rotation_matrix(
             theta_radec, phi_radec, R_exact)
 
         if ti == zero_indx:
@@ -139,21 +132,21 @@ def test_spherical_coordinates_map():
                                coherency_rot_matrix_one_pt, atol=1e-14)
 
     # check errors are raised appropriately
-    simtest.assert_raises_message(
-        ValueError, 'rot_matrix must be a 3x3 array',
-        scbt.spherical_coordinates_map, R_exact[0:1, :], theta_radec, phi_radec)
+    with pytest.raises(ValueError) as cm:
+        sct.spherical_coordinates_map(R_exact[0:1, :], theta_radec, phi_radec)
+    assert str(cm.value).startswith('rot_matrix must be a 3x3 array')
 
-    simtest.assert_raises_message(
-        ValueError, 'Either r1 and r2 must be supplied or all of',
-        scbt.vecs2rot, r1=intermediate_vec, theta2=theta_altaz, phi2=phi_altaz)
+    with pytest.raises(ValueError) as cm:
+        sct.vecs2rot(r1=intermediate_vec, theta2=theta_altaz, phi2=phi_altaz)
+    assert str(cm.value).startswith('Either r1 and r2 must be supplied or all of')
 
-    simtest.assert_raises_message(
-        ValueError, 'r1 and r2 must be length 3 vectors',
-        scbt.vecs2rot, r1=intermediate_vec[0:1], r2=altaz_vec)
+    with pytest.raises(ValueError) as cm:
+        sct.vecs2rot(r1=intermediate_vec[0:1], r2=altaz_vec)
+    assert str(cm.value).startswith('r1 and r2 must be length 3 vectors')
 
-    simtest.assert_raises_message(
-        ValueError, 'r1 and r2 must be unit vectors',
-        scbt.vecs2rot, r1=intermediate_vec * 2, r2=altaz_vec)
+    with pytest.raises(ValueError) as cm:
+        sct.vecs2rot(r1=intermediate_vec * 2, r2=altaz_vec)
+    assert str(cm.value).startswith('r1 and r2 must be unit vectors')
 
     norm = np.cross(intermediate_vec, altaz_vec)
     sinPsi = np.sqrt(np.dot(norm, norm))
@@ -161,10 +154,10 @@ def test_spherical_coordinates_map():
     cosPsi = np.dot(intermediate_vec, altaz_vec)
     Psi = np.arctan2(sinPsi, cosPsi)
 
-    simtest.assert_raises_message(
-        ValueError, 'axis must be a must be length 3 vector',
-        scbt.axis_angle_rotation_matrix, n_hat[0:1], Psi)
+    with pytest.raises(ValueError) as cm:
+        sct.axis_angle_rotation_matrix(n_hat[0:1], Psi)
+    assert str(cm.value).startswith('axis must be a must be length 3 vector')
 
-    simtest.assert_raises_message(
-        ValueError, 'axis must be a unit vector',
-        scbt.axis_angle_rotation_matrix, n_hat * 2, Psi)
+    with pytest.raises(ValueError) as cm:
+        sct.axis_angle_rotation_matrix(n_hat * 2, Psi)
+    assert str(cm.value).startswith('axis must be a unit vector')

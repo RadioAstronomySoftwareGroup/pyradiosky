@@ -2,20 +2,21 @@
 # Copyright (c) 2019 Radio Astronomy Software Group
 # Licensed under the 3-clause BSD License
 
-import numpy as np
-import sys
+import warnings
+
 import h5py
-
-import six
+import numpy as np
+from numpy.lib import recfunctions
 from scipy.linalg import orthogonal_procrustes as ortho_procr
-
 from astropy.coordinates import Angle, SkyCoord, EarthLocation, AltAz
 from astropy.time import Time
+import astropy.units as units
 from astropy.units import Quantity
+from astropy.io import votable
 import astropy_healpix
 
 from . import utils as skyutils
-from . import spherical_coordinates_basis_transformation as scbt
+from . import spherical_coords_transforms as sct
 
 
 class SkyModel(object):
@@ -59,8 +60,8 @@ class SkyModel(object):
 
     _member_funcs = ['coherency_calc', 'update_positions']
 
-    def __init__(self, name, ra, dec, stokes,
-                 Nfreqs=1, freq_array=None, rise_lst=None, set_lst=None,
+    def __init__(self, name, ra, dec, stokes, freq_array,
+                 rise_lst=None, set_lst=None,
                  spectral_type=None, pos_tol=np.finfo(float).eps):
         """
         Args:
@@ -98,7 +99,7 @@ class SkyModel(object):
 
         self.name = np.atleast_1d(np.asarray(name))
         self.freq_array = np.atleast_1d(freq_array)
-        self.Nfreqs = Nfreqs
+        self.Nfreqs = self.freq_array.size
         self.stokes = np.asarray(stokes)
         self.ra = np.atleast_1d(ra)
         self.dec = np.atleast_1d(dec)
@@ -125,7 +126,7 @@ class SkyModel(object):
             self.spectral_type = 'full'
 
         if self.Ncomponents == 1:
-            self.stokes = self.stokes.reshape(4, Nfreqs, 1)
+            self.stokes = self.stokes.reshape(4, self.Nfreqs, 1)
 
         # The coherency is a 2x2 matrix giving electric field correlation in Jy
         # Multiply by .5 to ensure that Trace sums to I not 2*I
@@ -162,20 +163,12 @@ class SkyModel(object):
         y_c = np.array([0, 1., 0])
         z_c = np.array([0, 0, 1.])
 
-        # astropy 2 vs 3 use a different keyword name
-        if six.PY2:
-            rep_keyword = 'representation'
-        else:
-            rep_keyword = 'representation_type'
-
-        rep_dict = {}
-        rep_dict[rep_keyword] = 'cartesian'
         axes_icrs = SkyCoord(x=x_c, y=y_c, z=z_c, obstime=self.time,
                              location=telescope_location, frame='icrs',
-                             **rep_dict)
+                             representation_type='cartesian')
 
         axes_altaz = axes_icrs.transform_to('altaz')
-        setattr(axes_altaz, rep_keyword, 'cartesian')
+        axes_altaz.representation_type = 'cartesian'
 
         ''' This transformation matrix is generally not orthogonal
             to better than 10^-7, so let's fix that. '''
@@ -183,7 +176,7 @@ class SkyModel(object):
         R_screwy = axes_altaz.cartesian.xyz
         R_really_orthogonal, _ = ortho_procr(R_screwy, np.eye(3))
 
-        # Note the transpose, to be consistent with calculation in scbt
+        # Note the transpose, to be consistent with calculation in sct
         R_really_orthogonal = np.array(R_really_orthogonal).T
 
         return R_really_orthogonal
@@ -206,22 +199,23 @@ class SkyModel(object):
         # Find mathematical points and vectors for RA/Dec
         theta_radec = np.pi / 2. - self.dec.rad
         phi_radec = self.ra.rad
-        radec_vec = scbt.r_hat(theta_radec, phi_radec)
+        radec_vec = sct.r_hat(theta_radec, phi_radec)
         assert radec_vec.shape == (3, self.Ncomponents)
 
         # Find mathematical points and vectors for Alt/Az
         theta_altaz = np.pi / 2. - self.alt_az[0, :]
         phi_altaz = self.alt_az[1, :]
-        altaz_vec = scbt.r_hat(theta_altaz, phi_altaz)
+        altaz_vec = sct.r_hat(theta_altaz, phi_altaz)
         assert altaz_vec.shape == (3, self.Ncomponents)
 
         R_avg = self._calc_average_rotation_matrix(telescope_location)
 
         R_exact = np.zeros((3, 3, self.Ncomponents), dtype=np.float)
+
         for src_i in range(self.Ncomponents):
             intermediate_vec = np.matmul(R_avg, radec_vec[:, src_i])
 
-            R_perturb = scbt.vecs2rot(r1=intermediate_vec, r2=altaz_vec[:, src_i])
+            R_perturb = sct.vecs2rot(r1=intermediate_vec, r2=altaz_vec[:, src_i])
 
             R_exact[:, :, src_i] = np.matmul(R_perturb, R_avg)
 
@@ -254,7 +248,7 @@ class SkyModel(object):
 
         coherency_rot_matrix = np.zeros((2, 2, self.Ncomponents), dtype=np.float)
         for src_i in range(self.Ncomponents):
-            coherency_rot_matrix[:, :, src_i] = scbt.spherical_basis_vector_rotation_matrix(
+            coherency_rot_matrix[:, :, src_i] = sct.spherical_basis_vector_rotation_matrix(
                 theta_radec[src_i], phi_radec[src_i],
                 basis_rotation_matrix[:, :, src_i],
                 theta_altaz[src_i], phi_altaz[src_i])
@@ -386,10 +380,10 @@ def read_healpix_hdf5(hdf5_filename):
     freqs : array_like, float
         Frequencies in Hz. Shape (Nfreqs)
     """
-    f = h5py.File(hdf5_filename, 'r')
-    hpmap = f['data'][0, ...]    # Remove Nskies axis.
-    indices = f['indices'][()]
-    freqs = f['freqs'][()]
+    with h5py.File(hdf5_filename, 'r') as file:
+        hpmap = file['data'][0, ...]    # Remove Nskies axis.
+        indices = file['indices'][()]
+        freqs = file['freqs'][()]
     return hpmap, indices, freqs
 
 
@@ -419,12 +413,11 @@ def healpix_to_sky(hpmap, indices, freqs):
     ra, dec = astropy_healpix.healpix_to_lonlat(indices, Nside)
     freq = Quantity(freqs, 'hertz')
     stokes = np.zeros((4, len(freq), len(indices)))
-    stokes[0] = (hpmap.T / skyutils.jy2Tsr(freq,
-                                           bm=astropy_healpix.nside_to_pixel_area(Nside), mK=False)
-                 ).T
-    sky = SkyModel(indices.astype('str'), ra, dec, stokes, freq_array=freq, Nfreqs=len(freq))
-    return sky
+    stokes[0] = (hpmap.T / skyutils.jy_to_ksr(freq)).T
+    stokes[0] = stokes[0] * astropy_healpix.nside_to_pixel_area(Nside)
 
+    sky = SkyModel(indices.astype('str'), ra, dec, stokes, freq)
+    return sky
 
 
 def skymodel_to_array(sky):
@@ -470,8 +463,8 @@ def array_to_skymodel(catalog_table):
         rise_lst = catalog_table['rise_lst']
         set_lst = catalog_table['set_lst']
 
-    sourcelist = SkyModel(ids, ra, dec, stokes, Nfreqs=source_freqs.size,
-                          freq_array=source_freqs, rise_lst=rise_lst, set_lst=set_lst)
+    sourcelist = SkyModel(ids, ra, dec, stokes, source_freqs,
+                          rise_lst=rise_lst, set_lst=set_lst)
 
     return sourcelist
 
@@ -548,7 +541,8 @@ def source_cuts(catalog_table, latitude_deg=None, horizon_buffer=0.04364,
     return catalog_table
 
 
-def read_votable_catalog(gleam_votable, input_uv=None, source_select_kwds={}, return_table=False):
+def read_votable_catalog(gleam_votable, source_select_kwds={},
+                         return_table=False):
     """
     Creates a list of pyuvsim source objects from a votable catalog.
 
@@ -557,8 +551,6 @@ def read_votable_catalog(gleam_votable, input_uv=None, source_select_kwds={}, re
     Args:
         gleam_votable: str
             Path to votable catalog file.
-        input_uv: :class:`~pyuvdata.UVData` object
-            The UVData object for the simulation (needed for horizon cuts)
         return_table: bool, optional
             Whether to return the astropy table instead of a list of Source objects.
         source_select_kwds: dict, optional
@@ -580,7 +572,7 @@ def read_votable_catalog(gleam_votable, input_uv=None, source_select_kwds={}, re
     class Found(Exception):
         pass
 
-    resources = parse(gleam_votable).resources
+    resources = votable.parse(gleam_votable).resources
     try:
         for rs in resources:
             for tab in rs.tables:
@@ -602,7 +594,7 @@ def read_votable_catalog(gleam_votable, input_uv=None, source_select_kwds={}, re
     data = data.as_array().data
 
     if len(source_select_kwds) > 0:
-        data = source_cuts(data, input_uv=input_uv, **source_select_kwds)
+        data = source_cuts(data, **source_select_kwds)
 
     if return_table:
         return data
@@ -610,7 +602,7 @@ def read_votable_catalog(gleam_votable, input_uv=None, source_select_kwds={}, re
     return array_to_skymodel(data)
 
 
-def read_text_catalog(catalog_csv, input_uv=None, source_select_kwds={}, return_table=False):
+def read_text_catalog(catalog_csv, source_select_kwds={}, return_table=False):
     """
     Read in a text file of sources.
 
@@ -625,8 +617,6 @@ def read_text_catalog(catalog_csv, input_uv=None, source_select_kwds={}, return_
             *  `flux_density_I`: Stokes I flux density in Janskys
             *  `frequency`: reference frequency (for future spectral indexing) [Hz]
 
-        input_uv: :class:`pyuvdata.UVData` object
-            The UVData object for the simulation (needed for horizon cuts)
         source_select_kwds: dict, optional
             Dictionary of keywords for source selection. Valid options:
 
@@ -655,7 +645,7 @@ def read_text_catalog(catalog_csv, input_uv=None, source_select_kwds={}, return_
     catalog_table = np.atleast_1d(catalog_table)
 
     if len(source_select_kwds) > 0:
-        catalog_table = source_cuts(catalog_table, input_uv=input_uv, **source_select_kwds)
+        catalog_table = source_cuts(catalog_table, **source_select_kwds)
 
     if return_table:
         return catalog_table

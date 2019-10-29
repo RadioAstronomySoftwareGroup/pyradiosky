@@ -289,3 +289,4 @@ def vecs2rot(r1=None, r2=None, theta1=None, phi1=None, theta2=None, phi2=None):
     assert verify_is_unit_vector(n_hat), 'n_hat is not a unit vector: ' + str(n_hat)
     assert verify_is_orthogonal(rotation), ('rotation matrix is not orthogonal: '
                                             + str(rotation))
+    return rotation

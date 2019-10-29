@@ -4,21 +4,24 @@
 
 import os
 
+import pytest
 import numpy as np
-import astropy.constants as const
+import h5py
 import astropy_healpix
+import astropy
 from astropy import units
 from astropy.coordinates import SkyCoord, EarthLocation, Angle, AltAz
 from astropy.time import Time
 
-from pyuvdata import UVData
 import pyuvdata.tests as uvtest
 
-from pyradiosky import SkyModel
 from pyradiosky.data import DATA_PATH as SKY_DATA_PATH
 from pyradiosky import utils as skyutils
 # this should be fixed in future:
-import * from pyradiosky.skymodel
+from pyradiosky.skymodel import *
+
+GLEAM_vot = os.path.join(SKY_DATA_PATH, 'gleam_50srcs.vot')
+
 
 def test_source_zenith_from_icrs():
     """Test single source position at zenith constructed using icrs."""
@@ -40,17 +43,17 @@ def test_source_zenith_from_icrs():
     dec = icrs_coord.dec
     # Check error cases
     with pytest.raises(ValueError) as cm:
-        SkyModel('icrs_zen', ra.rad, dec.rad, [1, 0, 0, 0])
+        SkyModel('icrs_zen', ra.rad, dec.rad, [1, 0, 0, 0], 1e8)
     assert str(cm.value).startswith('ra must be an astropy Angle object. '
                                     'value was: 3.14')
 
 
     with pytest.raises(ValueError) as cm:
-        SkyModel('icrs_zen', ra, dec.rad, [1, 0, 0, 0])
+        SkyModel('icrs_zen', ra, dec.rad, [1, 0, 0, 0], 1e8)
     assert str(cm.value).startswith('dec must be an astropy Angle object. '
                                     'value was: -0.53')
 
-    zenith_source = pyuvsim.SkyModel('icrs_zen', ra, dec, [1, 0, 0, 0])
+    zenith_source = SkyModel('icrs_zen', ra, dec, [1, 0, 0, 0], 1e8)
 
     zenith_source.update_positions(time, array_location)
     zenith_source_lmn = zenith_source.pos_lmn.squeeze()
@@ -64,7 +67,7 @@ def test_source_zenith():
     array_location = EarthLocation(lat='-30d43m17.5s', lon='21d25m41.9s',
                                    height=1073.)
 
-    source_coord = SkyCoord(alt=Angle(0, unit=units.deg), az=Angle(90, unit=units.deg),
+    source_coord = SkyCoord(alt=Angle(90, unit=units.deg), az=Angle(0, unit=units.deg),
                             obstime=time, frame='altaz', location=array_location)
     icrs_coord = source_coord.transform_to('icrs')
 
@@ -91,7 +94,7 @@ def test_calc_basis_rotation_matrix():
     telescope_location = EarthLocation(lat='-30d43m17.5s', lon='21d25m41.9s', height=1073.)
 
     source = SkyModel('Test', Angle(12. * units.hr),
-                      Angle(-30. * units.deg), [1., 0., 0., 0.])
+                      Angle(-30. * units.deg), [1., 0., 0., 0.], 1e8)
     source.update_positions(time, telescope_location)
 
     basis_rot_matrix = source._calc_average_rotation_matrix(telescope_location)
@@ -110,7 +113,7 @@ def test_calc_vector_rotation():
     telescope_location = EarthLocation(lat='-30d43m17.5s', lon='21d25m41.9s', height=1073.)
 
     source = SkyModel('Test', Angle(12. * units.hr),
-                      Angle(-30. * units.deg), [1., 0., 0., 0.])
+                      Angle(-30. * units.deg), [1., 0., 0., 0.], 1e8)
     source.update_positions(time, telescope_location)
 
     coherency_rotation = np.squeeze(source._calc_coherency_rotation(telescope_location))
@@ -159,7 +162,7 @@ def test_polarized_source_visibilities():
     raoff = 0.0 * units.arcsec
 
     source = SkyModel('icrs_zen', zenith_icrs.ra + raoff,
-                      zenith_icrs.dec + decoff, stokes_radec)
+                      zenith_icrs.dec + decoff, stokes_radec, 1e8)
 
     coherency_matrix_local = np.zeros([2, 2, ntimes], dtype='complex128')
     alts = np.zeros(ntimes)
@@ -222,7 +225,7 @@ def test_polarized_source_smooth_visibilities():
 
     stokes_radec = [1, -0.2, 0.3, 0.1]
 
-    source = SkyModel('icrs_zen', zenith_icrs.ra, zenith_icrs.dec, stokes_radec)
+    source = SkyModel('icrs_zen', zenith_icrs.ra, zenith_icrs.dec, stokes_radec, 1e8)
 
     coherency_matrix_local = np.zeros([2, 2, ntimes], dtype='complex128')
     alts = np.zeros(ntimes)
@@ -257,7 +260,7 @@ def test_polarized_source_smooth_visibilities():
             assert np.max(np.abs(imag_derivative_diff)) < 1e-6
 
     # test that the stokes coherencies are smooth
-    stokes_instr_local = simutils.coherency_to_stokes(coherency_instr_local)
+    stokes_instr_local = skyutils.coherency_to_stokes(coherency_instr_local)
     for pol_i in range(4):
         real_stokes = stokes_instr_local[pol_i, :].real
         real_derivative = np.diff(real_stokes) / t_diff_sec
@@ -291,20 +294,21 @@ def test_read_healpix_hdf5():
 
     frequencies = np.linspace(100, 110, 10)
 
-    hpmap, inds, freqs = pyuvsim.source.read_healpix_hdf5(
-        os.path.join(SKY_DATA_PATH, 'test_file.hdf5')
+    hpmap, inds, freqs = read_healpix_hdf5(
+        os.path.join(SKY_DATA_PATH, 'healpix_disk.hdf5')
     )
 
     assert np.allclose(hpmap[0, :], m)
     assert np.allclose(inds, indices)
     assert np.allclose(freqs, frequencies)
 
+
 def test_healpix_to_sky():
     Nside = 32
     Npix = astropy_healpix.nside_to_npix(Nside)
     # vec = hp.ang2vec(np.pi / 2, np.pi * 3 / 4)
     # ipix_disc = hp.query_disc(nside=32, vec=vec, radius=np.radians(10))
-    m = np.arange(Npix)
+    hmap_orig = np.arange(Npix)
     ipix_disc = [5103, 5104, 5231, 5232, 5233, 5358, 5359, 5360, 5361, 5486, 5487, 5488, 5489, 5490,
                  5613, 5614, 5615, 5616, 5617, 5618, 5741, 5742, 5743, 5744, 5745, 5746, 5747, 5869,
                  5870, 5871, 5872, 5873, 5874, 5997, 5998, 5999, 6000, 6001, 6002, 6003, 6124, 6125,
@@ -312,28 +316,29 @@ def test_healpix_to_sky():
                  6382, 6383, 6384, 6385, 6386, 6509, 6510, 6511, 6512, 6513, 6514, 6515, 6637, 6638,
                  6639, 6640, 6641, 6642, 6766, 6767, 6768, 6769, 6770, 6894, 6895, 6896, 6897, 7023,
                  7024, 7025, 7151, 7152]
-    m[ipix_disc] = m.max()
+    hmap_orig[ipix_disc] = hmap_orig.max()
 
-    m = np.repeat(m[None, :], 10, axis=0)
-    hpmap, inds, freqs = pyuvsim.source.read_healpix_hdf5(
-        os.path.join(SKY_DATA_PATH, 'test_file.hdf5')
+    hmap_orig = np.repeat(hmap_orig[None, :], 10, axis=0)
+    hpmap, inds, freqs = read_healpix_hdf5(
+        os.path.join(SKY_DATA_PATH, 'healpix_disk.hdf5')
     )
-    m = (m.T / simutils.jy2Tsr(freqs, bm=astropy_healpix.nside_to_pixel_area(Nside), mK=False)).T
-    sky = pyuvsim.source.healpix_to_sky(hpmap, inds, freqs)
+    hmap_orig = (hmap_orig.T / skyutils.jy_to_ksr(freqs)).T
+    hmap_orig = hmap_orig * astropy_healpix.nside_to_pixel_area(Nside)
+    sky = healpix_to_sky(hpmap, inds, freqs)
 
-    assert np.allclose(sky.stokes[0], m.value)
+    assert np.allclose(sky.stokes[0], hmap_orig.value)
 
 
 def test_units_healpix_to_sky():
     Nside = 32
     beam_area = astropy_healpix.nside_to_pixel_area(Nside)  # * units.sr
     # beam_area = hp.pixelfunc.nside2pixarea(Nside) * units.sr
-    hpmap, inds, freqs = pyuvsim.source.read_healpix_hdf5(
-        os.path.join(SKY_DATA_PATH, 'test_file.hdf5')
+    hpmap, inds, freqs = read_healpix_hdf5(
+        os.path.join(SKY_DATA_PATH, 'healpix_disk.hdf5')
     )
     freqs = freqs * units.Hz
     stokes = (hpmap.T * units.K).to(units.Jy, units.brightness_temperature(beam_area, freqs)).T
-    sky = pyuvsim.source.healpix_to_sky(hpmap, inds, freqs)
+    sky = healpix_to_sky(hpmap, inds, freqs)
 
     assert np.allclose(sky.stokes[0, 0], stokes.value[0])
 
@@ -356,7 +361,7 @@ def test_healpix_positions():
     for i in range(0, Nfreqs):
         dataset[0, i, :] = hpx_map[:, i]
 
-    filename = os.path.join(SKY_DATA_PATH, 'test_file.hdf5')
+    filename = os.path.join(SKY_DATA_PATH, 'healpix_single.hdf5')
 
     valid_params = {'Npix': Npix, 'Nside': Nside, 'Nskies': Nskies,
                     'Nfreqs': Nfreqs, 'data': dataset,
@@ -365,18 +370,19 @@ def test_healpix_positions():
     dsets = {'data': np.float64, 'indices': np.int32, 'freqs': np.float64,
              'history': h5py.special_dtype(vlen=str)}
 
+    history_string = ''
     with h5py.File(filename, 'w') as fileobj:
-        for k in self.valid_params:
+        for k in valid_params:
             d = valid_params[k]
             if k == 'history':
-                d += history_string()
-            if k in self.dsets:
+                d += history_string
+            if k in dsets:
                 if np.isscalar(d):
                     dset = fileobj.create_dataset(
-                        k, data=d, dtype=self.dsets[k])
+                        k, data=d, dtype=dsets[k])
                 else:
                     dset = fileobj.create_dataset(
-                        k, data=d, dtype=self.dsets[k], compression='gzip',
+                        k, data=d, dtype=dsets[k], compression='gzip',
                         compression_opts=9)
             else:
                 fileobj.attrs[k] = d
@@ -399,6 +405,7 @@ def test_healpix_positions():
     src_n = np.cos(src_za.rad)
 
     hpmap_hpx, indices_hpx, freqs_hpx = read_healpix_hdf5(filename)
+    os.remove(filename)
 
     sky_hpx = healpix_to_sky(hpmap_hpx, indices_hpx, freqs_hpx)
 
@@ -414,23 +421,25 @@ def test_healpix_positions():
     assert np.isclose(src_lmn[1][ipix], src_m)
     assert np.isclose(src_lmn[2][ipix], src_n)
 
-
 def test_param_flux_cuts():
     # Check that min/max flux limits in test params work.
 
-    gleam_path = os.path.join(SKY_DATA_PATH, 'test_config', '..', 'gleam_50srcs.vot')
-    catalog, srclistname = uvtest.checkWarnings(
-        pyuvsim.simsetup.initialize_catalog_from_params, [gleam_param_file],
-        message=gleam_path, nwarnings=11,
-        category=[astropy.io.votable.exceptions.W27] + [astropy.io.votable.exceptions.W50] * 10
+    catalog_table = uvtest.checkWarnings(
+        read_votable_catalog, func_args=[GLEAM_vot],
+        func_kwargs={'return_table': True}, message=GLEAM_vot, nwarnings=11,
+        category=([astropy.io.votable.exceptions.W27]
+                  + [astropy.io.votable.exceptions.W50] * 10)
     )
 
-    catalog = array_to_skymodel(catalog)
+    catalog_table = source_cuts(catalog_table, min_flux=0.2, max_flux=1.5)
+
+    catalog = array_to_skymodel(catalog_table)
     for sI in catalog.stokes[0, 0, :]:
         assert np.all(0.2 < sI < 1.5)
 
+
 def test_point_catalog_reader():
-    catfile = os.path.join(SKY_DATA_PATH, 'test_config', 'pointsource_catalog.txt')
+    catfile = os.path.join(SKY_DATA_PATH, 'pointsource_catalog.txt')
     srcs = read_text_catalog(catfile)
 
     with open(catfile, 'r') as fhandle:
@@ -481,8 +490,94 @@ def test_flux_cuts():
     minI_cut = 1.0
     maxI_cut = 2.3
 
-    cut_sourcelist = pyuvsim.simsetup.source_cuts(
+    cut_sourcelist = source_cuts(
         catalog_table, latitude_deg=30., min_flux=minI_cut, max_flux=maxI_cut
     )
     assert np.all(cut_sourcelist['flux_density_I'] > minI_cut)
     assert np.all(cut_sourcelist['flux_density_I'] < maxI_cut)
+
+def test_circumpolar_nonrising():
+    # Check that the source_cut function correctly identifies sources that are circumpolar or
+    # won't rise.
+    # Working with an observatory at the HERA latitude
+
+    lat = -31.0
+    lon = 0.0
+
+    Ntimes = 100
+    Nsrcs = 50
+
+    j2000 = 2451545.0
+    times = Time(np.linspace(j2000 - 0.5, j2000 + 0.5, Ntimes), format='jd', scale='utc')
+
+    ra = np.zeros(Nsrcs)
+    dec = np.linspace(-90, 90, Nsrcs)
+
+    ra = Angle(ra, units.deg)
+    dec = Angle(dec, units.deg)
+
+    coord = SkyCoord(ra=ra, dec=dec, frame='icrs')
+    alts = []
+    azs = []
+
+    loc = EarthLocation.from_geodetic(lat=lat, lon=lon)
+    for i in range(Ntimes):
+        altaz = coord.transform_to(AltAz(obstime=times[i], location=loc))
+        alts.append(altaz.alt.deg)
+        azs.append(altaz.az.deg)
+    alts = np.array(alts)
+
+    nonrising = np.where(np.all(alts < 0, axis=0))[0]
+    circumpolar = np.where(np.all(alts > 0, axis=0))[0]
+
+    tans = np.tan(np.radians(lat)) * np.tan(dec.rad)
+    nonrising_check = np.where(tans < -1)
+    circumpolar_check = np.where(tans > 1)
+    assert np.all(circumpolar_check == circumpolar)
+    assert np.all(nonrising_check == nonrising)
+
+
+def test_read_gleam():
+    sourcelist = uvtest.checkWarnings(
+        read_votable_catalog, [GLEAM_vot],
+        message=GLEAM_vot, nwarnings=11,
+        category=[astropy.io.votable.exceptions.W27] + [astropy.io.votable.exceptions.W50] * 10
+    )
+
+    assert sourcelist.Ncomponents == 50
+
+    # Check cuts
+    source_select_kwds = {'min_flux': 1.0}
+    catalog = uvtest.checkWarnings(
+        read_votable_catalog, [GLEAM_vot],
+        dict(source_select_kwds=source_select_kwds, return_table=True),
+        message=GLEAM_vot, nwarnings=11,
+        category=[astropy.io.votable.exceptions.W27] + [astropy.io.votable.exceptions.W50] * 10
+    )
+
+    assert len(catalog) < sourcelist.Ncomponents
+
+
+def test_catalog_file_writer():
+    time = Time(2458098.27471265, scale='utc', format='jd')
+    array_location = EarthLocation(lat='-30d43m17.5s', lon='21d25m41.9s',
+                                   height=1073.)
+
+    source_coord = SkyCoord(alt=Angle(90, unit=units.deg), az=Angle(0, unit=units.deg),
+                            obstime=time, frame='altaz', location=array_location)
+    icrs_coord = source_coord.transform_to('icrs')
+
+    ra = icrs_coord.ra
+    dec = icrs_coord.dec
+
+    names = 'zen_source'
+    stokes = [1, 0, 0, 0]
+    freqs = [1e8]
+    zenith_source = SkyModel(names, ra, dec, stokes, freq_array=freqs)
+
+    fname = os.path.join(SKY_DATA_PATH, 'temp_cat.txt')
+
+    write_catalog_to_file(fname, zenith_source)
+    zenith_loop = read_text_catalog(fname)
+    assert np.all(zenith_loop == zenith_source)
+    os.remove(fname)
