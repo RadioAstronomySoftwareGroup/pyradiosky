@@ -19,18 +19,32 @@ from . import utils as skyutils
 from . import spherical_coords_transforms as sct
 
 
+# Nov 5 2019 notes
+#    Read/write methods to add:
+#        FHD save file -- (read only)
+#        VOTable -- (needs a write method)
+#        HDF5 HEALPix --- (needs a write method)
+#        HEALPix fits files
+
+#    Convert stokes and coherency to Astropy quantities.
+
+
 class SkyModel(object):
     """
     Defines a set of point source components at given ICRS ra/dec coordinates, with a
     flux densities defined by stokes parameters.
 
-    Used to calculate local coherency matrix for source brightness in AltAz
-    frame at a specified time.
+    The attribute Ncomponents gives the number of source components.
+
+    Contains methods to:
+        - Read and write different catalog formats.
+        - Calculate source positions.
+        - Calculate local coherency matrix in the AltAz frame.
 
     Parameters
     ----------
     name : array_like of str
-        Unique identifier for the source.
+        Unique identifier for each source component, shape (Ncomponents,).
     ra : astropy Angle object
         source RA in J2000 (or ICRS) coordinates, shape (Ncomponents,).
     dec : astropy Angle object
@@ -39,6 +53,13 @@ class SkyModel(object):
         4 element vector giving the source [I, Q, U, V], shape (4, Ncomponents).
     freq : astropy Quantity
         Reference frequencies of flux values, shape (Ncomponents,).
+    spectral_type : str
+        Indicates how fluxes should be calculated at each frequency.
+        Options :
+            - 'flat' : Flat spectrum.
+            - 'full' : Flux is defined by a saved value at each frequency.
+            - 'subband' : Flux is given at a set of band centers. (TODO)
+            - 'spectral_index' : Flux is given at a reference frequency. (TODO)
     rise_lst : array_like of float
         Approximate lst (radians) when the source rises, shape (Ncomponents,).
         Set by coarse horizon cut in simsetup.
@@ -60,32 +81,8 @@ class SkyModel(object):
 
     _member_funcs = ['coherency_calc', 'update_positions']
 
-    def __init__(self, name, ra, dec, stokes, freq_array,
-                 rise_lst=None, set_lst=None,
-                 spectral_type=None, pos_tol=np.finfo(float).eps):
-        """
-        Args:
-            name: Unique identifier for the source.
-            ra: astropy Angle object, shape (Ncomponents,)
-                source RA in J2000 (or ICRS) coordinates
-            dec: astropy Angle object, shape (Ncomponents,)
-                source Dec in J2000 (or ICRS) coordinates
-            stokes: shape (4, Nfreqs, Ncomponents)
-                4 element vector giving the source [I, Q, U, V]
-            Nfreqs: (integer)
-                length of frequency axis
-            freq_array: shape(Nfreqs,)
-                corresponding frequencies for each flux density
-            rise_lst: (float), shape (Ncomponents,)
-                Approximate lst (radians) when the source rises.
-                Set by coarse horizon cut in simsetup.
-                Default is nan, meaning the source never rises.
-            set_lst: (float), shape (Ncomponents,)
-                Approximate lst (radians) when the source sets.
-                Default is None, meaning the source never sets.
-            pos_tol: float, defaults to minimum float in numpy
-                position tolerance in degrees
-        """
+    def __init__(self, name, ra, dec, stokes, freq_array, spectral_type,
+                 rise_lst=None, set_lst=None, pos_tol=np.finfo(float).eps):
 
         if not isinstance(ra, Angle):
             raise ValueError('ra must be an astropy Angle object. '
@@ -117,13 +114,6 @@ class SkyModel(object):
 
         self.horizon_mask = np.zeros(self.Ncomponents).astype(
             bool)  # If true, source component is below horizon.
-
-        # TODO -- Need a way of passing the spectral_type from catalog to each rank.
-        # For now, if there are multiple frequencies, assume we have one per simulation frequency.
-        if self.spectral_type is None:
-            self.spectral_type = 'flat'
-        if self.Nfreqs > 1:
-            self.spectral_type = 'full'
 
         if self.Ncomponents == 1:
             self.stokes = self.stokes.reshape(4, self.Nfreqs, 1)
@@ -416,7 +406,7 @@ def healpix_to_sky(hpmap, indices, freqs):
     stokes[0] = (hpmap.T / skyutils.jy_to_ksr(freq)).T
     stokes[0] = stokes[0] * astropy_healpix.nside_to_pixel_area(Nside)
 
-    sky = SkyModel(indices.astype('str'), ra, dec, stokes, freq)
+    sky = SkyModel(indices.astype('str'), ra, dec, stokes, freq, 'full')
     return sky
 
 
@@ -463,7 +453,10 @@ def array_to_skymodel(catalog_table):
         rise_lst = catalog_table['rise_lst']
         set_lst = catalog_table['set_lst']
 
-    sourcelist = SkyModel(ids, ra, dec, stokes, source_freqs,
+    spectral_type = 'flat'
+    if source_freqs.size > 1:
+        spectral_type = 'full'
+    sourcelist = SkyModel(ids, ra, dec, stokes, source_freqs, spectral_type,
                           rise_lst=rise_lst, set_lst=set_lst)
 
     return sourcelist
@@ -669,3 +662,5 @@ def write_catalog_to_file(filename, catalog):
 
             fo.write("{}\t{:f}\t{:f}\t{:0.2f}\t{:0.2f}\n".format(
                 srcid, ra, dec, flux_i[0], freq[0]))
+
+

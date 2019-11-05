@@ -43,17 +43,17 @@ def test_source_zenith_from_icrs():
     dec = icrs_coord.dec
     # Check error cases
     with pytest.raises(ValueError) as cm:
-        SkyModel('icrs_zen', ra.rad, dec.rad, [1, 0, 0, 0], 1e8)
+        SkyModel('icrs_zen', ra.rad, dec.rad, [1, 0, 0, 0], 1e8, 'flat')
     assert str(cm.value).startswith('ra must be an astropy Angle object. '
                                     'value was: 3.14')
 
 
     with pytest.raises(ValueError) as cm:
-        SkyModel('icrs_zen', ra, dec.rad, [1, 0, 0, 0], 1e8)
+        SkyModel('icrs_zen', ra, dec.rad, [1, 0, 0, 0], 1e8, 'flat')
     assert str(cm.value).startswith('dec must be an astropy Angle object. '
                                     'value was: -0.53')
 
-    zenith_source = SkyModel('icrs_zen', ra, dec, [1, 0, 0, 0], 1e8)
+    zenith_source = SkyModel('icrs_zen', ra, dec, [1, 0, 0, 0], 1e8, 'flat')
 
     zenith_source.update_positions(time, array_location)
     zenith_source_lmn = zenith_source.pos_lmn.squeeze()
@@ -77,7 +77,7 @@ def test_source_zenith():
     names = 'zen_source'
     stokes = [1, 0, 0, 0]
     freqs = [1e8]
-    zenith_source = SkyModel(names, ra, dec, stokes, freq_array=freqs)
+    zenith_source = SkyModel(names, ra, dec, stokes, freqs, 'flat')
 
     zenith_source.update_positions(time, array_location)
     zenith_source_lmn = zenith_source.pos_lmn.squeeze()
@@ -94,7 +94,7 @@ def test_calc_basis_rotation_matrix():
     telescope_location = EarthLocation(lat='-30d43m17.5s', lon='21d25m41.9s', height=1073.)
 
     source = SkyModel('Test', Angle(12. * units.hr),
-                      Angle(-30. * units.deg), [1., 0., 0., 0.], 1e8)
+                      Angle(-30. * units.deg), [1., 0., 0., 0.], 1e8, 'flat')
     source.update_positions(time, telescope_location)
 
     basis_rot_matrix = source._calc_average_rotation_matrix(telescope_location)
@@ -113,7 +113,7 @@ def test_calc_vector_rotation():
     telescope_location = EarthLocation(lat='-30d43m17.5s', lon='21d25m41.9s', height=1073.)
 
     source = SkyModel('Test', Angle(12. * units.hr),
-                      Angle(-30. * units.deg), [1., 0., 0., 0.], 1e8)
+                      Angle(-30. * units.deg), [1., 0., 0., 0.], 1e8, 'flat')
     source.update_positions(time, telescope_location)
 
     coherency_rotation = np.squeeze(source._calc_coherency_rotation(telescope_location))
@@ -162,7 +162,7 @@ def test_polarized_source_visibilities():
     raoff = 0.0 * units.arcsec
 
     source = SkyModel('icrs_zen', zenith_icrs.ra + raoff,
-                      zenith_icrs.dec + decoff, stokes_radec, 1e8)
+                      zenith_icrs.dec + decoff, stokes_radec, 1e8, 'flat')
 
     coherency_matrix_local = np.zeros([2, 2, ntimes], dtype='complex128')
     alts = np.zeros(ntimes)
@@ -225,7 +225,7 @@ def test_polarized_source_smooth_visibilities():
 
     stokes_radec = [1, -0.2, 0.3, 0.1]
 
-    source = SkyModel('icrs_zen', zenith_icrs.ra, zenith_icrs.dec, stokes_radec, 1e8)
+    source = SkyModel('icrs_zen', zenith_icrs.ra, zenith_icrs.dec, stokes_radec, 1e8, 'flat')
 
     coherency_matrix_local = np.zeros([2, 2, ntimes], dtype='complex128')
     alts = np.zeros(ntimes)
@@ -573,7 +573,7 @@ def test_catalog_file_writer():
     names = 'zen_source'
     stokes = [1, 0, 0, 0]
     freqs = [1e8]
-    zenith_source = SkyModel(names, ra, dec, stokes, freq_array=freqs)
+    zenith_source = SkyModel(names, ra, dec, stokes, freqs, 'flat')
 
     fname = os.path.join(SKY_DATA_PATH, 'temp_cat.txt')
 
