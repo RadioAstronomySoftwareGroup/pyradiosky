@@ -650,11 +650,11 @@ def read_text_catalog(catalog_csv, source_select_kwds={}, return_table=False):
 def read_idl_catalog(filename_sav, expand_extended=True):
 
     catalog = scipy.io.readsav(filename_sav)['catalog']
-    ids = catalog['ids']
+    ids = catalog['id']
     ra = catalog['ra']
     dec = catalog['dec']
     Nsrcs = len(catalog)
-    stokes = np.zeros(4, Nsrcs)
+    stokes = np.zeros((4, Nsrcs))
     for src in range(Nsrcs):
         src_flux = catalog['flux'][src]
         stokes[0, src] = src_flux['I'][0]
@@ -667,34 +667,45 @@ def read_idl_catalog(filename_sav, expand_extended=True):
     if expand_extended:
         ext_inds = np.where([
             catalog['extend'][ind] is not None for ind in range(Nsrcs)
-        ])
-        if len(ext_inds) > 0:
-            ids_ext = ids[ext_inds]
-            ids = np.delete(ids, ext_inds)
-            ra = np.delete(ra, ext_inds)
-            dec = np.delete(dec, ext_inds)
-            stokes = np.delete(stokes, ext_inds, axis=1)
-            source_freq = np.delete(source_freqs, ext_inds)
-            spectral_index = np.delete(spectral_index, ext_inds)
-            # Add component information and preserve ordering
-            for ind, ext in enumerate(np.flip(ext_inds)):
+        ])[0]
+        if len(ext_inds) > 0:  # Add components and preserve ordering
+            source_inds = np.array(range(Nsrcs))
+            for ext in ext_inds:
+                use_index = np.where(source_inds==ext)[0][0]
+                source_id = ids[use_index]
+                # Remove top-level source information
+                ids = np.delete(ids, ext)
+                ra = np.delete(ra, ext)
+                dec = np.delete(dec, ext)
+                stokes = np.delete(stokes, ext, axis=1)
+                source_freq = np.delete(source_freqs, ext)
+                spectral_index = np.delete(spectral_index, ext)
+                source_inds = np.delete(source_inds, ext)
+                # Add component information
                 src = catalog[ext]['extend']
                 Ncomps = len(src)
-                ids = np.insert(ids, ext,
-                                np.full(Ncomps, np.flip(ids_ext)[ind]))
-                ra = np.insert(ra, ext, src['ra'])
-                dec = np.insert(dec, ext, src['dec'])
-                stokes_ext = np.zeros(4, Ncomps)
+                ids = np.insert(ids, use_index, np.full(Ncomps, source_id))
+                ra = np.insert(ra, use_index,src['ra'])
+                dec = np.insert(dec, use_index, src['dec'])
+                stokes_ext = np.zeros((4, Ncomps))
                 for comp in range(Ncomps):
                     comp_flux = src['flux'][comp]
                     stokes_ext[0, comp] = comp_flux['I'][0]
                     stokes_ext[1, comp] = comp_flux['Q'][0]
                     stokes_ext[2, comp] = comp_flux['U'][0]
                     stokes_ext[3, comp] = comp_flux['V'][0]
-                stokes = np.insert(stokes, ext, stokes_ext, axis=1)
-                source_freqs = np.insert(source_freqs, ext, src['freq'])
-                spectral_index = np.insert(spectral_index, ext, src['alpha'])
+                stokes = np.concatenate((  # np.insert doesn't work with arrays
+                    np.concatenate((stokes[:, :use_index], stokes_ext),
+                    axis=1
+                ), stokes[:, use_index:]), axis=1)
+                source_freqs = np.insert(source_freqs, use_index, src['freq'])
+                spectral_index = np.insert(
+                    spectral_index, use_index, src['alpha']
+                )
+                source_inds = np.insert(source_inds, use_index, np.full(Ncomps, ext))
 
+    ra = Angle(ra, units.deg)
+    dec = Angle(dec, units.deg)
     sourcelist = SkyModel(ids, ra, dec, stokes, source_freqs,
                           spectral_type='spectral_index')
     return sourcelist
