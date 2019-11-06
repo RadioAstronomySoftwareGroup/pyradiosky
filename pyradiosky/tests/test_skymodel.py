@@ -11,6 +11,7 @@ import astropy_healpix
 from astropy import units
 from astropy.coordinates import SkyCoord, EarthLocation, Angle, AltAz
 from astropy.time import Time
+import scipy.io
 
 
 from pyradiosky.data import DATA_PATH as SKY_DATA_PATH
@@ -464,6 +465,26 @@ def test_point_catalog_reader():
         catfile, source_select_kwds=source_select_kwds, return_table=True
     )
     assert len(catalog) == 2
+
+
+def test_idl_catalog_reader():
+    catfile = os.path.join(SKY_DATA_PATH, 'fhd_catalog.sav')
+    sourcelist = read_idl_catalog(catfile, expand_extended=False)
+
+    catalog = scipy.io.readsav(catfile)['catalog']
+    assert len(sourcelist.ra) == len(catalog)
+
+
+def test_idl_catalog_reader_extended_sources():
+    catfile = os.path.join(SKY_DATA_PATH, 'fhd_catalog.sav')
+    sourcelist = read_idl_catalog(catfile, expand_extended=True)
+
+    catalog = scipy.io.readsav(catfile)['catalog']
+    ext_inds = np.where([
+        catalog['extend'][ind] is not None for ind in range(len(catalog))
+    ])
+    ext_Ncomps = [len(catalog[ext]['extend']) for ext in ext_inds]
+    assert len(sourcelist.ra) == len(catalog) - len(ext_inds) + sum(ext_Ncomps)
 
 
 def test_flux_cuts():
