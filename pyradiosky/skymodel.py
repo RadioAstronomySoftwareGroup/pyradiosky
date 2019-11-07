@@ -51,7 +51,7 @@ class SkyModel(object):
     dec : astropy Angle object
         source Dec in J2000 (or ICRS) coordinates, shape (Ncomponents,).
     stokes : array_like of float
-        4 element vector giving the source [I, Q, U, V], shape (4, Ncomponents).
+        4 element vector giving the source [I, Q, U, V], shape (4, Nfreqs, Ncomponents).
     freq : astropy Quantity
         Reference frequencies of flux values, shape (Ncomponents,).
     spectral_type : str
@@ -706,6 +706,7 @@ def read_idl_catalog(filename_sav, expand_extended=True):
 
     ra = Angle(ra, units.deg)
     dec = Angle(dec, units.deg)
+    stokes = stokes[:, np.newaxis, :]  # Add frequency axis
     sourcelist = SkyModel(ids, ra, dec, stokes, source_freqs,
                           spectral_type='spectral_index')
     return sourcelist
