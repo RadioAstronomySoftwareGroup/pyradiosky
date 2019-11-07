@@ -128,7 +128,7 @@ class SkyModel(object):
         self.time = None
 
         assert np.all(
-            [self.Ncomponents == l for l in [self.ra.size, self.dec.size, self.stokes.shape[1]]]
+            [self.Ncomponents == l for l in [self.ra.size, self.dec.size, self.stokes.shape[2]]]
         ), 'Inconsistent quantity dimensions.'
 
     def _calc_average_rotation_matrix(self, telescope_location):
