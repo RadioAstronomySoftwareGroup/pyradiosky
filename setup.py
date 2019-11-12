@@ -11,12 +11,16 @@ from setuptools import setup
 import json
 
 sys.path.append('pyradiosky')
-import version  # noqa
+# import version  # noqa
 
 
-data = [version.git_origin, version.git_hash, version.git_description, version.git_branch]
-with open(os.path.join('pyuvdata', 'GIT_INFO'), 'w') as outfile:
-    json.dump(data, outfile)
+# data = [version.git_origin, version.git_hash, version.git_description, version.git_branch]
+# with open(os.path.join('pyradiosky', 'GIT_INFO'), 'w') as outfile:
+#     json.dump(data, outfile)
+class mock_version(object):
+    version = 0.0
+
+version = mock_version()
 
 with io.open('README.md', 'r', encoding='utf-8') as readme_file:
     readme = readme_file.read()
@@ -34,9 +38,9 @@ setup_args = {
     'scripts': glob.glob('scripts/*'),
     'version': version.version,
     'include_package_data': True,
-    'install_requires': ['numpy>=1.15', 'scipy', 'astropy>=2.0'],
+    'install_requires': ['numpy>=1.15', 'scipy', 'astropy>=3.0'],
     'tests_require': ['pytest'],
-    'extras_require': {'healpix': ['healpy']},
+    'extras_require': {'healpix': ['astropy-healpix']},
     'classifiers': ['Development Status :: 1 - Planning',
                     'Intended Audience :: Science/Research',
                     'License :: OSI Approved :: BSD License',
