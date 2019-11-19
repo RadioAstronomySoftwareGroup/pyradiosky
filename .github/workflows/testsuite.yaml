@@ -9,18 +9,22 @@ jobs:
       ENV_NAME: linting
       PYTHON: 3.7
     steps:
-     - uses: actions/checkout@master
-       with:
+      - uses: actions/checkout@master
+        with:
          fetch-depth: 1
-
-     - name: Setup Environment
-       run: |
-         export PATH="/usr/share/miniconda/bin:$PATH"
-         ./ci/install_conda.sh
-     - name: Linting
-       run: |
-         conda /usr/share/miniconda/bin/activate $ENV_NAME
-         flake8
+      - name: Get Miniconda Linux
+        run: |
+          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O $HOME/miniconda.sh;
+          bash $HOME/miniconda.sh -b -p $HOME/miniconda
+      - name: Setup Environment
+        run: |
+          export PATH="$HOME/miniconda/bin:$PATH"
+          ./ci/install_conda.sh
+      - name: Linting
+        run: |
+          export PATH="$HOME/miniconda/bin:$PATH"
+          conda activate ${ENV_NAME}
+          flake8
   tests:
     env:
       ENV_NAME: tests
