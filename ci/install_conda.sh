@@ -10,7 +10,7 @@ conda config --set always_yes yes --set changeps1 no
 conda update -q conda
 conda info -a
 conda create --name=${ENV_NAME}  python=$PYTHON --quiet
-conda env update -f ci/${ENV_NAME}.yml
+conda env update -f ci/${ENV_NAME}.yaml
 source activate ${ENV_NAME}
 conda list -n ${ENV_NAME}
 # check that the python version matches the desired one; exit immediately if not
