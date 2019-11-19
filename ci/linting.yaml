@@ -1,4 +1,4 @@
-name: pyradiosky
+name: linting
 channels:
   - conda-forge
   - defaults
