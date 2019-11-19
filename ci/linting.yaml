@@ -1,0 +1,10 @@
+name: pyradiosky
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - pip
+  - pip:
+      - flake8-docstrings
+      - flake8-pytest
+      - flake8-black

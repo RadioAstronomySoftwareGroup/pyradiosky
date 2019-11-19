@@ -1,0 +1,13 @@
+name: tests
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - astropy
+  - astropy-healpix
+  - numpy
+  - pyyaml
+  - scipy
+  - coverage
+  - pytest-cov
+  - setuptools_scm
