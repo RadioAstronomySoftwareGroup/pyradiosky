@@ -75,8 +75,8 @@ class SkyModel(object):
         position tolerance in degrees, defaults to minimum float in numpy
         position tolerance in degrees
     extended_model_group : array_like of int
-        Identifier that groups components of an extended source model,
-        shape (Ncomponents,).
+        Identifier that groups components of an extended source model.
+        -1 for point sources, shape (Ncomponents,).
     beam_amp : array_like of float
         Beam amplitude at the source position, shape (4, Nfreqs, Ncomponents).
         4 element vector corresponds to [XX, YY, XY, YX] instrumental
@@ -686,7 +686,7 @@ def read_idl_catalog(filename_sav, expand_extended=True):
     source_freqs = catalog['freq']
     spectral_index = catalog['alpha']
     Nsrcs = len(catalog)
-    extended_model_group = np.array(range(Nsrcs))
+    extended_model_group = np.full(Nsrcs, -1, dtype=int)
     if 'BEAM' in catalog.dtype.names:
         use_beam_amps = True
         beam_amp = np.zeros((4, Nsrcs))
@@ -709,12 +709,12 @@ def read_idl_catalog(filename_sav, expand_extended=True):
         ext_inds = np.where([
             catalog['extend'][ind] is not None for ind in range(Nsrcs)
         ])[0]
+        source_group_id = 1
         if len(ext_inds) > 0:  # Add components and preserve ordering
             source_inds = np.array(range(Nsrcs))
             for ext in ext_inds:
                 use_index = np.where(source_inds==ext)[0][0]
                 source_id = ids[use_index]
-                source_group_id = extended_model_group[use_index]
                 # Remove top-level source information
                 ids = np.delete(ids, ext)
                 ra = np.delete(ra, ext)
@@ -731,6 +731,7 @@ def read_idl_catalog(filename_sav, expand_extended=True):
                     extended_model_group, use_index,
                     np.full(Ncomps, source_group_id)
                 )
+                source_group_id += 1
                 ra = np.insert(ra, use_index, src['ra'])
                 dec = np.insert(dec, use_index, src['dec'])
                 stokes_ext = np.zeros((4, Ncomps))
