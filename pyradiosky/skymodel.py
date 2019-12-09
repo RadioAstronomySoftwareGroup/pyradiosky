@@ -61,6 +61,9 @@ class SkyModel(object):
             - 'full' : Flux is defined by a saved value at each frequency.
             - 'subband' : Flux is given at a set of band centers. (TODO)
             - 'spectral_index' : Flux is given at a reference frequency. (TODO)
+    spectral_index : array_like of float
+        Spectral index of each source, shape (Nfreqs, Ncomponents).
+        None if spectral_type is not 'spectral_index'.
     rise_lst : array_like of float
         Approximate lst (radians) when the source rises, shape (Ncomponents,).
         Set by source_cuts.
@@ -71,6 +74,10 @@ class SkyModel(object):
     pos_tol : float
         position tolerance in degrees, defaults to minimum float in numpy
         position tolerance in degrees
+    beam_amp : array-like of float
+        Beam amplitude at the source position, shape (4, Nfreqs, Ncomponents).
+        4 element vector corresponds to [XX, YY, XY, YX] instrumental
+        polarizations.
     """
 
     Ncomponents = None  # Number of point source components represented here.
@@ -83,7 +90,8 @@ class SkyModel(object):
     _member_funcs = ['coherency_calc', 'update_positions']
 
     def __init__(self, name, ra, dec, stokes, freq_array, spectral_type,
-                 rise_lst=None, set_lst=None, pos_tol=np.finfo(float).eps):
+                 spectral_index=None, rise_lst=None, set_lst=None,
+                 beam_amp=None, pos_tol=np.finfo(float).eps):
 
         if not isinstance(ra, Angle):
             raise ValueError('ra must be an astropy Angle object. '
@@ -103,6 +111,10 @@ class SkyModel(object):
         self.dec = np.atleast_1d(dec)
         self.pos_tol = pos_tol
         self.spectral_type = spectral_type
+        self.beam_amp = beam_amp
+
+        if self.spectral_type == 'spectral_index':
+            self.spectral_index = spectral_index
 
         self.has_rise_set_lsts = False
         if (rise_lst is not None) and (set_lst is not None):
@@ -648,21 +660,44 @@ def read_text_catalog(catalog_csv, source_select_kwds={}, return_table=False):
 
 
 def read_idl_catalog(filename_sav, expand_extended=True):
+    """
+    Read in an FHD-readable IDL .sav file catalog.
 
+    Args:
+        filename_sav: str
+            Path to IDL .sav file.
+
+        expand_extended: bool
+            If True, return extended source components.
+            Default: True
+
+    Returns:
+        :class:`pyuvsim.SkyModel`
+    """
     catalog = scipy.io.readsav(filename_sav)['catalog']
     ids = catalog['id']
     ra = catalog['ra']
     dec = catalog['dec']
+    source_freqs = catalog['freq']
+    spectral_index = catalog['alpha']
     Nsrcs = len(catalog)
+    if 'BEAM' in catalog.dtype.names:
+        use_beam_amps = True
+        beam_amp = np.zeros((4, Nsrcs))
+    else:
+        use_beam_amps = False
+        beam_amp = None
     stokes = np.zeros((4, Nsrcs))
     for src in range(Nsrcs):
-        src_flux = catalog['flux'][src]
-        stokes[0, src] = src_flux['I'][0]
-        stokes[1, src] = src_flux['Q'][0]
-        stokes[2, src] = src_flux['U'][0]
-        stokes[3, src] = src_flux['V'][0]
-    source_freqs = catalog['freq']
-    spectral_index = catalog['alpha']  # todo: add once supported
+        stokes[0, src] = catalog['flux'][src]['I'][0]
+        stokes[1, src] = catalog['flux'][src]['Q'][0]
+        stokes[2, src] = catalog['flux'][src]['U'][0]
+        stokes[3, src] = catalog['flux'][src]['V'][0]
+        if use_beam_amps:
+            beam_amp[0, src] = catalog['beam'][src]['XX'][0]
+            beam_amp[1, src] = catalog['beam'][src]['YY'][0]
+            beam_amp[2, src] = catalog['beam'][src]['XY'][0]
+            beam_amp[3, src] = catalog['beam'][src]['YX'][0]
 
     if expand_extended:
         ext_inds = np.where([
@@ -685,19 +720,30 @@ def read_idl_catalog(filename_sav, expand_extended=True):
                 src = catalog[ext]['extend']
                 Ncomps = len(src)
                 ids = np.insert(ids, use_index, np.full(Ncomps, source_id))
-                ra = np.insert(ra, use_index,src['ra'])
+                ra = np.insert(ra, use_index, src['ra'])
                 dec = np.insert(dec, use_index, src['dec'])
                 stokes_ext = np.zeros((4, Ncomps))
+                if use_beam_amps:
+                    beam_amp_ext = np.zeros((4, Ncomps))
                 for comp in range(Ncomps):
-                    comp_flux = src['flux'][comp]
-                    stokes_ext[0, comp] = comp_flux['I'][0]
-                    stokes_ext[1, comp] = comp_flux['Q'][0]
-                    stokes_ext[2, comp] = comp_flux['U'][0]
-                    stokes_ext[3, comp] = comp_flux['V'][0]
+                    stokes_ext[0, comp] = src['flux'][comp]['I'][0]
+                    stokes_ext[1, comp] = src['flux'][comp]['Q'][0]
+                    stokes_ext[2, comp] = src['flux'][comp]['U'][0]
+                    stokes_ext[3, comp] = src['flux'][comp]['V'][0]
+                    if use_beam_amps:
+                        beam_amp_ext[0, comp] = src['beam'][comp]['XX'][0]
+                        beam_amp_ext[1, comp] = src['beam'][comp]['YY'][0]
+                        beam_amp_ext[2, comp] = src['beam'][comp]['XY'][0]
+                        beam_amp_ext[3, comp] = src['beam'][comp]['YX'][0]
                 stokes = np.concatenate((  # np.insert doesn't work with arrays
                     np.concatenate((stokes[:, :use_index], stokes_ext),
                     axis=1
                 ), stokes[:, use_index:]), axis=1)
+                if use_beam_amps:
+                    beam_amp = np.concatenate((
+                        np.concatenate((beam_amp[:, :use_index], beam_amp_ext),
+                        axis=1
+                    ), beam_amp[:, use_index:]), axis=1)
                 source_freqs = np.insert(source_freqs, use_index, src['freq'])
                 spectral_index = np.insert(
                     spectral_index, use_index, src['alpha']
@@ -708,7 +754,8 @@ def read_idl_catalog(filename_sav, expand_extended=True):
     dec = Angle(dec, units.deg)
     stokes = stokes[:, np.newaxis, :]  # Add frequency axis
     sourcelist = SkyModel(ids, ra, dec, stokes, source_freqs,
-                          spectral_type='spectral_index')
+                          spectral_type='spectral_index',
+                          spectral_index=spectral_index, beam_amp=beam_amp)
     return sourcelist
 
 
