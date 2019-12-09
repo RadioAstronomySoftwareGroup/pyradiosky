@@ -74,7 +74,10 @@ class SkyModel(object):
     pos_tol : float
         position tolerance in degrees, defaults to minimum float in numpy
         position tolerance in degrees
-    beam_amp : array-like of float
+    extended_model_group : array_like of int
+        Identifier that groups components of an extended source model,
+        shape (Ncomponents,).
+    beam_amp : array_like of float
         Beam amplitude at the source position, shape (4, Nfreqs, Ncomponents).
         4 element vector corresponds to [XX, YY, XY, YX] instrumental
         polarizations.
@@ -91,7 +94,8 @@ class SkyModel(object):
 
     def __init__(self, name, ra, dec, stokes, freq_array, spectral_type,
                  spectral_index=None, rise_lst=None, set_lst=None,
-                 beam_amp=None, pos_tol=np.finfo(float).eps):
+                 pos_tol=np.finfo(float).eps, extended_model_group=None,
+                 beam_amp=None):
 
         if not isinstance(ra, Angle):
             raise ValueError('ra must be an astropy Angle object. '
@@ -112,6 +116,7 @@ class SkyModel(object):
         self.pos_tol = pos_tol
         self.spectral_type = spectral_type
         self.beam_amp = beam_amp
+        self.extended_model_group = extended_model_group
 
         if self.spectral_type == 'spectral_index':
             self.spectral_index = spectral_index
@@ -681,6 +686,7 @@ def read_idl_catalog(filename_sav, expand_extended=True):
     source_freqs = catalog['freq']
     spectral_index = catalog['alpha']
     Nsrcs = len(catalog)
+    extended_model_group = np.array(range(Nsrcs))
     if 'BEAM' in catalog.dtype.names:
         use_beam_amps = True
         beam_amp = np.zeros((4, Nsrcs))
@@ -708,6 +714,7 @@ def read_idl_catalog(filename_sav, expand_extended=True):
             for ext in ext_inds:
                 use_index = np.where(source_inds==ext)[0][0]
                 source_id = ids[use_index]
+                source_group_id = extended_model_group[use_index]
                 # Remove top-level source information
                 ids = np.delete(ids, ext)
                 ra = np.delete(ra, ext)
@@ -720,6 +727,10 @@ def read_idl_catalog(filename_sav, expand_extended=True):
                 src = catalog[ext]['extend']
                 Ncomps = len(src)
                 ids = np.insert(ids, use_index, np.full(Ncomps, source_id))
+                extended_model_group = np.insert(
+                    extended_model_group, use_index,
+                    np.full(Ncomps, source_group_id)
+                )
                 ra = np.insert(ra, use_index, src['ra'])
                 dec = np.insert(dec, use_index, src['dec'])
                 stokes_ext = np.zeros((4, Ncomps))
@@ -755,7 +766,8 @@ def read_idl_catalog(filename_sav, expand_extended=True):
     stokes = stokes[:, np.newaxis, :]  # Add frequency axis
     sourcelist = SkyModel(ids, ra, dec, stokes, source_freqs,
                           spectral_type='spectral_index',
-                          spectral_index=spectral_index, beam_amp=beam_amp)
+                          spectral_index=spectral_index, beam_amp=beam_amp,
+                          extended_model_group=extended_model_group)
     return sourcelist
 
 
