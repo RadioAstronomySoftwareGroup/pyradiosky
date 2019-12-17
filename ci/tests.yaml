@@ -5,6 +5,7 @@ channels:
 dependencies:
   - astropy
   - astropy-healpix
+  - h5py
   - numpy
   - h5py
   - pyyaml
