@@ -690,7 +690,7 @@ def test_point_catalog_reader():
 
 def test_idl_catalog_reader():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
-    sourcelist = read_idl_catalog(catfile, expand_extended=False)
+    sourcelist = pyradiosky.read_idl_catalog(catfile, expand_extended=False)
 
     catalog = scipy.io.readsav(catfile)["catalog"]
     assert len(sourcelist.ra) == len(catalog)
@@ -698,7 +698,7 @@ def test_idl_catalog_reader():
 
 def test_idl_catalog_reader_extended_sources():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
-    sourcelist = read_idl_catalog(catfile, expand_extended=True)
+    sourcelist = pyradiosky.read_idl_catalog(catfile, expand_extended=True)
 
     catalog = scipy.io.readsav(catfile)["catalog"]
     ext_inds = np.where(
