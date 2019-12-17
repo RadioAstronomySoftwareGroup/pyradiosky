@@ -19,9 +19,9 @@ def _tee_to_cirs_ra(tee_ra, time):
     era = erfa.era00(*get_jd12(time, 'ut1'))
     theta_earth = Angle(era, unit='rad')
 
-    assert (isinstance(time, Time))
-    assert (isinstance(tee_ra, Angle))
-    gast = time.sidereal_time('apparent', longitude=0)
+    assert isinstance(time, Time)
+    assert isinstance(tee_ra, Angle)
+    gast = time.sidereal_time("apparent", longitude=0)
     cirs_ra = tee_ra - (gast - theta_earth)
     return cirs_ra
 
@@ -30,9 +30,9 @@ def _cirs_to_tee_ra(cirs_ra, time):
     era = erfa.era00(*get_jd12(time, 'ut1'))
     theta_earth = Angle(era, unit='rad')
 
-    assert (isinstance(time, Time))
-    assert (isinstance(cirs_ra, Angle))
-    gast = time.sidereal_time('apparent', longitude=0)
+    assert isinstance(time, Time)
+    assert isinstance(cirs_ra, Angle)
+    gast = time.sidereal_time("apparent", longitude=0)
     tee_ra = cirs_ra + (gast - theta_earth)
     return tee_ra
 
@@ -54,15 +54,23 @@ def stokes_to_coherency(stokes_vector):
     stokes_arr = np.atleast_1d(np.asarray(stokes_vector))
     initial_shape = stokes_arr.shape
     if initial_shape[0] != 4:
-        raise ValueError('First dimension of stokes_vector must be length 4.')
+        raise ValueError("First dimension of stokes_vector must be length 4.")
 
     if stokes_arr.size == 4 and len(initial_shape) == 1:
         stokes_arr = stokes_arr[:, np.newaxis, np.newaxis]
 
-    coherency = .5 * np.array([[stokes_arr[0, :, :] + stokes_arr[1, :, :],
-                                stokes_arr[2, :, :] - 1j * stokes_arr[3, :, :]],
-                               [stokes_arr[2, :, :] + 1j * stokes_arr[3, :, :],
-                                stokes_arr[0, :, :] - stokes_arr[1, :, :]]])
+    coherency = 0.5 * np.array(
+        [
+            [
+                stokes_arr[0, :, :] + stokes_arr[1, :, :],
+                stokes_arr[2, :, :] - 1j * stokes_arr[3, :, :],
+            ],
+            [
+                stokes_arr[2, :, :] + 1j * stokes_arr[3, :, :],
+                stokes_arr[0, :, :] - stokes_arr[1, :, :],
+            ],
+        ]
+    )
 
     if stokes_arr.size == 4 and len(initial_shape) == 1:
         coherency = np.squeeze(coherency)
@@ -86,15 +94,19 @@ def coherency_to_stokes(coherency_matrix):
     coherency_arr = np.asarray(coherency_matrix)
     initial_shape = coherency_arr.shape
     if len(initial_shape) < 2 or initial_shape[0] != 2 or initial_shape[1] != 2:
-        raise ValueError('First two dimensions of coherency_matrix must be length 2.')
+        raise ValueError("First two dimensions of coherency_matrix must be length 2.")
 
     if coherency_arr.size == 4 and len(initial_shape) == 2:
         coherency_arr = coherency_arr[:, :, np.newaxis]
 
-    stokes = np.array([coherency_arr[0, 0, :] + coherency_arr[1, 1, :],
-                       coherency_arr[0, 0, :] - coherency_arr[1, 1, :],
-                       coherency_arr[0, 1, :] + coherency_arr[1, 0, :],
-                       -(coherency_arr[0, 1, :] - coherency_arr[1, 0, :]).imag]).real
+    stokes = np.array(
+        [
+            coherency_arr[0, 0, :] + coherency_arr[1, 1, :],
+            coherency_arr[0, 0, :] - coherency_arr[1, 1, :],
+            coherency_arr[0, 1, :] + coherency_arr[1, 0, :],
+            -(coherency_arr[0, 1, :] - coherency_arr[1, 0, :]).imag,
+        ]
+    ).real
     if coherency_arr.size == 4 and len(initial_shape) == 2:
         stokes = np.squeeze(stokes)
 
@@ -111,7 +123,7 @@ def jy_to_ksr(freqs):
         Frequencies in Hz.
 
     """
-    c_cmps = c.to('cm/s').value  # cm/s
-    k_boltz = 1.380658e-16   # erg/K
+    c_cmps = c.to("cm/s").value  # cm/s
+    k_boltz = 1.380658e-16  # erg/K
     lambdas = c_cmps / freqs  # cm
-    return 1e-23 * lambdas**2 / (2 * k_boltz)
+    return 1e-23 * lambdas ** 2 / (2 * k_boltz)

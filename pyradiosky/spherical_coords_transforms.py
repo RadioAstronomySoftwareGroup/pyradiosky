@@ -24,7 +24,7 @@ def r_hat(theta, phi):
     theta = np.array(theta)
     phi = np.array(phi)
     if theta.shape != phi.shape:
-        raise ValueError('theta and phi must have the same shape')
+        raise ValueError("theta and phi must have the same shape")
     rhx = np.cos(phi) * np.sin(theta)
     rhy = np.sin(phi) * np.sin(theta)
     rhz = np.cos(theta)
@@ -50,7 +50,7 @@ def theta_hat(theta, phi):
     theta = np.array(theta)
     phi = np.array(phi)
     if theta.shape != phi.shape:
-        raise ValueError('theta and phi must have the same shape')
+        raise ValueError("theta and phi must have the same shape")
     thx = np.cos(phi) * np.cos(theta)
     thy = np.sin(phi) * np.cos(theta)
     thz = -np.sin(theta)
@@ -76,7 +76,7 @@ def phi_hat(theta, phi):
     theta = np.array(theta)
     phi = np.array(phi)
     if theta.shape != phi.shape:
-        raise ValueError('theta and phi must have the same shape')
+        raise ValueError("theta and phi must have the same shape")
     phx = -np.sin(phi)
     phy = np.cos(phi)
     phz = np.zeros_like(phi)
@@ -113,7 +113,7 @@ def rotate_points_3d(rot_matrix, theta, phi):
 
     rot_matrix = np.array(rot_matrix)
     if rot_matrix.shape != (3, 3):
-        raise ValueError('rot_matrix must be a 3x3 array')
+        raise ValueError("rot_matrix must be a 3x3 array")
 
     # Replace with function call?
     q_hat_1 = np.cos(phi) * np.sin(theta)
@@ -121,7 +121,7 @@ def rotate_points_3d(rot_matrix, theta, phi):
     q_hat_3 = np.cos(theta)
     q_hat = np.stack((q_hat_1, q_hat_2, q_hat_3))
 
-    p_hat = np.einsum('ab...,b...->a...', rot_matrix, q_hat)
+    p_hat = np.einsum("ab...,b...->a...", rot_matrix, q_hat)
     # Should test for shape of p_hat
 
     # Should write a function to do this as well, i.e., pull back angles from
@@ -129,13 +129,14 @@ def rotate_points_3d(rot_matrix, theta, phi):
     beta = np.arccos(p_hat[2])
     alpha = np.arctan2(p_hat[1], p_hat[0])
     if alpha < 0:
-        alpha += 2. * np.pi
+        alpha += 2.0 * np.pi
 
     return (beta, alpha)
 
 
-def spherical_basis_vector_rotation_matrix(theta, phi, rot_matrix, beta=None,
-                                           alpha=None):
+def spherical_basis_vector_rotation_matrix(
+    theta, phi, rot_matrix, beta=None, alpha=None
+):
     """
     Get the rotation matrix to take vectors in the theta/phi basis to a new reference frame.
 
@@ -174,10 +175,10 @@ def spherical_basis_vector_rotation_matrix(theta, phi, rot_matrix, beta=None,
     th = theta_hat(theta, phi)
     ph = phi_hat(theta, phi)
 
-    bh = np.einsum('ab...,b...->a...', rot_matrix.T, theta_hat(beta, alpha))
+    bh = np.einsum("ab...,b...->a...", rot_matrix.T, theta_hat(beta, alpha))
 
-    cosX = np.einsum('a...,a...', bh, th)
-    sinX = np.einsum('a...,a...', bh, ph)
+    cosX = np.einsum("a...,a...", bh, th)
+    sinX = np.einsum("a...,a...", bh, ph)
 
     return np.array([[cosX, sinX], [-sinX, cosX]])
 
@@ -203,14 +204,17 @@ def axis_angle_rotation_matrix(axis, angle):
     if not is_unit_vector(axis):
         raise ValueError('axis must be a unit vector')
 
-    K_matrix = np.array([[0., -axis[2], axis[1]],
-                         [axis[2], 0., -axis[0]],
-                         [-axis[1], axis[0], 0.]])
+    K_matrix = np.array(
+        [[0.0, -axis[2], axis[1]], [axis[2], 0.0, -axis[0]], [-axis[1], axis[0], 0.0]]
+    )
 
     I_matrix = np.identity(3)
 
-    rot_matrix = (I_matrix + np.sin(angle) * K_matrix
-                  + (1. - np.cos(angle)) * np.dot(K_matrix, K_matrix))
+    rot_matrix = (
+        I_matrix
+        + np.sin(angle) * K_matrix
+        + (1.0 - np.cos(angle)) * np.dot(K_matrix, K_matrix)
+    )
 
     return rot_matrix
 
@@ -270,8 +274,10 @@ def vecs2rot(r1=None, r2=None, theta1=None, phi1=None, theta2=None, phi2=None):
     """
     if r1 is None or r2 is None:
         if theta1 is None or phi1 is None or theta2 is None or phi2 is None:
-            raise ValueError('Either r1 and r2 must be supplied or all of '
-                             'theta1, phi1, theta2 and phi2 must be supplied.')
+            raise ValueError(
+                "Either r1 and r2 must be supplied or all of "
+                "theta1, phi1, theta2 and phi2 must be supplied."
+            )
         r1 = r_hat(theta1, phi1)
         r2 = r_hat(theta2, phi2)
 

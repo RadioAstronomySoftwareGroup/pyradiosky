@@ -26,7 +26,7 @@ def test_stokes_tofrom_coherency():
     stokesV = -0.15
     stokes = np.array([stokesI, stokesQ, stokesU, stokesV])
 
-    expected_coherency = .5 * np.array([[4.2, 1.2 + 0.15j], [1.2 - 0.15j, 4.8]])
+    expected_coherency = 0.5 * np.array([[4.2, 1.2 + 0.15j], [1.2 - 0.15j, 4.8]])
 
     coherency = skyutils.stokes_to_coherency(stokes)
 
@@ -37,8 +37,9 @@ def test_stokes_tofrom_coherency():
     assert np.allclose(stokes, back_to_stokes)
 
     # again, with multiple sources and a frequency axis.
-    stokes = np.array([[stokesI, stokesQ, stokesU, stokesV],
-                       [stokesI, stokesQ, stokesU, stokesV]]).T
+    stokes = np.array(
+        [[stokesI, stokesQ, stokesU, stokesV], [stokesI, stokesQ, stokesU, stokesV]]
+    ).T
 
     stokes = stokes[:, np.newaxis, :]
 
@@ -49,8 +50,12 @@ def test_stokes_tofrom_coherency():
 
     with pytest.raises(ValueError) as cm:
         skyutils.stokes_to_coherency(stokes[0:2, :])
-    assert str(cm.value).startswith('First dimension of stokes_vector must be length 4.')
+    assert str(cm.value).startswith(
+        "First dimension of stokes_vector must be length 4."
+    )
 
     with pytest.raises(ValueError) as cm:
         skyutils.coherency_to_stokes(expected_coherency[0, :])
-    assert str(cm.value).startswith('First two dimensions of coherency_matrix must be length 2.')
+    assert str(cm.value).startswith(
+        "First two dimensions of coherency_matrix must be length 2."
+    )
