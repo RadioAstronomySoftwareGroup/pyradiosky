@@ -787,7 +787,7 @@ def read_idl_catalog(filename_sav, expand_extended=True):
                 ra = np.delete(ra, ext)
                 dec = np.delete(dec, ext)
                 stokes = np.delete(stokes, ext, axis=1)
-                source_freq = np.delete(source_freqs, ext)
+                source_freqs = np.delete(source_freqs, ext)
                 spectral_index = np.delete(spectral_index, ext)
                 source_inds = np.delete(source_inds, ext)
                 # Add component information
