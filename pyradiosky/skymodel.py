@@ -6,7 +6,6 @@
 
 import warnings
 
-import h5py
 import numpy as np
 from numpy.lib import recfunctions
 from scipy.linalg import orthogonal_procrustes as ortho_procr
@@ -15,7 +14,6 @@ from astropy.time import Time
 import astropy.units as units
 from astropy.units import Quantity
 from astropy.io import votable
-import astropy_healpix
 import scipy.io
 
 from . import utils as skyutils
@@ -446,6 +444,8 @@ def read_healpix_hdf5(hdf5_filename):
     freqs : array_like, float
         Frequencies in Hz. Shape (Nfreqs)
     """
+    import h5py
+
     with h5py.File(hdf5_filename, "r") as file:
         hpmap = file["data"][0, ...]  # Remove Nskies axis.
         indices = file["indices"][()]
@@ -475,6 +475,8 @@ def healpix_to_sky(hpmap, indices, freqs):
     -----
     Currently, this function only converts a HEALPix map with a frequency axis.
     """
+    import astropy_healpix
+
     Nside = astropy_healpix.npix_to_nside(hpmap.shape[-1])
     ra, dec = astropy_healpix.healpix_to_lonlat(indices, Nside)
     freq = Quantity(freqs, "hertz")

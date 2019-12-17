@@ -317,7 +317,10 @@ def test_polarized_source_smooth_visibilities():
         assert np.all(imag_stokes == 0)
 
 
+@skipIf_no_healpix
 def test_read_healpix_hdf5():
+    import astropy_healpix
+
     Nside = 32
     # hp_obj = HEALPix(nside=Nside)
     Npix = astropy_healpix.nside_to_npix(Nside)
@@ -433,7 +436,10 @@ def test_read_healpix_hdf5():
     assert np.allclose(freqs, frequencies)
 
 
+@skipIf_no_healpix
 def test_healpix_to_sky():
+    import astropy_healpix
+
     Nside = 32
     Npix = astropy_healpix.nside_to_npix(Nside)
     # vec = hp.ang2vec(np.pi / 2, np.pi * 3 / 4)
@@ -542,7 +548,10 @@ def test_healpix_to_sky():
     assert np.allclose(sky.stokes[0], hmap_orig.value)
 
 
+@skipIf_no_healpix
 def test_units_healpix_to_sky():
+    import astropy_healpix
+
     Nside = 32
     beam_area = astropy_healpix.nside_to_pixel_area(Nside)  # * units.sr
     # beam_area = hp.pixelfunc.nside2pixarea(Nside) * units.sr
@@ -550,14 +559,32 @@ def test_units_healpix_to_sky():
         os.path.join(SKY_DATA_PATH, 'healpix_disk.hdf5')
     )
     freqs = freqs * units.Hz
+<<<<<<< HEAD
     stokes = (hpmap.T * units.K).to(units.Jy,
                                     units.brightness_temperature(beam_area, freqs)).T
     sky = skymodel.healpix_to_sky(hpmap, inds, freqs)
+=======
+
+    if astropy.__version__.startswith('4'):
+        brightness_temperature_conv = units.brightness_temperature(freqs, beam_area=beam_area)
+    else:
+        brightness_temperature_conv = units.brightness_temperature(beam_area, freqs)
+    stokes = (
+        (hpmap.T * units.K)
+        .to(units.Jy, brightness_temperature_conv)
+        .T
+    )
+    sky = pyradiosky.healpix_to_sky(hpmap, inds, freqs)
+>>>>>>> fix healpix, h5py imports, more fixes for astropy 4.0
 
     assert np.allclose(sky.stokes[0, 0], stokes.value[0])
 
 
+@skipIf_no_healpix
 def test_healpix_positions():
+    import h5py
+    import astropy_healpix
+
     # write out a healpix file, read it back in check that it is as expected
     Nside = 8
     Npix = astropy_healpix.nside_to_npix(Nside)
@@ -649,7 +676,11 @@ def test_healpix_positions():
 def test_param_flux_cuts():
     # Check that min/max flux limits in test params work.
 
+<<<<<<< HEAD
     catalog_table = skymodel.read_votable_catalog(GLEAM_vot, return_table=True)
+=======
+    catalog_table = pyradiosky.read_votable_catalog(GLEAM_vot, return_table=True)
+>>>>>>> fix healpix, h5py imports, more fixes for astropy 4.0
 
     catalog_table = skymodel.source_cuts(catalog_table, min_flux=0.2, max_flux=1.5)
 

@@ -37,7 +37,7 @@ setup_args = {
     "include_package_data": True,
     "install_requires": ["numpy>=1.15", "scipy", "astropy>=3.0"],
     "tests_require": ["pytest"],
-    "extras_require": {"healpix": ["astropy-healpix"]},
+    "extras_require": {"healpix": ["astropy-healpix, h5py"]},
     "classifiers": [
         "Development Status :: 1 - Planning",
         "Intended Audience :: Science/Research",
