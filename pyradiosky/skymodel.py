@@ -1,6 +1,8 @@
 # -*- mode: python; coding: utf-8 -*
 # Copyright (c) 2019 Radio Astronomy Software Group
 # Licensed under the 3-clause BSD License
+"""Define SkyModel class and helper functions."""
+
 
 import warnings
 
@@ -32,8 +34,10 @@ from . import spherical_coords_transforms as sct
 
 class SkyModel(object):
     """
-    Defines a set of point source components at given ICRS ra/dec coordinates, with a
-    flux densities defined by stokes parameters.
+    Object to hold point source and diffuse models.
+
+    Defines a set of components at given ICRS ra/dec coordinates,
+    with flux densities defined by stokes parameters.
 
     The attribute Ncomponents gives the number of source components.
 
@@ -357,19 +361,23 @@ class SkyModel(object):
 
     def update_positions(self, time, telescope_location):
         """
-        Calculate the altitude/azimuth positions for these sources
+        Calculate the altitude/azimuth positions for source components.
+
         From alt/az, calculate direction cosines (lmn)
 
-        Args:
-            time: astropy Time object
-            telescope_location: astropy EarthLocation object
+        Parameters
+        ----------
+        time : astropy Time object
+            Time to update positions for.
+        telescope_location : astropy EarthLocation object
+            Telescope location to update positions for.
 
-        Sets:
-            self.pos_lmn: (3, Ncomponents)
-            self.alt_az: (2, Ncomponents)
-            self.time: (1,) Time object
+        Sets
+        ----
+        self.pos_lmn: (3, Ncomponents)
+        self.alt_az: (2, Ncomponents)
+        self.time: (1,) Time object
         """
-
         if not isinstance(time, Time):
             raise ValueError(
                 "time must be an astropy Time object. " "value was: {t}".format(t=time)
@@ -408,6 +416,7 @@ class SkyModel(object):
         self.horizon_mask = self.alt_az[0, :] < 0.0
 
     def __eq__(self, other):
+        """Check for equality between SkyModel objects."""
         time_check = self.time is None and other.time is None
         if not time_check:
             time_check = np.isclose(self.time, other.time)
@@ -421,7 +430,7 @@ class SkyModel(object):
 
 def read_healpix_hdf5(hdf5_filename):
     """
-    Read hdf5 healpix files using h5py and get a healpix map, indices and frequencies
+    Read hdf5 healpix files using h5py and get a healpix map, indices and frequencies.
 
     Parameters
     ----------
@@ -479,9 +488,19 @@ def healpix_to_sky(hpmap, indices, freqs):
 
 def skymodel_to_array(sky):
     """
-    Return a recarray of source components from a given SkyModel object.
-    """
+    Make a recarrayof source components from a SkyModel object.
 
+    Parameters
+    ----------
+    sky : :class:`pyradiosky.SkyModel`
+        SkyModel object to convert to a recarray.
+
+    Returns
+    -------
+    catalog_table : recarray
+        recarray to turn into a SkyModel object.
+
+    """
     fieldtypes = ["U10", "f8", "f8", "f8", "f8"]
     fieldnames = ["source_id", "ra_j2000", "dec_j2000", "flux_density_I", "frequency"]
     fieldshapes = [()] * 3 + [(sky.Nfreqs,)] * 2
@@ -503,8 +522,17 @@ def skymodel_to_array(sky):
 def array_to_skymodel(catalog_table):
     """
     Make a SkyModel object from a recarray.
-    """
 
+    Parameters
+    ----------
+    catalog_table : recarray
+        recarray to turn into a SkyModel object.
+
+    Returns
+    -------
+    :class:`pyradiosky.SkyModel`
+
+    """
     ra = Angle(catalog_table["ra_j2000"], units.deg)
     dec = Angle(catalog_table["dec_j2000"], units.deg)
     ids = catalog_table["source_id"]
@@ -545,7 +573,7 @@ def source_cuts(
     max_flux=None,
 ):
     """
-    Performing flux and horizon selections on recarray of source components.
+    Perform flux and horizon selections on recarray of source components.
 
     Parameters
     ----------
@@ -567,10 +595,13 @@ def source_cuts(
         Minimum stokes I flux to select [Jy]
     max_flux : float
         Maximum stokes I flux to select [Jy]
-    Returns:
-        A new recarray of source components, with additional columns for rise and set lst.
-    """
 
+    Returns
+    -------
+    recarray
+        A new recarray of source components, with additional columns for rise and set lst.
+
+    """
     coarse_horizon_cut = latitude_deg is not None
 
     if coarse_horizon_cut:
@@ -617,35 +648,39 @@ def source_cuts(
 
 def read_votable_catalog(gleam_votable, source_select_kwds={}, return_table=False):
     """
-    Creates a SkyModel object from a votable catalog.
+    Create a list of pyradiosky source objects from a votable catalog.
 
     Tested on: GLEAM EGC catalog, version 2
 
-    Args:
-        gleam_votable: str
-            Path to votable catalog file.
-        return_table: bool, optional
-            Whether to return the astropy table instead of a list of Source objects.
-        source_select_kwds: dict, optional
-            Dictionary of keywords for source selection Valid options:
+    Parameters
+    ----------
+    gleam_votable: str
+        Path to votable catalog file.
+    return_table: bool, optional
+        Whether to return the astropy table instead of a list of Source objects.
+    source_select_kwds: dict, optional
+        Dictionary of keywords for source selection Valid options:
 
-            * `lst_array`: For coarse RA horizon cuts, lsts used in the simulation [radians]
-            * `latitude_deg`: Latitude of telescope in degrees. Used for declination coarse
-               horizon cut.
-            * `horizon_buffer`: Angle (float, in radians) of buffer for coarse horizon cut.
-              Default is about 10 minutes of sky rotation. (See caveats in
-              :func:`array_to_skymodel` docstring)
-            * `min_flux`: Minimum stokes I flux to select [Jy]
-            * `max_flux`: Maximum stokes I flux to select [Jy]
+        * `lst_array`: For coarse RA horizon cuts, lsts used in the simulation [radians]
+        * `latitude_deg`: Latitude of telescope in degrees. Used for declination coarse
+           horizon cut.
+        * `horizon_buffer`: Angle (float, in radians) of buffer for coarse horizon cut.
+          Default is about 10 minutes of sky rotation. (See caveats in
+          :func:`array_to_skymodel` docstring)
+        * `min_flux`: Minimum stokes I flux to select [Jy]
+        * `max_flux`: Maximum stokes I flux to select [Jy]
 
-    Returns:
+    Returns
+    -------
+    recarray or :class:`pyradiosky.SkyModel`
         if return_table, recarray of source parameters, otherwise :class:`pyradiosky.SkyModel` instance
+
     """
+    resources = votable.parse(gleam_votable).resources
 
     class Found(Exception):
         pass
 
-    resources = votable.parse(gleam_votable).resources
     try:
         for rs in resources:
             for tab in rs.tables:
@@ -679,31 +714,33 @@ def read_text_catalog(catalog_csv, source_select_kwds={}, return_table=False):
     """
     Read in a text file of sources.
 
-    Args:
-        catalog_csv: str
-            Path to tab separated value file with the following expected columns
-            (For now, all sources are flat spectrum):
+    Parameters
+    ----------
+    catalog_csv: str
+        Path to tab separated value file with the following expected columns
+        (For now, all sources are flat spectrum):
 
-            *  `Source_ID`: source name as a string of maximum 10 characters
-            *  `ra_j2000`: right ascension at J2000 epoch, in decimal degrees
-            *  `dec_j2000`: declination at J2000 epoch, in decimal degrees
-            *  `flux_density_I`: Stokes I flux density in Janskys
-            *  `frequency`: reference frequency (for future spectral indexing) [Hz]
+        *  `Source_ID`: source name as a string of maximum 10 characters
+        *  `ra_j2000`: right ascension at J2000 epoch, in decimal degrees
+        *  `dec_j2000`: declination at J2000 epoch, in decimal degrees
+        *  `flux_density_I`: Stokes I flux density in Janskys
+        *  `frequency`: reference frequency (for future spectral indexing) [Hz]
 
-        source_select_kwds: dict, optional
-            Dictionary of keywords for source selection. Valid options:
+    source_select_kwds: dict, optional
+        Dictionary of keywords for source selection. Valid options:
 
-            * `lst_array`: For coarse RA horizon cuts, lsts used in the simulation [radians]
-            * `latitude_deg`: Latitude of telescope in degrees. Used for declination coarse
-            *  horizon cut.
-            * `horizon_buffer`: Angle (float, in radians) of buffer for coarse horizon cut.
-              Default is about 10 minutes of sky rotation. (See caveats in
-              :func:`array_to_skymodel` docstring)
-            * `min_flux`: Minimum stokes I flux to select [Jy]
-            * `max_flux`: Maximum stokes I flux to select [Jy]
+        * `lst_array`: For coarse RA horizon cuts, lsts used in the simulation [radians]
+        * `latitude_deg`: Latitude of telescope in degrees. Used for declination coarse
+        *  horizon cut.
+        * `horizon_buffer`: Angle (float, in radians) of buffer for coarse horizon cut.
+          Default is about 10 minutes of sky rotation. (See caveats in
+          :func:`array_to_skymodel` docstring)
+        * `min_flux`: Minimum stokes I flux to select [Jy]
+        * `max_flux`: Maximum stokes I flux to select [Jy]
 
-    Returns:
-        :class:`pyradiosky.SkyModel`
+    Returns
+    -------
+    :class:`pyradiosky.SkyModel`
     """
     with open(catalog_csv, "r") as cfile:
         header = cfile.readline()
@@ -735,16 +772,18 @@ def read_idl_catalog(filename_sav, expand_extended=True):
     """
     Read in an FHD-readable IDL .sav file catalog.
 
-    Args:
-        filename_sav: str
-            Path to IDL .sav file.
+    Parameters
+    ----------
+    filename_sav: str
+        Path to IDL .sav file.
 
-        expand_extended: bool
-            If True, return extended source components.
-            Default: True
+    expand_extended: bool
+        If True, return extended source components.
+        Default: True
 
-    Returns:
-        :class:`pyuvsim.SkyModel`
+    Returns
+    -------
+    :class:`pyradiosky.SkyModel`
     """
     catalog = scipy.io.readsav(filename_sav)["catalog"]
     ids = catalog["id"]
@@ -853,11 +892,16 @@ def read_idl_catalog(filename_sav, expand_extended=True):
 
 def write_catalog_to_file(filename, catalog):
     """
-    Writes out a catalog to a text file, readable with skymodel.read_catalog_text()
+    Write out a catalog to a text file.
 
-    Args:
-        filename: Path to output file (string)
-        catalog: pyradiosky.SkyModel object
+    Readable with simsetup.read_catalog_text().
+
+    Parameters
+    ----------
+    filename : str
+        Path to output file (string)
+    catalog : pyradiosky.SkyModel object
+        SkyModel object to write to file.
     """
     with open(filename, "w+") as fo:
         fo.write(

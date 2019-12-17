@@ -1,6 +1,8 @@
 # -*- mode: python; coding: utf-8 -*
 # Copyright (c) 2019 Radio Astronomy Software Group
 # Licensed under the 3-clause BSD License
+"""Utility methods."""
+
 
 import numpy as np
 from astropy.constants import c
@@ -16,6 +18,23 @@ from astropy.coordinates import Angle
 # by modifying the ra to reflect the difference between
 # GAST (Grenwich Apparent Sidereal Time) and the earth rotation angle (theta)
 def _tee_to_cirs_ra(tee_ra, time):
+    """
+    Convert from the true equator & equinox frame to the CIRS frame.
+
+    The frame radio astronomers call the apparent or current epoch is the
+    "true equator & equinox" frame, notated E_upsilon in the USNO circular
+    astropy doesn't have this frame but it's pretty easy to adapt the CIRS frame
+    by modifying the ra to reflect the difference between
+    GAST (Grenwich Apparent Sidereal Time) and the earth rotation angle (theta)
+
+    Parameters
+    ----------
+    tee_ra : astropy Angle object
+        Current epoch RA (RA in the true equator and equinox frame).
+    time : astropy Time object
+        Time object for the epoch of the `tee_ra`.
+
+    """
     era = erfa.era00(*get_jd12(time, 'ut1'))
     theta_earth = Angle(era, unit='rad')
 
@@ -27,6 +46,23 @@ def _tee_to_cirs_ra(tee_ra, time):
 
 
 def _cirs_to_tee_ra(cirs_ra, time):
+    """
+    Convert from CIRS frame to the true equator & equinox frame.
+
+    The frame radio astronomers call the apparent or current epoch is the
+    "true equator & equinox" frame, notated E_upsilon in the USNO circular
+    astropy doesn't have this frame but it's pretty easy to adapt the CIRS frame
+    by modifying the ra to reflect the difference between
+    GAST (Grenwich Apparent Sidereal Time) and the earth rotation angle (theta)
+
+    Parameters
+    ----------
+    cirs_ra : astropy Angle object
+        CIRS RA.
+    time : astropy Time object
+        Time object for time to convert to the "true equator & equinox" frame.
+
+    """
     era = erfa.era00(*get_jd12(time, 'ut1'))
     theta_earth = Angle(era, unit='rad')
 
@@ -79,7 +115,7 @@ def stokes_to_coherency(stokes_vector):
 
 def coherency_to_stokes(coherency_matrix):
     """
-    Convert coherency matrix to vector of 4 Stokes parameter in order [I, Q, U, V]
+    Convert coherency matrix to vector of 4 Stokes parameter in order [I, Q, U, V].
 
     Parameters
     ----------
