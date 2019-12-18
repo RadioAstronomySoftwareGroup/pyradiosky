@@ -565,15 +565,13 @@ def test_units_healpix_to_sky():
     sky = skymodel.healpix_to_sky(hpmap, inds, freqs)
 =======
 
-    if astropy.__version__.startswith('4'):
-        brightness_temperature_conv = units.brightness_temperature(freqs, beam_area=beam_area)
+    if astropy.__version__.startswith("4"):
+        brightness_temperature_conv = units.brightness_temperature(
+            freqs, beam_area=beam_area
+        )
     else:
         brightness_temperature_conv = units.brightness_temperature(beam_area, freqs)
-    stokes = (
-        (hpmap.T * units.K)
-        .to(units.Jy, brightness_temperature_conv)
-        .T
-    )
+    stokes = (hpmap.T * units.K).to(units.Jy, brightness_temperature_conv).T
     sky = pyradiosky.healpix_to_sky(hpmap, inds, freqs)
 >>>>>>> fix healpix, h5py imports, more fixes for astropy 4.0
 
