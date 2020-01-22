@@ -19,6 +19,23 @@ import scipy.io
 from . import utils as skyutils
 from . import spherical_coords_transforms as sct
 
+hasmoon = True
+try:
+    from lunarsky import SkyCoord, MoonLocation, LunarTopo
+except ImportError:
+
+    # If lunarsky is unavailable, error if you try to use MoonLocation
+    # or LunarTopo frames.
+
+    hasmoon = False
+
+    class MoonLocation:
+        def __init__(self, *args, **kwargs):
+            raise ValueError('MoonLocation is undefined.')
+
+    class LunarTopo:
+        def __init__(self, *args, **kwargs):
+            raise ValueError('LunarTopo frame is undefined.')
 
 # Nov 5 2019 notes
 #    Read/write methods to add:
@@ -42,7 +59,7 @@ class SkyModel(object):
     Contains methods to:
         - Read and write different catalog formats.
         - Calculate source positions.
-        - Calculate local coherency matrix in the AltAz frame.
+        - Calculate local coherency matrix in a local topocentric frame.
 
     Parameters
     ----------
@@ -188,7 +205,7 @@ class SkyModel(object):
 
         Parameters
         ----------
-        telescope_location : astropy EarthLocation object
+        telescope_location : astropy EarthLocation or lunarsky MoonLocation object
             Location of the telescope.
 
         Returns
@@ -232,7 +249,7 @@ class SkyModel(object):
 
         Parameters
         ----------
-        telescope_location : astropy EarthLocation object
+        telescope_location : astropy EarthLocation or lunarsky MoonLocation object
             Location of the telescope.
 
         Returns
@@ -272,7 +289,7 @@ class SkyModel(object):
 
         Parameters
         ----------
-        telescope_location : astropy EarthLocation object
+        telescope_location : astropy EarthLocation or lunarsky MoonLocation object
             Location of the telescope.
 
         Returns
@@ -315,7 +332,7 @@ class SkyModel(object):
 
         Parameters
         ----------
-        telescope_location : astropy EarthLocation object
+        telescope_location : astropy EarthLocation or lunarsky MoonLocation object
             location of the telescope.
 
         Returns
@@ -323,9 +340,14 @@ class SkyModel(object):
         array of float
             local coherency in alt/az basis, shape (2, 2, Ncomponents)
         """
-        if not isinstance(telescope_location, EarthLocation):
+        if not isinstance(telescope_location, (EarthLocation, MoonLocation)):
+
+            errm = "telescope_location must be an astropy EarthLocation object"
+            if hasmoon:
+                errm += " or a lunarsky MoonLocation object "
+            errm += ". "
             raise ValueError(
-                "telescope_location must be an astropy EarthLocation object. "
+                errm
                 "value was: {al}".format(al=telescope_location)
             )
 
@@ -381,19 +403,29 @@ class SkyModel(object):
                 "time must be an astropy Time object. " "value was: {t}".format(t=time)
             )
 
-        if not isinstance(telescope_location, EarthLocation):
+        if not isinstance(telescope_location, (EarthLocation, MoonLocation)):
+
+            errm = "telescope_location must be an astropy EarthLocation object"
+            if hasmoon:
+                errm += " or a lunarsky MoonLocation object "
+            errm += ". "
             raise ValueError(
-                "telescope_location must be an astropy EarthLocation object. "
+                errm
                 "value was: {al}".format(al=telescope_location)
             )
 
         if self.time == time:  # Don't repeat calculations
             return
 
-        skycoord_use = SkyCoord(self.ra, self.dec, frame="icrs")
-        source_altaz = skycoord_use.transform_to(
-            AltAz(obstime=time, location=telescope_location)
-        )
+        skycoord_use = SkyCoord(self.ra, self.dec, frame='icrs')
+        if isinstance(telescope_location, MoonLocation):
+            source_altaz = skycoord_use.transform_to(
+                LunarTopo(obstime=time, location=telescope_location)
+            )
+        else:
+            source_altaz = skycoord_use.transform_to(
+                AltAz(obstime=time, location=telescope_location)
+            )
 
         time.location = telescope_location
 
