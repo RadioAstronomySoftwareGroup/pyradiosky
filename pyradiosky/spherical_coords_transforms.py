@@ -12,8 +12,9 @@ def r_hat(theta, phi):
     Parameters
     ----------
     theta, phi : float
-        The theta, phi coordinates for the point on the sphere (using normal
-        mathematical conventions)
+        The co-latitude and azimuth coordinates, respectively, for a point
+        on the sphere, in radians. Azimuth is defined with respect to the
+        x axis, co-latitude is the angle with the positive z axis.
 
     Returns
     -------
@@ -37,8 +38,9 @@ def theta_hat(theta, phi):
     Parameters
     ----------
     theta, phi : float
-        The theta, phi coordinates for the point on the sphere (using normal
-        mathematical conventions)
+        The co-latitude and azimuth coordinates, respectively, for a point
+        on the sphere, in radians. Azimuth is defined with respect to the
+        x axis, co-latitude is the angle with the positive z axis.
 
     Returns
     -------
@@ -62,8 +64,9 @@ def phi_hat(theta, phi):
     Parameters
     ----------
     theta, phi : float
-        The theta, phi coordinates for the point on the sphere (using normal
-        mathematical conventions)
+        The co-latitude and azimuth coordinates, respectively, for a point
+        on the sphere, in radians. Azimuth is defined with respect to the
+        x axis, co-latitude is the angle with the positive z axis.
 
     Returns
     -------
@@ -96,8 +99,9 @@ def rotate_points_3d(rot_matrix, theta, phi):
     rot_matrix : array-like of float
         rotation matrix to use
     theta, phi : float
-        The theta, phi coordinates for the point on the sphere (using normal
-        mathematical conventions) in the inital frame.
+        The co-latitude and azimuth coordinates, respectively, for a point
+        on the sphere, in radians. Azimuth is defined with respect to the
+        x axis, co-latitude is the angle with the positive z axis.
 
     Returns
     -------
@@ -147,8 +151,9 @@ def spherical_basis_vector_rotation_matrix(theta, phi, rot_matrix, beta=None,
     Parameters
     ----------
     theta, phi : float
-        The theta, phi coordinates for the point on the sphere (using normal
-        mathematical conventions) in the inital frame.
+        The co-latitude and azimuth coordinates, respectively, for a point
+        on the sphere, in radians. Azimuth is defined with respect to the
+        x axis, co-latitude is the angle with the positive z axis.
     rot_matrix : array-like of float
         Rotation matrix that takes 3-vectors from (theta, phi) to (beta, alpha)
     beta, alpha : float, optional
@@ -253,8 +258,10 @@ def vecs2rot(r1=None, r2=None, theta1=None, phi1=None, theta2=None, phi2=None):
     r1, r2 : array-like of float, optional
         length 3 unit vectors
     theta1, phi1, theta2, phi2 : float, optional
-        The theta, phi coordinates for the two point on the sphere (using normal
-        mathematical conventions). Ignored if r1 and r2 are supplied.
+        The co-latitude and azimuth coordinates, respectively, for a point
+        on the sphere, in radians. Azimuth is defined with respect to the
+        x axis, co-latitude is the angle with the positive z axis.
+        Ignored if r1 and r2 are supplied.
 
     Returns
     -------
