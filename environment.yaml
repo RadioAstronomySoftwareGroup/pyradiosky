@@ -8,6 +8,7 @@ dependencies:
   - numpy
   - pyyaml
   - scipy
+  - h5py
   - coverage
   - pytest-cov
   - setuptools_scm

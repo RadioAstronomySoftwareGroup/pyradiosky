@@ -6,6 +6,7 @@ dependencies:
   - astropy
   - astropy-healpix
   - numpy
+  - h5py
   - pyyaml
   - scipy
   - coverage
