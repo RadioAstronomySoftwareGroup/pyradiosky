@@ -31,7 +31,7 @@ jobs:
       PYTHON: ${{ matrix.python-version }}
       OS: ${{ matrix.os }}
     name: Testing
-    needs: [linter]
+    #    needs: [linter]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

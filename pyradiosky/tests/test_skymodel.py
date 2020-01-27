@@ -421,6 +421,7 @@ def test_healpix_positions():
     assert np.isclose(src_lmn[1][ipix], src_m)
     assert np.isclose(src_lmn[2][ipix], src_n)
 
+
 def test_param_flux_cuts():
     # Check that min/max flux limits in test params work.
 
@@ -490,6 +491,7 @@ def test_flux_cuts():
     )
     assert np.all(cut_sourcelist['flux_density_I'] > minI_cut)
     assert np.all(cut_sourcelist['flux_density_I'] < maxI_cut)
+
 
 def test_circumpolar_nonrising():
     # Check that the source_cut function correctly identifies sources that are circumpolar or
