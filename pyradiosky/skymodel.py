@@ -62,7 +62,7 @@ class SkyModel(object):
             - 'spectral_index' : Flux is given at a reference frequency. (TODO)
     rise_lst : array_like of float
         Approximate lst (radians) when the source rises, shape (Ncomponents,).
-        Set by coarse horizon cut in simsetup.
+        Set by source_cuts.
         Default is nan, meaning the source never rises.
     set_lst : array_like of float
         Approximate lst (radians) when the source sets, shape (Ncomponents,).
@@ -537,7 +537,7 @@ def source_cuts(catalog_table, latitude_deg=None, horizon_buffer=0.04364,
 def read_votable_catalog(gleam_votable, source_select_kwds={},
                          return_table=False):
     """
-    Creates a list of pyuvsim source objects from a votable catalog.
+    Creates a SkyModel object from a votable catalog.
 
     Tested on: GLEAM EGC catalog, version 2
 
@@ -559,7 +559,7 @@ def read_votable_catalog(gleam_votable, source_select_kwds={},
             * `max_flux`: Maximum stokes I flux to select [Jy]
 
     Returns:
-        if return_table, recarray of source parameters, otherwise :class:`pyuvsim.SkyModel` instance
+        if return_table, recarray of source parameters, otherwise :class:`pyradiosky.SkyModel` instance
     """
 
     class Found(Exception):
@@ -623,7 +623,7 @@ def read_text_catalog(catalog_csv, source_select_kwds={}, return_table=False):
             * `max_flux`: Maximum stokes I flux to select [Jy]
 
     Returns:
-        :class:`pyuvsim.SkyModel`
+        :class:`pyradiosky.SkyModel`
     """
     with open(catalog_csv, 'r') as cfile:
         header = cfile.readline()
@@ -648,11 +648,11 @@ def read_text_catalog(catalog_csv, source_select_kwds={}, return_table=False):
 
 def write_catalog_to_file(filename, catalog):
     """
-    Writes out a catalog to a text file, readable with simsetup.read_catalog_text()
+    Writes out a catalog to a text file, readable with skymodel.read_catalog_text()
 
     Args:
         filename: Path to output file (string)
-        catalog: pyuvsim.SkyModel object
+        catalog: pyradiosky.SkyModel object
     """
     with open(filename, 'w+') as fo:
         fo.write("SOURCE_ID\tRA_J2000 [deg]\tDec_J2000 [deg]\tFlux [Jy]\tFrequency [Hz]\n")
