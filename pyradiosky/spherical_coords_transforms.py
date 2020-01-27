@@ -80,7 +80,7 @@ def phi_hat(theta, phi):
     return np.stack((phx, phy, phz))
 
 
-def spherical_coordinates_map(rot_matrix, theta, phi):
+def rotate_points_3d(rot_matrix, theta, phi):
     """
     Get the spherical coordinates of the point under a 3d rotation.
 
@@ -154,7 +154,7 @@ def spherical_basis_vector_rotation_matrix(theta, phi, rot_matrix, beta=None,
     beta, alpha : float, optional
         The theta, phi coordinates for the point on the sphere (using normal
         mathematical conventions) in the rotated frame. If either is not provided,
-        they are calculated using `spherical_coordinates_map`. Note these may
+        they are calculated using `rotate_points_3d`. Note these may
         not be as exact as values calculated from astropy.
 
     Returns
@@ -164,7 +164,7 @@ def spherical_basis_vector_rotation_matrix(theta, phi, rot_matrix, beta=None,
         the beta/alpha basis.
     """
     if alpha is None or beta is None:
-        beta, alpha = spherical_coordinates_map(rot_matrix, theta, phi)
+        beta, alpha = rotate_points_3d(rot_matrix, theta, phi)
 
     th = theta_hat(theta, phi)
     ph = phi_hat(theta, phi)
