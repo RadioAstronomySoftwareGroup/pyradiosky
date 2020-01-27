@@ -29,7 +29,7 @@ def test_source_zenith_from_icrs():
     lst = time.sidereal_time('apparent')
 
     tee_ra = lst
-    cirs_ra = skyutils.tee_to_cirs_ra(tee_ra, time)
+    cirs_ra = skyutils._tee_to_cirs_ra(tee_ra, time)
 
     cirs_source_coord = SkyCoord(ra=cirs_ra, dec=array_location.lat,
                                  obstime=time, frame='cirs', location=array_location)

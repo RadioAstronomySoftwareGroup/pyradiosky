@@ -15,7 +15,7 @@ from astropy.coordinates import Angle
 # astropy doesn't have this frame but it's pretty easy to adapt the CIRS frame
 # by modifying the ra to reflect the difference between
 # GAST (Grenwich Apparent Sidereal Time) and the earth rotation angle (theta)
-def tee_to_cirs_ra(tee_ra, time):
+def _tee_to_cirs_ra(tee_ra, time):
     era = erfa.era00(*get_jd12(time, 'ut1'))
     theta_earth = Angle(era, unit='rad')
 
@@ -26,7 +26,7 @@ def tee_to_cirs_ra(tee_ra, time):
     return cirs_ra
 
 
-def cirs_to_tee_ra(cirs_ra, time):
+def _cirs_to_tee_ra(cirs_ra, time):
     era = erfa.era00(*get_jd12(time, 'ut1'))
     theta_earth = Angle(era, unit='rad')
 
@@ -39,7 +39,7 @@ def cirs_to_tee_ra(cirs_ra, time):
 
 def stokes_to_coherency(stokes_vector):
     """
-    Convert Stokes vector to coherency matrix
+    Convert Stokes vector to coherency matrix.
 
     Parameters
     ----------
