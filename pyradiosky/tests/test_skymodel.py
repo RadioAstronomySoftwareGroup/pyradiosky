@@ -424,12 +424,7 @@ def test_healpix_positions():
 def test_param_flux_cuts():
     # Check that min/max flux limits in test params work.
 
-    catalog_table = uvtest.checkWarnings(
-        read_votable_catalog, func_args=[GLEAM_vot],
-        func_kwargs={'return_table': True}, message=GLEAM_vot, nwarnings=11,
-        category=([astropy.io.votable.exceptions.W27]
-                  + [astropy.io.votable.exceptions.W50] * 10)
-    )
+    catalog_table = read_votable_catalog(GLEAM_vot, return_table=True)
 
     catalog_table = source_cuts(catalog_table, min_flux=0.2, max_flux=1.5)
 
@@ -538,22 +533,15 @@ def test_circumpolar_nonrising():
 
 
 def test_read_gleam():
-    sourcelist = uvtest.checkWarnings(
-        read_votable_catalog, [GLEAM_vot],
-        message=GLEAM_vot, nwarnings=11,
-        category=[astropy.io.votable.exceptions.W27] + [astropy.io.votable.exceptions.W50] * 10
-    )
+    sourcelist = read_votable_catalog(GLEAM_vot)
 
     assert sourcelist.Ncomponents == 50
 
     # Check cuts
     source_select_kwds = {'min_flux': 1.0}
-    catalog = uvtest.checkWarnings(
-        read_votable_catalog, [GLEAM_vot],
-        dict(source_select_kwds=source_select_kwds, return_table=True),
-        message=GLEAM_vot, nwarnings=11,
-        category=[astropy.io.votable.exceptions.W27] + [astropy.io.votable.exceptions.W50] * 10
-    )
+    catalog = read_votable_catalog(GLEAM_vot,
+                                   source_select_kwds=source_select_kwds,
+                                   return_table=True)
 
     assert len(catalog) < sourcelist.Ncomponents
 
@@ -584,11 +572,7 @@ def test_catalog_file_writer():
 
 
 def test_array_to_skymodel_loop():
-    sky = uvtest.checkWarnings(
-        read_votable_catalog, [GLEAM_vot],
-        message=GLEAM_vot, nwarnings=11,
-        category=[astropy.io.votable.exceptions.W27] + [astropy.io.votable.exceptions.W50] * 10
-    )
+    sky = read_votable_catalog(GLEAM_vot)
     sky.ra = Angle(sky.ra.rad, 'rad')
     sky.dec = Angle(sky.dec.rad, 'rad')
     arr = skymodel_to_array(sky)
