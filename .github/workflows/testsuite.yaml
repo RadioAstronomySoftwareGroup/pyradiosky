@@ -94,7 +94,7 @@ jobs:
           ./ci/install_conda.sh
       - name: run pyuvsim tests
         run: |
-          source activate ${ENV_NAME}
+          source activate $ENV_NAME
           pip install --no-deps .
           cd ../
           git clone https://github.com/RadioAstronomySoftwareGroup/pyuvsim.git
