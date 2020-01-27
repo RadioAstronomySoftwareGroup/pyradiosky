@@ -94,6 +94,7 @@ jobs:
           ./ci/install_conda.sh
       - name: run pyuvsim tests
         run: |
+          export PATH="$HOME/miniconda/bin:$PATH"
           source activate $ENV_NAME
           pip install --no-deps .
           cd ../
