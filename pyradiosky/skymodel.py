@@ -662,5 +662,3 @@ def write_catalog_to_file(filename, catalog):
 
             fo.write("{}\t{:f}\t{:f}\t{:0.2f}\t{:0.2f}\n".format(
                 srcid, ra, dec, flux_i[0], freq[0]))
-
-
