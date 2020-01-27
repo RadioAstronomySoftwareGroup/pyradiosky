@@ -92,8 +92,8 @@ jobs:
         run: |
           export PATH="$HOME/miniconda/bin:$PATH"
           ./ci/install_conda.sh
-
-      - bash: |
+      - name: run pyuvsim tests
+        run: |
           source activate ${ENV_NAME}
           pip install --no-deps .
           cd ../
@@ -101,4 +101,3 @@ jobs:
           cd pyuvsim
           mkdir test-reports
           python -m pytest pyuvsim --junitxml=test-reports/xunit.xml
-        displayName: run pyuvsim tests
