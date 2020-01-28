@@ -202,9 +202,9 @@ def axis_angle_rotation_matrix(axis, angle):
     """
     if axis.shape != (3,):
 
-        raise ValueError('axis must be a must be length 3 vector')
+        raise ValueError("axis must be a must be length 3 vector")
     if not is_unit_vector(axis):
-        raise ValueError('axis must be a unit vector')
+        raise ValueError("axis must be a unit vector")
 
     K_matrix = np.array(
         [[0.0, -axis[2], axis[1]], [axis[2], 0.0, -axis[0]], [-axis[1], axis[0], 0.0]]
@@ -283,16 +283,16 @@ def vecs2rot(r1=None, r2=None, theta1=None, phi1=None, theta2=None, phi2=None):
         r1 = r_hat(theta1, phi1)
         r2 = r_hat(theta2, phi2)
 
-        assert is_unit_vector(r1), 'r1 is not a unit vector: ' + str(r1)
-        assert is_unit_vector(r2), 'r2 is not a unit vector: ' + str(r2)
+        assert is_unit_vector(r1), "r1 is not a unit vector: " + str(r1)
+        assert is_unit_vector(r2), "r2 is not a unit vector: " + str(r2)
     else:
         r1 = np.array(r1)
         r2 = np.array(r2)
         if r1.shape != (3,) or r2.shape != (3,):
 
-            raise ValueError('r1 and r2 must be length 3 vectors')
+            raise ValueError("r1 and r2 must be length 3 vectors")
         if not is_unit_vector(r1) or not is_unit_vector(r2):
-            raise ValueError('r1 and r2 must be unit vectors')
+            raise ValueError("r1 and r2 must be unit vectors")
 
     norm = np.cross(r1, r2)
     # Note that Psi is between 0 and pi
@@ -302,8 +302,9 @@ def vecs2rot(r1=None, r2=None, theta1=None, phi1=None, theta2=None, phi2=None):
     Psi = np.arctan2(sinPsi, cosPsi)
     rotation = axis_angle_rotation_matrix(n_hat, Psi)
 
-    assert is_unit_vector(n_hat), 'n_hat is not a unit vector: ' + str(n_hat)
-    assert is_orthogonal(rotation), ('rotation matrix is not orthogonal: '
-                                            + str(rotation))
+    assert is_unit_vector(n_hat), "n_hat is not a unit vector: " + str(n_hat)
+    assert is_orthogonal(rotation), "rotation matrix is not orthogonal: " + str(
+        rotation
+    )
 
     return rotation
