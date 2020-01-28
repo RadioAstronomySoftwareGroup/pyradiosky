@@ -33,8 +33,8 @@ def _tee_to_cirs_ra(tee_ra, time):
     time : :class:`astropy.Time`
         Time object for the epoch of the `tee_ra`.
     """
-    era = erfa.era00(*get_jd12(time, 'ut1'))
-    theta_earth = Angle(era, unit='rad')
+    era = erfa.era00(*get_jd12(time, "ut1"))
+    theta_earth = Angle(era, unit="rad")
 
     assert isinstance(time, Time)
     assert isinstance(tee_ra, Angle)
@@ -60,8 +60,8 @@ def _cirs_to_tee_ra(cirs_ra, time):
     time : :class:`astropy.Time`
         Time object for time to convert to the "true equator & equinox" frame.
     """
-    era = erfa.era00(*get_jd12(time, 'ut1'))
-    theta_earth = Angle(era, unit='rad')
+    era = erfa.era00(*get_jd12(time, "ut1"))
+    theta_earth = Angle(era, unit="rad")
 
     assert isinstance(time, Time)
     assert isinstance(cirs_ra, Angle)
