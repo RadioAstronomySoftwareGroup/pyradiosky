@@ -3,7 +3,6 @@
 # Licensed under the 3-clause BSD License
 """Define SkyModel class and helper functions."""
 
-
 import warnings
 
 import numpy as np
@@ -65,6 +64,7 @@ class SkyModel(object):
     Defines a set of components at given ICRS ra/dec coordinates,
     with flux densities defined by stokes parameters.
 
+    Flux densities defined are by stokes parameters.
     The attribute Ncomponents gives the number of source components.
 
     Contains methods to:
@@ -395,18 +395,17 @@ class SkyModel(object):
 
         From alt/az, calculate direction cosines (lmn)
 
+        Doesn't return anything but updates the following attributes in-place:
+        * ``pos_lmn``
+        * ``alt_az``
+        * ``time``
+
         Parameters
         ----------
         time : astropy Time object
             Time to update positions for.
         telescope_location : astropy EarthLocation object
             Telescope location to update positions for.
-
-        Sets
-        ----
-        self.pos_lmn: (3, Ncomponents)
-        self.alt_az: (2, Ncomponents)
-        self.time: (1,) Time object
         """
         if not isinstance(time, Time):
             raise ValueError(
@@ -457,6 +456,7 @@ class SkyModel(object):
     def __eq__(self, other):
         """Check for equality between SkyModel objects."""
         time_check = self.time is None and other.time is None
+
         if not time_check:
             time_check = np.isclose(self.time, other.time)
         return (
@@ -473,7 +473,8 @@ def read_healpix_hdf5(hdf5_filename):
 
     Parameters
     ----------
-    hdf5_filename : path and name of the hdf5 file to read
+    hdf5_filename : str
+        Path and name of the hdf5 file to read.
 
     Returns
     -------
@@ -510,7 +511,8 @@ def healpix_to_sky(hpmap, indices, freqs):
 
     Returns
     -------
-    SkyModel
+    sky : :class:`SkyModel`
+        The sky model created from the healpix map.
 
     Notes
     -----
@@ -584,6 +586,7 @@ def array_to_skymodel(catalog_table):
     dec = Angle(catalog_table["dec_j2000"], units.deg)
     ids = catalog_table["source_id"]
     flux_I = np.atleast_1d(catalog_table["flux_density_I"])
+
     if flux_I.ndim == 1:
         flux_I = flux_I[:, None]
     stokes = np.pad(np.expand_dims(flux_I, 2), ((0, 0), (0, 0), (0, 3)), "constant").T
@@ -647,7 +650,6 @@ def source_cuts(
     -------
     recarray
         A new recarray of source components, with additional columns for rise and set lst.
-
     """
     coarse_horizon_cut = latitude_deg is not None
 
@@ -721,7 +723,6 @@ def read_votable_catalog(gleam_votable, source_select_kwds={}, return_table=Fals
     -------
     recarray or :class:`pyradiosky.SkyModel`
         if return_table, recarray of source parameters, otherwise :class:`pyradiosky.SkyModel` instance
-
     """
     resources = votable.parse(gleam_votable).resources
 
@@ -773,7 +774,7 @@ def read_text_catalog(catalog_csv, source_select_kwds={}, return_table=False):
         *  `flux_density_I`: Stokes I flux density in Janskys
         *  `frequency`: reference frequency (for future spectral indexing) [Hz]
 
-    source_select_kwds: dict, optional
+    source_select_kwds : dict, optional
         Dictionary of keywords for source selection. Valid options:
 
         * `lst_array`: For coarse RA horizon cuts, lsts used in the simulation [radians]
@@ -787,7 +788,8 @@ def read_text_catalog(catalog_csv, source_select_kwds={}, return_table=False):
 
     Returns
     -------
-    :class:`pyradiosky.SkyModel`
+    sky_model : :class:`SkyModel`
+        A sky model created from the text catalog.
     """
     with open(catalog_csv, "r") as cfile:
         header = cfile.readline()
@@ -941,14 +943,14 @@ def write_catalog_to_file(filename, catalog):
     """
     Write out a catalog to a text file.
 
-    Readable with simsetup.read_catalog_text().
+    Readable with :meth:`simsetup.read_catalog_text()`.
 
     Parameters
     ----------
     filename : str
         Path to output file (string)
-    catalog : pyradiosky.SkyModel object
-        SkyModel object to write to file.
+    catalog : :class:`SkyModel`
+        The sky model to write to file.
     """
     with open(filename, "w+") as fo:
         fo.write(
