@@ -22,8 +22,8 @@ def test_hat_errors(func_name):
 
 @pytest.mark.skip()
 def test_rotate_points_3d():
-    array_location = EarthLocation(lat='-30d43m17.5s', lon='21d25m41.9s', height=1073.)
-    time0 = Time('2018-03-01 18:00:00', scale='utc', location=array_location)
+    array_location = EarthLocation(lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0)
+    time0 = Time("2018-03-01 18:00:00", scale="utc", location=array_location)
 
     ha_off = 0.5
     ha_delta = 0.01
@@ -104,16 +104,22 @@ def test_rotate_points_3d():
         R_perturb = sct.vecs2rot(r1=intermediate_vec, r2=altaz_vec)
 
         intermediate_theta, intermediate_phi = sct.rotate_points_3d(
-            R_avg, theta_radec, phi_radec)
-        R_perturb_pts = sct.vecs2rot(theta1=intermediate_theta, phi1=intermediate_phi,
-                                     theta2=theta_altaz, phi2=phi_altaz)
+            R_avg, theta_radec, phi_radec
+        )
+        R_perturb_pts = sct.vecs2rot(
+            theta1=intermediate_theta,
+            phi1=intermediate_phi,
+            theta2=theta_altaz,
+            phi2=phi_altaz,
+        )
 
         assert np.allclose(R_perturb, R_perturb_pts)
 
         R_exact = np.matmul(R_perturb, R_avg)
 
         calc_theta_altaz, calc_phi_altaz = sct.rotate_points_3d(
-            R_exact, theta_radec, phi_radec)
+            R_exact, theta_radec, phi_radec
+        )
 
         if ti == zero_indx:
             assert np.isclose(calc_theta_altaz, theta_altaz, atol=1e-7)
@@ -150,7 +156,7 @@ def test_rotate_points_3d():
     # check errors are raised appropriately
     with pytest.raises(ValueError) as cm:
         sct.rotate_points_3d(R_exact[0:1, :], theta_radec, phi_radec)
-    assert str(cm.value).startswith('rot_matrix must be a 3x3 array')
+    assert str(cm.value).startswith("rot_matrix must be a 3x3 array")
 
     with pytest.raises(ValueError) as cm:
         sct.vecs2rot(r1=intermediate_vec, theta2=theta_altaz, phi2=phi_altaz)

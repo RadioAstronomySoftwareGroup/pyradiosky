@@ -45,16 +45,18 @@ def test_source_zenith_from_icrs():
     dec = icrs_coord.dec
     # Check error cases
     with pytest.raises(ValueError) as cm:
-        skymodel.SkyModel('icrs_zen', ra.rad, dec.rad, [1, 0, 0, 0], 1e8, 'flat')
-    assert str(cm.value).startswith('ra must be an astropy Angle object. '
-                                    'value was: 3.14')
+        skymodel.SkyModel("icrs_zen", ra.rad, dec.rad, [1, 0, 0, 0], 1e8, "flat")
+    assert str(cm.value).startswith(
+        "ra must be an astropy Angle object. " "value was: 3.14"
+    )
 
     with pytest.raises(ValueError) as cm:
-        skymodel.SkyModel('icrs_zen', ra, dec.rad, [1, 0, 0, 0], 1e8, 'flat')
-    assert str(cm.value).startswith('dec must be an astropy Angle object. '
-                                    'value was: -0.53')
+        skymodel.SkyModel("icrs_zen", ra, dec.rad, [1, 0, 0, 0], 1e8, "flat")
+    assert str(cm.value).startswith(
+        "dec must be an astropy Angle object. " "value was: -0.53"
+    )
 
-    zenith_source = skymodel.SkyModel('icrs_zen', ra, dec, [1, 0, 0, 0], 1e8, 'flat')
+    zenith_source = skymodel.SkyModel("icrs_zen", ra, dec, [1, 0, 0, 0], 1e8, "flat")
 
     zenith_source.update_positions(time, array_location)
     zenith_source_lmn = zenith_source.pos_lmn.squeeze()
@@ -82,7 +84,7 @@ def test_source_zenith():
     names = "zen_source"
     stokes = [1, 0, 0, 0]
     freqs = [1e8]
-    zenith_source = skymodel.SkyModel(names, ra, dec, stokes, freqs, 'flat')
+    zenith_source = skymodel.SkyModel(names, ra, dec, stokes, freqs, "flat")
 
     zenith_source.update_positions(time, array_location)
     zenith_source_lmn = zenith_source.pos_lmn.squeeze()
@@ -95,12 +97,19 @@ def test_calc_basis_rotation_matrix():
     actually a rotation matrix (R R^T = R^T R = I)
     """
 
-    time = Time('2018-01-01 00:00')
+    time = Time("2018-01-01 00:00")
     telescope_location = EarthLocation(
-        lat='-30d43m17.5s', lon='21d25m41.9s', height=1073.)
+        lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0
+    )
 
-    source = skymodel.SkyModel('Test', Angle(12. * units.hr),
-                               Angle(-30. * units.deg), [1., 0., 0., 0.], 1e8, 'flat')
+    source = skymodel.SkyModel(
+        "Test",
+        Angle(12.0 * units.hr),
+        Angle(-30.0 * units.deg),
+        [1.0, 0.0, 0.0, 0.0],
+        1e8,
+        "flat",
+    )
 
     source.update_positions(time, telescope_location)
 
@@ -116,12 +125,19 @@ def test_calc_vector_rotation():
     I suppose we could also have checked (R R^T = R^T R = I)
     """
 
-    time = Time('2018-01-01 00:00')
+    time = Time("2018-01-01 00:00")
     telescope_location = EarthLocation(
-        lat='-30d43m17.5s', lon='21d25m41.9s', height=1073.)
+        lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0
+    )
 
-    source = skymodel.SkyModel('Test', Angle(12. * units.hr),
-                               Angle(-30. * units.deg), [1., 0., 0., 0.], 1e8, 'flat')
+    source = skymodel.SkyModel(
+        "Test",
+        Angle(12.0 * units.hr),
+        Angle(-30.0 * units.deg),
+        [1.0, 0.0, 0.0, 0.0],
+        1e8,
+        "flat",
+    )
 
     source.update_positions(time, telescope_location)
 
@@ -178,8 +194,14 @@ def test_polarized_source_visibilities():
     decoff = 0.0 * units.arcmin  # -0.17 * units.arcsec
     raoff = 0.0 * units.arcsec
 
-    source = skymodel.SkyModel('icrs_zen', zenith_icrs.ra + raoff,
-                               zenith_icrs.dec + decoff, stokes_radec, 1e8, 'flat')
+    source = skymodel.SkyModel(
+        "icrs_zen",
+        zenith_icrs.ra + raoff,
+        zenith_icrs.dec + decoff,
+        stokes_radec,
+        1e8,
+        "flat",
+    )
 
     coherency_matrix_local = np.zeros([2, 2, ntimes], dtype="complex128")
     alts = np.zeros(ntimes)
@@ -291,8 +313,9 @@ def test_polarized_source_smooth_visibilities():
 
     stokes_radec = [1, -0.2, 0.3, 0.1]
 
-    source = skymodel.SkyModel('icrs_zen', zenith_icrs.ra,
-                               zenith_icrs.dec, stokes_radec, 1e8, 'flat')
+    source = skymodel.SkyModel(
+        "icrs_zen", zenith_icrs.ra, zenith_icrs.dec, stokes_radec, 1e8, "flat"
+    )
 
     coherency_matrix_local = np.zeros([2, 2, ntimes], dtype="complex128")
     alts = np.zeros(ntimes)
@@ -449,7 +472,7 @@ def test_read_healpix_hdf5():
     frequencies = np.linspace(100, 110, 10)
 
     hpmap, inds, freqs = skymodel.read_healpix_hdf5(
-        os.path.join(SKY_DATA_PATH, 'healpix_disk.hdf5')
+        os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
     )
 
     assert np.allclose(hpmap[0, :], m)
@@ -584,10 +607,9 @@ def test_units_healpix_to_sky():
     # beam_area = hp.pixelfunc.nside2pixarea(Nside) * units.sr
 
     hpmap, inds, freqs = skymodel.read_healpix_hdf5(
-        os.path.join(SKY_DATA_PATH, 'healpix_disk.hdf5')
+        os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
     )
     freqs = freqs * units.Hz
-
     brightness_temperature_conv = units.brightness_temperature(
         freqs, beam_area=beam_area
     )
@@ -705,7 +727,7 @@ def test_param_flux_cuts():
 
 
 def test_point_catalog_reader():
-    catfile = os.path.join(SKY_DATA_PATH, 'pointsource_catalog.txt')
+    catfile = os.path.join(SKY_DATA_PATH, "pointsource_catalog.txt")
     srcs = skymodel.read_text_catalog(catfile)
 
     with open(catfile, "r") as fhandle:
@@ -727,7 +749,7 @@ def test_point_catalog_reader():
     assert srcs.stokes[0] in catalog_table["flux_density_I"]
 
     # Check cuts
-    source_select_kwds = {'min_flux': 1.0}
+    source_select_kwds = {"min_flux": 1.0}
     catalog = skymodel.read_text_catalog(
         catfile, source_select_kwds=source_select_kwds, return_table=True
     )
@@ -777,7 +799,7 @@ def test_flux_cuts():
     maxI_cut = 2.3
 
     cut_sourcelist = skymodel.source_cuts(
-        catalog_table, latitude_deg=30., min_flux=minI_cut, max_flux=maxI_cut
+        catalog_table, latitude_deg=30.0, min_flux=minI_cut, max_flux=maxI_cut
     )
     assert np.all(cut_sourcelist["flux_density_I"] > minI_cut)
     assert np.all(cut_sourcelist["flux_density_I"] < maxI_cut)
@@ -832,12 +854,10 @@ def test_read_gleam():
     assert sourcelist.Ncomponents == 50
 
     # Check cuts
-    source_select_kwds = {'min_flux': 1.0}
+    source_select_kwds = {"min_flux": 1.0}
 
     catalog = skymodel.read_votable_catalog(
-        GLEAM_vot,
-        source_select_kwds=source_select_kwds,
-        return_table=True
+        GLEAM_vot, source_select_kwds=source_select_kwds, return_table=True
     )
 
     assert len(catalog) < sourcelist.Ncomponents
@@ -862,7 +882,7 @@ def test_catalog_file_writer():
     names = "zen_source"
     stokes = [1, 0, 0, 0]
     freqs = [1e8]
-    zenith_source = skymodel.SkyModel(names, ra, dec, stokes, freqs, 'flat')
+    zenith_source = skymodel.SkyModel(names, ra, dec, stokes, freqs, "flat")
 
     fname = os.path.join(SKY_DATA_PATH, "temp_cat.txt")
 
@@ -874,8 +894,8 @@ def test_catalog_file_writer():
 
 def test_array_to_skymodel_loop():
     sky = skymodel.read_votable_catalog(GLEAM_vot)
-    sky.ra = Angle(sky.ra.rad, 'rad')
-    sky.dec = Angle(sky.dec.rad, 'rad')
+    sky.ra = Angle(sky.ra.rad, "rad")
+    sky.dec = Angle(sky.dec.rad, "rad")
     arr = skymodel.skymodel_to_array(sky)
     sky2 = skymodel.array_to_skymodel(arr)
 
