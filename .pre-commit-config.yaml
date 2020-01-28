@@ -19,7 +19,7 @@ repos:
             additional_dependencies:
                 - flake8-docstrings
                 - flake8-comprehensions
-#                - flake8-black
+                - flake8-black
 #                - flake8-builtins
 #                - flake8-eradicate
 #                - pep8-naming
@@ -27,10 +27,10 @@ repos:
 #                - flake8-rst-docstrings
 #                - flake8-copyright
 
-#    - repo: https://github.com/psf/black
-#      rev: 19.10b0
-#      hooks:
-#          - id: black
+    - repo: https://github.com/psf/black
+      rev: 19.10b0
+      hooks:
+          - id: black
 #    - repo: https://github.com/pre-commit/mirrors-isort
 #      rev: v4.3.21
 #      hooks:

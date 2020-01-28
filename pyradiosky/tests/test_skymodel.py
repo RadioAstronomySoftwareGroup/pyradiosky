@@ -17,6 +17,7 @@ from pyradiosky.data import DATA_PATH as SKY_DATA_PATH
 from pyradiosky import utils as skyutils
 from pyradiosky import skymodel
 
+
 GLEAM_vot = os.path.join(SKY_DATA_PATH, "gleam_50srcs.vot")
 
 
@@ -100,6 +101,7 @@ def test_calc_basis_rotation_matrix():
 
     source = skymodel.SkyModel('Test', Angle(12. * units.hr),
                                Angle(-30. * units.deg), [1., 0., 0., 0.], 1e8, 'flat')
+
     source.update_positions(time, telescope_location)
 
     basis_rot_matrix = source._calc_average_rotation_matrix(telescope_location)
@@ -120,6 +122,7 @@ def test_calc_vector_rotation():
 
     source = skymodel.SkyModel('Test', Angle(12. * units.hr),
                                Angle(-30. * units.deg), [1., 0., 0., 0.], 1e8, 'flat')
+
     source.update_positions(time, telescope_location)
 
     coherency_rotation = np.squeeze(source._calc_coherency_rotation(telescope_location))
@@ -579,6 +582,7 @@ def test_units_healpix_to_sky():
     Nside = 32
     beam_area = astropy_healpix.nside_to_pixel_area(Nside)  # * units.sr
     # beam_area = hp.pixelfunc.nside2pixarea(Nside) * units.sr
+
     hpmap, inds, freqs = skymodel.read_healpix_hdf5(
         os.path.join(SKY_DATA_PATH, 'healpix_disk.hdf5')
     )
@@ -641,12 +645,15 @@ def test_healpix_positions():
                 d += history_string
             if k in dsets:
                 if np.isscalar(d):
-                    fileobj.create_dataset(
-                        k, data=d, dtype=dsets[k])
+                    fileobj.create_dataset(k, data=d, dtype=dsets[k])
                 else:
                     fileobj.create_dataset(
-                        k, data=d, dtype=dsets[k], compression='gzip',
-                        compression_opts=9)
+                        k,
+                        data=d,
+                        dtype=dsets[k],
+                        compression="gzip",
+                        compression_opts=9,
+                    )
             else:
                 fileobj.attrs[k] = d
 
@@ -654,9 +661,10 @@ def test_healpix_positions():
     array_location = EarthLocation(lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0)
 
     ra, dec = astropy_healpix.healpix_to_lonlat(ipix, Nside)
-    skycoord_use = SkyCoord(ra, dec, frame='icrs')
+    skycoord_use = SkyCoord(ra, dec, frame="icrs")
     source_altaz = skycoord_use.transform_to(
-        AltAz(obstime=time, location=array_location))
+        AltAz(obstime=time, location=array_location)
+    )
     alt_az = np.array([source_altaz.alt.value, source_altaz.az.value])
 
     src_az = Angle(alt_az[1], unit="deg")
@@ -689,7 +697,6 @@ def test_param_flux_cuts():
     # Check that min/max flux limits in test params work.
 
     catalog_table = skymodel.read_votable_catalog(GLEAM_vot, return_table=True)
-
     catalog_table = skymodel.source_cuts(catalog_table, min_flux=0.2, max_flux=1.5)
 
     catalog = skymodel.array_to_skymodel(catalog_table)
@@ -788,8 +795,9 @@ def test_circumpolar_nonrising():
     Nsrcs = 50
 
     j2000 = 2451545.0
-    times = Time(np.linspace(j2000 - 0.5, j2000 + 0.5, Ntimes),
-                 format='jd', scale='utc')
+    times = Time(
+        np.linspace(j2000 - 0.5, j2000 + 0.5, Ntimes), format="jd", scale="utc"
+    )
 
     ra = np.zeros(Nsrcs)
     dec = np.linspace(-90, 90, Nsrcs)

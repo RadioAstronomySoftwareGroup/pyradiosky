@@ -454,9 +454,8 @@ class SkyModel(object):
         self.horizon_mask = self.alt_az[0, :] < 0.0
 
     def __eq__(self, other):
-        """Check for equality between SkyModel objects."""
+        """Test equality with another sky model."""
         time_check = self.time is None and other.time is None
-
         if not time_check:
             time_check = np.isclose(self.time, other.time)
         return (
