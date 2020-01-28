@@ -3,7 +3,6 @@
 # Licensed under the 3-clause BSD License
 """Utility methods."""
 
-
 import numpy as np
 from astropy.constants import c
 from astropy import _erfa as erfa
@@ -29,11 +28,10 @@ def _tee_to_cirs_ra(tee_ra, time):
 
     Parameters
     ----------
-    tee_ra : astropy Angle object
+    tee_ra : :class:`astropy.Angle`
         Current epoch RA (RA in the true equator and equinox frame).
-    time : astropy Time object
+    time : :class:`astropy.Time`
         Time object for the epoch of the `tee_ra`.
-
     """
     era = erfa.era00(*get_jd12(time, 'ut1'))
     theta_earth = Angle(era, unit='rad')
@@ -57,11 +55,10 @@ def _cirs_to_tee_ra(cirs_ra, time):
 
     Parameters
     ----------
-    cirs_ra : astropy Angle object
+    cirs_ra : :class:`astropy.Angle`
         CIRS RA.
-    time : astropy Time object
+    time : :class:`astropy.Time`
         Time object for time to convert to the "true equator & equinox" frame.
-
     """
     era = erfa.era00(*get_jd12(time, 'ut1'))
     theta_earth = Angle(era, unit='rad')
@@ -157,7 +154,6 @@ def jy_to_ksr(freqs):
     ----------
     freqs : array_like of float
         Frequencies in Hz.
-
     """
     c_cmps = c.to("cm/s").value  # cm/s
     k_boltz = 1.380658e-16  # erg/K
