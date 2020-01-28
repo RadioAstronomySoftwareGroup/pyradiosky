@@ -24,7 +24,8 @@ jobs:
         run: |
           export PATH="$HOME/miniconda/bin:$PATH"
           source activate ${ENV_NAME}
-          flake8
+          pre-commit install
+          pre-commit run -a
   tests:
     env:
       ENV_NAME: tests

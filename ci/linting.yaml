@@ -3,9 +3,4 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - flake8
-  - pip
-  - pip:
-      - flake8-docstrings
-      - flake8-pytest
-      - flake8-black
+  - pre-commit
