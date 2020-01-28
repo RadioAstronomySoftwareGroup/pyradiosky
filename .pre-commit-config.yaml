@@ -22,11 +22,11 @@ repos:
                 - flake8-comprehensions
                 - flake8-black
                 - flake8-builtins
-#                - flake8-eradicate
+                - flake8-copyright
 #                - pep8-naming
+#                - flake8-eradicate
 #                - flake8-isort
 
-#                - flake8-copyright
 
     - repo: https://github.com/psf/black
       rev: 19.10b0
