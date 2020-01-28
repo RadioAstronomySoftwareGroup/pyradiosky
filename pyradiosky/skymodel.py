@@ -86,18 +86,17 @@ class SkyModel(object):
         Reference frequencies of flux values, shape (Ncomponents,).
     spectral_type : str
         Indicates how fluxes should be calculated at each frequency.
-        Options :
-            - 'flat' : Flat spectrum.
-            - 'full' : Flux is defined by a saved value at each frequency.
-            - 'subband' : Flux is given at a set of band centers. (TODO)
-            - 'spectral_index' : Flux is given at a reference frequency. (TODO)
     spectral_index : array_like of float
         Spectral index of each source, shape (Nfreqs, Ncomponents).
         None if spectral_type is not 'spectral_index'.
+        Options:
+        - 'flat' : Flat spectrum.
+        - 'full' : Flux is defined by a saved value at each frequency.
+        - 'subband' : Flux is given at a set of band centers. (TODO)
+        - 'spectral_index' : Flux is given at a reference frequency. (TODO)
     rise_lst : array_like of float
-        Approximate lst (radians) when the source rises, shape (Ncomponents,).
-        Set by source_cuts.
-        Default is nan, meaning the source never rises.
+        Approximate lst (radians) when the source rises, shape (Ncomponents,). Set by
+        coarse horizon cut in simsetup. Default is nan, meaning the source never rises.
     set_lst : array_like of float
         Approximate lst (radians) when the source sets, shape (Ncomponents,).
         Default is None, meaning the source never sets.
