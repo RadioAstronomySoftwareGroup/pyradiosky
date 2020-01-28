@@ -1,14 +1,10 @@
 # Copyright (c) 2019 Radio Astronomy Software Group
 # Licensed under the 2-clause BSD License
 
-from __future__ import absolute_import, division, print_function
-
 import glob
-import os
 import io
 import sys
 from setuptools import setup
-import json
 
 sys.path.append('pyradiosky')
 # import version  # noqa
@@ -19,6 +15,7 @@ sys.path.append('pyradiosky')
 #     json.dump(data, outfile)
 class mock_version(object):
     version = 0.0
+
 
 version = mock_version()
 

@@ -13,8 +13,8 @@ import pyradiosky.utils as skyutils
 def test_tee_ra_loop():
     time = Time(2457458.1739, scale='utc', format='jd')
     tee_ra = Angle(np.pi / 4., unit='rad')  # rad
-    cirs_ra = skyutils.tee_to_cirs_ra(tee_ra, time)
-    new_tee_ra = skyutils.cirs_to_tee_ra(cirs_ra, time)
+    cirs_ra = skyutils._tee_to_cirs_ra(tee_ra, time)
+    new_tee_ra = skyutils._cirs_to_tee_ra(cirs_ra, time)
     assert new_tee_ra == tee_ra
 
 

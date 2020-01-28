@@ -6,8 +6,10 @@ dependencies:
   - astropy
   - astropy-healpix
   - numpy
+  - h5py
   - pyyaml
   - scipy
   - coverage
   - pytest-cov
   - setuptools_scm
+  - pyuvdata

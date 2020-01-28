@@ -12,8 +12,9 @@ def r_hat(theta, phi):
     Parameters
     ----------
     theta, phi : float
-        The theta, phi coordinates for the point on the sphere (using normal
-        mathematical conventions)
+        The co-latitude and azimuth coordinates, respectively, for a point
+        on the sphere, in radians. Azimuth is defined with respect to the
+        x axis, co-latitude is the angle with the positive z axis.
 
     Returns
     -------
@@ -37,8 +38,9 @@ def theta_hat(theta, phi):
     Parameters
     ----------
     theta, phi : float
-        The theta, phi coordinates for the point on the sphere (using normal
-        mathematical conventions)
+        The co-latitude and azimuth coordinates, respectively, for a point
+        on the sphere, in radians. Azimuth is defined with respect to the
+        x axis, co-latitude is the angle with the positive z axis.
 
     Returns
     -------
@@ -62,8 +64,9 @@ def phi_hat(theta, phi):
     Parameters
     ----------
     theta, phi : float
-        The theta, phi coordinates for the point on the sphere (using normal
-        mathematical conventions)
+        The co-latitude and azimuth coordinates, respectively, for a point
+        on the sphere, in radians. Azimuth is defined with respect to the
+        x axis, co-latitude is the angle with the positive z axis.
 
     Returns
     -------
@@ -80,7 +83,7 @@ def phi_hat(theta, phi):
     return np.stack((phx, phy, phz))
 
 
-def spherical_coordinates_map(rot_matrix, theta, phi):
+def rotate_points_3d(rot_matrix, theta, phi):
     """
     Get the spherical coordinates of the point under a 3d rotation.
 
@@ -96,8 +99,9 @@ def spherical_coordinates_map(rot_matrix, theta, phi):
     rot_matrix : array-like of float
         rotation matrix to use
     theta, phi : float
-        The theta, phi coordinates for the point on the sphere (using normal
-        mathematical conventions) in the inital frame.
+        The co-latitude and azimuth coordinates, respectively, for a point
+        on the sphere, in radians. Azimuth is defined with respect to the
+        x axis, co-latitude is the angle with the positive z axis.
 
     Returns
     -------
@@ -147,14 +151,15 @@ def spherical_basis_vector_rotation_matrix(theta, phi, rot_matrix, beta=None,
     Parameters
     ----------
     theta, phi : float
-        The theta, phi coordinates for the point on the sphere (using normal
-        mathematical conventions) in the inital frame.
+        The co-latitude and azimuth coordinates, respectively, for a point
+        on the sphere, in radians. Azimuth is defined with respect to the
+        x axis, co-latitude is the angle with the positive z axis.
     rot_matrix : array-like of float
         Rotation matrix that takes 3-vectors from (theta, phi) to (beta, alpha)
     beta, alpha : float, optional
         The theta, phi coordinates for the point on the sphere (using normal
         mathematical conventions) in the rotated frame. If either is not provided,
-        they are calculated using `spherical_coordinates_map`. Note these may
+        they are calculated using `rotate_points_3d`. Note these may
         not be as exact as values calculated from astropy.
 
     Returns
@@ -164,7 +169,7 @@ def spherical_basis_vector_rotation_matrix(theta, phi, rot_matrix, beta=None,
         the beta/alpha basis.
     """
     if alpha is None or beta is None:
-        beta, alpha = spherical_coordinates_map(rot_matrix, theta, phi)
+        beta, alpha = rotate_points_3d(rot_matrix, theta, phi)
 
     th = theta_hat(theta, phi)
     ph = phi_hat(theta, phi)
@@ -195,7 +200,7 @@ def axis_angle_rotation_matrix(axis, angle):
     """
     if axis.shape != (3,):
         raise ValueError('axis must be a must be length 3 vector')
-    if not verify_is_unit_vector(axis):
+    if not is_unit_vector(axis):
         raise ValueError('axis must be a unit vector')
 
     K_matrix = np.array([[0., -axis[2], axis[1]],
@@ -210,7 +215,7 @@ def axis_angle_rotation_matrix(axis, angle):
     return rot_matrix
 
 
-def verify_is_orthogonal(matrix, tol=1e-15):
+def is_orthogonal(matrix, tol=1e-15):
     """
     Test for matrix orthogonality.
 
@@ -227,7 +232,7 @@ def verify_is_orthogonal(matrix, tol=1e-15):
     return np.allclose(np.matmul(matrix, matrix.T), np.eye(3), atol=tol)
 
 
-def verify_is_unit_vector(vec, tol=1e-15):
+def is_unit_vector(vec, tol=1e-15):
     """
     Test for unit vectors.
 
@@ -253,8 +258,10 @@ def vecs2rot(r1=None, r2=None, theta1=None, phi1=None, theta2=None, phi2=None):
     r1, r2 : array-like of float, optional
         length 3 unit vectors
     theta1, phi1, theta2, phi2 : float, optional
-        The theta, phi coordinates for the two point on the sphere (using normal
-        mathematical conventions). Ignored if r1 and r2 are supplied.
+        The co-latitude and azimuth coordinates, respectively, for a point
+        on the sphere, in radians. Azimuth is defined with respect to the
+        x axis, co-latitude is the angle with the positive z axis.
+        Ignored if r1 and r2 are supplied.
 
     Returns
     -------
@@ -268,14 +275,14 @@ def vecs2rot(r1=None, r2=None, theta1=None, phi1=None, theta2=None, phi2=None):
         r1 = r_hat(theta1, phi1)
         r2 = r_hat(theta2, phi2)
 
-        assert verify_is_unit_vector(r1), 'r1 is not a unit vector: ' + str(r1)
-        assert verify_is_unit_vector(r2), 'r2 is not a unit vector: ' + str(r2)
+        assert is_unit_vector(r1), 'r1 is not a unit vector: ' + str(r1)
+        assert is_unit_vector(r2), 'r2 is not a unit vector: ' + str(r2)
     else:
         r1 = np.array(r1)
         r2 = np.array(r2)
         if r1.shape != (3,) or r2.shape != (3,):
             raise ValueError('r1 and r2 must be length 3 vectors')
-        if not verify_is_unit_vector(r1) or not verify_is_unit_vector(r2):
+        if not is_unit_vector(r1) or not is_unit_vector(r2):
             raise ValueError('r1 and r2 must be unit vectors')
 
     norm = np.cross(r1, r2)
@@ -286,7 +293,7 @@ def vecs2rot(r1=None, r2=None, theta1=None, phi1=None, theta2=None, phi2=None):
     Psi = np.arctan2(sinPsi, cosPsi)
     rotation = axis_angle_rotation_matrix(n_hat, Psi)
 
-    assert verify_is_unit_vector(n_hat), 'n_hat is not a unit vector: ' + str(n_hat)
-    assert verify_is_orthogonal(rotation), ('rotation matrix is not orthogonal: '
+    assert is_unit_vector(n_hat), 'n_hat is not a unit vector: ' + str(n_hat)
+    assert is_orthogonal(rotation), ('rotation matrix is not orthogonal: '
                                             + str(rotation))
     return rotation

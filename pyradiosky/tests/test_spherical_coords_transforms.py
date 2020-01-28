@@ -21,7 +21,7 @@ def test_hat_errors(func_name):
 
 
 @pytest.mark.skip()
-def test_spherical_coordinates_map():
+def test_rotate_points_3d():
     array_location = EarthLocation(lat='-30d43m17.5s', lon='21d25m41.9s', height=1073.)
     time0 = Time('2018-03-01 18:00:00', scale='utc', location=array_location)
 
@@ -91,7 +91,7 @@ def test_spherical_coordinates_map():
 
         R_perturb = sct.vecs2rot(r1=intermediate_vec, r2=altaz_vec)
 
-        intermediate_theta, intermediate_phi = sct.spherical_coordinates_map(
+        intermediate_theta, intermediate_phi = sct.rotate_points_3d(
             R_avg, theta_radec, phi_radec)
         R_perturb_pts = sct.vecs2rot(theta1=intermediate_theta, phi1=intermediate_phi,
                                      theta2=theta_altaz, phi2=phi_altaz)
@@ -100,7 +100,7 @@ def test_spherical_coordinates_map():
 
         R_exact = np.matmul(R_perturb, R_avg)
 
-        calc_theta_altaz, calc_phi_altaz = sct.spherical_coordinates_map(
+        calc_theta_altaz, calc_phi_altaz = sct.rotate_points_3d(
             R_exact, theta_radec, phi_radec)
 
         if ti == zero_indx:
@@ -133,7 +133,7 @@ def test_spherical_coordinates_map():
 
     # check errors are raised appropriately
     with pytest.raises(ValueError) as cm:
-        sct.spherical_coordinates_map(R_exact[0:1, :], theta_radec, phi_radec)
+        sct.rotate_points_3d(R_exact[0:1, :], theta_radec, phi_radec)
     assert str(cm.value).startswith('rot_matrix must be a 3x3 array')
 
     with pytest.raises(ValueError) as cm:
