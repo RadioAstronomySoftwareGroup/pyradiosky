@@ -825,6 +825,7 @@ def test_read_gleam():
 
     # Check cuts
     source_select_kwds = {'min_flux': 1.0}
+
     catalog = skymodel.read_votable_catalog(
         GLEAM_vot,
         source_select_kwds=source_select_kwds,
