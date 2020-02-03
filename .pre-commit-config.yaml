@@ -23,7 +23,7 @@ repos:
                 - flake8-black
                 - flake8-builtins
                 - flake8-copyright
-#                - pep8-naming
+                - pep8-naming
 #                - flake8-eradicate
 #                - flake8-isort
 
