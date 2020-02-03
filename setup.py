@@ -14,11 +14,11 @@ sys.path.append("pyradiosky")
 # data = [version.git_origin, version.git_hash, version.git_description, version.git_branch]
 # with open(os.path.join('pyradiosky', 'GIT_INFO'), 'w') as outfile:
 #     json.dump(data, outfile)
-class mock_version(object):
+class MockVersion:
     version = 0.0
 
 
-version = mock_version()
+version = MockVersion()
 
 with io.open("README.md", "r", encoding="utf-8") as readme_file:
     readme = readme_file.read()
