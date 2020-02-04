@@ -9,7 +9,7 @@ import warnings
 import numpy as np
 from numpy.lib import recfunctions
 from scipy.linalg import orthogonal_procrustes as ortho_procr
-from astropy.coordinates import Angle, SkyCoord, EarthLocation, AltAz
+from astropy.coordinates import Angle, EarthLocation, AltAz
 from astropy.time import Time
 import astropy.units as units
 from astropy.units import Quantity
@@ -19,15 +19,13 @@ import scipy.io
 from . import utils as skyutils
 from . import spherical_coords_transforms as sct
 
-hasmoon = True
 try:
     from lunarsky import SkyCoord, MoonLocation, LunarTopo
 except ImportError:
+    from astropy.coordinates import SkyCoord
 
     # If lunarsky is unavailable, error if you try to use MoonLocation
     # or LunarTopo frames.
-
-    hasmoon = False
 
     class MoonLocation:
         def __init__(self, *args, **kwargs):
