@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - astropy
+  - astropy>=4.0
   - astropy-healpix
   - numpy
   - pyyaml
