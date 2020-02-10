@@ -6,8 +6,6 @@ import os
 
 import pytest
 import numpy as np
-import h5py
-import astropy_healpix
 from astropy import units
 from astropy.coordinates import SkyCoord, EarthLocation, Angle, AltAz
 from astropy.time import Time
@@ -17,6 +15,7 @@ import scipy.io
 from pyradiosky.data import DATA_PATH as SKY_DATA_PATH
 from pyradiosky import utils as skyutils
 from pyradiosky import skymodel
+from pyradiosky.tests import skipIf_no_healpix
 
 GLEAM_vot = os.path.join(SKY_DATA_PATH, "gleam_50srcs.vot")
 
@@ -559,21 +558,12 @@ def test_units_healpix_to_sky():
         os.path.join(SKY_DATA_PATH, 'healpix_disk.hdf5')
     )
     freqs = freqs * units.Hz
-<<<<<<< HEAD
-    stokes = (hpmap.T * units.K).to(units.Jy,
-                                    units.brightness_temperature(beam_area, freqs)).T
-    sky = skymodel.healpix_to_sky(hpmap, inds, freqs)
-=======
 
-    if astropy.__version__.startswith("4"):
-        brightness_temperature_conv = units.brightness_temperature(
-            freqs, beam_area=beam_area
-        )
-    else:
-        brightness_temperature_conv = units.brightness_temperature(beam_area, freqs)
+    brightness_temperature_conv = units.brightness_temperature(
+        freqs, beam_area=beam_area
+    )
     stokes = (hpmap.T * units.K).to(units.Jy, brightness_temperature_conv).T
-    sky = pyradiosky.healpix_to_sky(hpmap, inds, freqs)
->>>>>>> fix healpix, h5py imports, more fixes for astropy 4.0
+    sky = skymodel.healpix_to_sky(hpmap, inds, freqs)
 
     assert np.allclose(sky.stokes[0, 0], stokes.value[0])
 
@@ -674,11 +664,7 @@ def test_healpix_positions():
 def test_param_flux_cuts():
     # Check that min/max flux limits in test params work.
 
-<<<<<<< HEAD
     catalog_table = skymodel.read_votable_catalog(GLEAM_vot, return_table=True)
-=======
-    catalog_table = pyradiosky.read_votable_catalog(GLEAM_vot, return_table=True)
->>>>>>> fix healpix, h5py imports, more fixes for astropy 4.0
 
     catalog_table = skymodel.source_cuts(catalog_table, min_flux=0.2, max_flux=1.5)
 
@@ -719,7 +705,7 @@ def test_point_catalog_reader():
 
 def test_idl_catalog_reader():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
-    sourcelist = pyradiosky.read_idl_catalog(catfile, expand_extended=False)
+    sourcelist = skymodel.read_idl_catalog(catfile, expand_extended=False)
 
     catalog = scipy.io.readsav(catfile)["catalog"]
     assert len(sourcelist.ra) == len(catalog)
@@ -727,7 +713,7 @@ def test_idl_catalog_reader():
 
 def test_idl_catalog_reader_extended_sources():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
-    sourcelist = pyradiosky.read_idl_catalog(catfile, expand_extended=True)
+    sourcelist = skymodel.read_idl_catalog(catfile, expand_extended=True)
 
     catalog = scipy.io.readsav(catfile)["catalog"]
     ext_inds = np.where(
