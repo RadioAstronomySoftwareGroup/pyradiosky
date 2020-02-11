@@ -1,11 +1,9 @@
-name: tests
+name: min_deps
 channels:
   - conda-forge
   - defaults
 dependencies:
-  - astropy>=4.0
-  - astropy-healpix
-  - h5py
+  - astropy
   - numpy
   - h5py
   - scipy
