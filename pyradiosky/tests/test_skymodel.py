@@ -718,7 +718,7 @@ def test_idl_catalog_reader_extended_sources():
     catalog = scipy.io.readsav(catfile)["catalog"]
     ext_inds = np.where(
         [catalog["extend"][ind] is not None for ind in range(len(catalog))]
-    )
+    )[0]
     ext_Ncomps = [len(catalog[ext]["extend"]) for ext in ext_inds]
     assert len(sourcelist.ra) == len(catalog) - len(ext_inds) + sum(ext_Ncomps)
 
