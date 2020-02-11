@@ -4,6 +4,7 @@
 
 import os
 
+import h5py
 import pytest
 import numpy as np
 from astropy import units
@@ -15,7 +16,6 @@ import scipy.io
 from pyradiosky.data import DATA_PATH as SKY_DATA_PATH
 from pyradiosky import utils as skyutils
 from pyradiosky import skymodel
-from pyradiosky.tests import skipIf_no_healpix
 
 GLEAM_vot = os.path.join(SKY_DATA_PATH, "gleam_50srcs.vot")
 
@@ -316,8 +316,8 @@ def test_polarized_source_smooth_visibilities():
         assert np.all(imag_stokes == 0)
 
 
-@skipIf_no_healpix
 def test_read_healpix_hdf5():
+    pytest.importorskip('astropy_healpix')
     import astropy_healpix
 
     Nside = 32
@@ -435,8 +435,8 @@ def test_read_healpix_hdf5():
     assert np.allclose(freqs, frequencies)
 
 
-@skipIf_no_healpix
 def test_healpix_to_sky():
+    pytest.importorskip('astropy_healpix')
     import astropy_healpix
 
     Nside = 32
@@ -547,8 +547,8 @@ def test_healpix_to_sky():
     assert np.allclose(sky.stokes[0], hmap_orig.value)
 
 
-@skipIf_no_healpix
 def test_units_healpix_to_sky():
+    pytest.importorskip('astropy_healpix')
     import astropy_healpix
 
     Nside = 32
@@ -568,9 +568,8 @@ def test_units_healpix_to_sky():
     assert np.allclose(sky.stokes[0, 0], stokes.value[0])
 
 
-@skipIf_no_healpix
 def test_healpix_positions():
-    import h5py
+    pytest.importorskip('astropy_healpix')
     import astropy_healpix
 
     # write out a healpix file, read it back in check that it is as expected
