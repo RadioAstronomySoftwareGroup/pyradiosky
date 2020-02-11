@@ -436,8 +436,17 @@ def test_read_healpix_hdf5():
 
 
 def test_healpix_to_sky():
-    pytest.importorskip('astropy_healpix')
-    import astropy_healpix
+    hpmap, inds, freqs = skymodel.read_healpix_hdf5(
+        os.path.join(SKY_DATA_PATH, 'healpix_disk.hdf5')
+    )
+
+    try:
+        import astropy_healpix
+    except ImportError:
+        with pytest.raises(ImportError) as cm:
+            skymodel.healpix_to_sky(hpmap, inds, freqs)
+        assert str(cm.value).startswith("The astropy-healpix module must be installed to use HEALPix methods")
+        pytest.importorskip('astropy_healpix')
 
     Nside = 32
     Npix = astropy_healpix.nside_to_npix(Nside)
@@ -537,9 +546,6 @@ def test_healpix_to_sky():
     hmap_orig[ipix_disc] = hmap_orig.max()
 
     hmap_orig = np.repeat(hmap_orig[None, :], 10, axis=0)
-    hpmap, inds, freqs = skymodel.read_healpix_hdf5(
-        os.path.join(SKY_DATA_PATH, 'healpix_disk.hdf5')
-    )
     hmap_orig = (hmap_orig.T / skyutils.jy_to_ksr(freqs)).T
     hmap_orig = hmap_orig * astropy_healpix.nside_to_pixel_area(Nside)
     sky = skymodel.healpix_to_sky(hpmap, inds, freqs)
