@@ -102,7 +102,7 @@ jobs:
           source activate $ENV_NAME
           python -m pytest -v --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml --junitxml=test-reports/xunit.xml
       - uses: codecov/codecov-action@master
-        if: matrix.os == 'ubuntu-latest' && success()
+        if: success()
         with:
           token: ${{secrets.CODECOV_TOKEN}} #required
           file: ./coverage.xml #optional
