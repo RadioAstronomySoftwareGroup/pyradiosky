@@ -345,8 +345,7 @@ class SkyModel(object):
                 errm += " or a lunarsky MoonLocation object "
             errm += ". "
             raise ValueError(
-                errm
-                "value was: {al}".format(al=telescope_location)
+                errm + "value was: {al}".format(al=telescope_location)
             )
 
         Ionly_mask = np.sum(self.stokes[1:, :, :], axis=0) == 0.0
@@ -408,8 +407,7 @@ class SkyModel(object):
                 errm += " or a lunarsky MoonLocation object "
             errm += ". "
             raise ValueError(
-                errm
-                "value was: {al}".format(al=telescope_location)
+                errm + "value was: {al}".format(al=telescope_location)
             )
 
         if self.time == time:  # Don't repeat calculations

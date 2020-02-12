@@ -16,7 +16,6 @@ import scipy.io
 from pyradiosky.data import DATA_PATH as SKY_DATA_PATH
 from pyradiosky import utils as skyutils
 from pyradiosky import skymodel
-from pyradiosky.tests import skipIf_no_healpix, skipIf_no_moon
 
 GLEAM_vot = os.path.join(SKY_DATA_PATH, "gleam_50srcs.vot")
 
@@ -857,13 +856,13 @@ def test_array_to_skymodel_loop():
     assert np.allclose((sky.dec - sky2.dec).rad, 0.0)
 
 
-@skipIf_no_moon
 class TestMoon():
     """
     Series of tests for Moon-based observers
     """
 
     def setup(self):
+        pytest.importorskip('lunarsky')
 
         from lunarsky import MoonLocation, SkyCoord as SC
 
