@@ -520,7 +520,8 @@ def healpix_to_sky(hpmap, indices, freqs):
         import astropy_healpix
     except ImportError as e:
         raise ImportError(
-            'The astropy-healpix module must be installed to use HEALPix methods') from e
+            "The astropy-healpix module must be installed to use HEALPix methods"
+        ) from e
 
     Nside = astropy_healpix.npix_to_nside(hpmap.shape[-1])
     ra, dec = astropy_healpix.healpix_to_lonlat(indices, Nside)
