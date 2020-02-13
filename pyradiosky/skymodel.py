@@ -19,21 +19,34 @@ import scipy.io
 from . import utils as skyutils
 from . import spherical_coords_transforms as sct
 
+
+__all__ = [
+    'hasmoon',
+    'SkyModel',
+    'read_healpix_hdf5',
+    'healpix_to_sky',
+    'skymodel_to_array',
+    'array_to_skymodel',
+    'source_cuts',
+    'read_votable_catalog',
+    'read_text_catalog',
+    'read_idl_catalog',
+    'write_catalog_to_file'
+]
+
+
 try:
     from lunarsky import SkyCoord, MoonLocation, LunarTopo
+    hasmoon = True
 except ImportError:
     from astropy.coordinates import SkyCoord
-
-    # If lunarsky is unavailable, error if you try to use MoonLocation
-    # or LunarTopo frames.
+    hasmoon = False
 
     class MoonLocation:
-        def __init__(self, *args, **kwargs):
-            raise ValueError('MoonLocation is undefined.')
+        pass
 
     class LunarTopo:
-        def __init__(self, *args, **kwargs):
-            raise ValueError('LunarTopo frame is undefined.')
+        pass
 
 # Nov 5 2019 notes
 #    Read/write methods to add:
@@ -345,7 +358,7 @@ class SkyModel(object):
                 errm += " or a lunarsky MoonLocation object "
             errm += ". "
             raise ValueError(
-                errm + "value was: {al}".format(al=telescope_location)
+                errm + "value was: {al}".format(al=str(telescope_location))
             )
 
         Ionly_mask = np.sum(self.stokes[1:, :, :], axis=0) == 0.0
@@ -407,7 +420,7 @@ class SkyModel(object):
                 errm += " or a lunarsky MoonLocation object "
             errm += ". "
             raise ValueError(
-                errm + "value was: {al}".format(al=telescope_location)
+                errm + "value was: {al}".format(al=str(telescope_location))
             )
 
         if self.time == time:  # Don't repeat calculations
