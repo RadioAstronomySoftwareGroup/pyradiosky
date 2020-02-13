@@ -362,7 +362,7 @@ def test_polarized_source_smooth_visibilities():
 
 
 def test_read_healpix_hdf5():
-    pytest.importorskip('astropy_healpix')
+    pytest.importorskip("astropy_healpix")
     import astropy_healpix
 
     Nside = 32
@@ -482,7 +482,7 @@ def test_read_healpix_hdf5():
 
 def test_healpix_to_sky():
     hpmap, inds, freqs = skymodel.read_healpix_hdf5(
-        os.path.join(SKY_DATA_PATH, 'healpix_disk.hdf5')
+        os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
     )
 
     try:
@@ -490,8 +490,10 @@ def test_healpix_to_sky():
     except ImportError:
         with pytest.raises(ImportError) as cm:
             skymodel.healpix_to_sky(hpmap, inds, freqs)
-        assert str(cm.value).startswith("The astropy-healpix module must be installed to use HEALPix methods")
-        pytest.importorskip('astropy_healpix')
+        assert str(cm.value).startswith(
+            "The astropy-healpix module must be installed to use HEALPix methods"
+        )
+        pytest.importorskip("astropy_healpix")
 
     Nside = 32
     Npix = astropy_healpix.nside_to_npix(Nside)
@@ -599,7 +601,7 @@ def test_healpix_to_sky():
 
 
 def test_units_healpix_to_sky():
-    pytest.importorskip('astropy_healpix')
+    pytest.importorskip("astropy_healpix")
     import astropy_healpix
 
     Nside = 32
@@ -620,7 +622,7 @@ def test_units_healpix_to_sky():
 
 
 def test_healpix_positions():
-    pytest.importorskip('astropy_healpix')
+    pytest.importorskip("astropy_healpix")
     import astropy_healpix
 
     # write out a healpix file, read it back in check that it is as expected
