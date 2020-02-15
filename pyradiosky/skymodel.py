@@ -496,6 +496,63 @@ def read_healpix_hdf5(hdf5_filename):
     return hpmap, indices, freqs
 
 
+def write_healpix_hdf5(filename, hpmap, indices, freqs, Nside=None, history=None):
+    try:
+        import astropy_healpix
+    except ImportError as e:
+        raise ImportError(
+            'The astropy-healpix module must be installed to use HEALPix methods') from e
+
+    import h5py
+
+    Nfreqs = freqs.size
+    Npix = len(indices)
+    if Nside is None:
+        try:
+            Nside = astropy_healpix.npix_to_nside(Npix)
+        except ValueError:
+            raise ValueError("Need to provide Nside if giving a subset of the map.")
+
+    try:
+        assert hpmap.shape == (Nfreqs, Npix)
+    except AssertionError:
+        raise ValueError("Invalid map shape {}".format(str(hpmap.shape)))
+
+    if history is None:
+        history = ''
+
+    valid_params = {
+        "Npix": Npix,
+        "Nside": Nside,
+        "Nskies": 1,
+        "Nfreqs": Nfreqs,
+        "data": hpmap[None, ...],
+        "indices": indices,
+        "freqs": freqs.to('Hz').value,
+        "history": history,
+    }
+    dsets = {
+        "data": np.float64,
+        "indices": np.int32,
+        "freqs": np.float64,
+        "history": h5py.special_dtype(vlen=str),
+    }
+
+    with h5py.File(filename, "w") as fileobj:
+        for k in valid_params:
+            d = valid_params[k]
+            if k in dsets:
+                if np.isscalar(d):
+                    fileobj.create_dataset(
+                        k, data=d, dtype=dsets[k])
+                else:
+                    fileobj.create_dataset(
+                        k, data=d, dtype=dsets[k], compression='gzip',
+                        compression_opts=9)
+            else:
+                fileobj.attrs[k] = d
+
+
 def healpix_to_sky(hpmap, indices, freqs):
     """
     Convert a healpix map in K to a set of point source components in Jy.
@@ -504,7 +561,7 @@ def healpix_to_sky(hpmap, indices, freqs):
     ----------
     hpmap : array_like of float
         Stokes-I surface brightness in K, for a set of pixels
-        Shape (Ncomponents, Nfreqs)
+        Shape (Nfreqs, Ncomponents)
     indices : array_like, int
         Corresponding HEALPix indices for hpmap.
     freqs : array_like, float
