@@ -4,19 +4,17 @@
 
 import os
 
-import h5py
 import pytest
 import numpy as np
 from astropy import units
 from astropy.coordinates import SkyCoord, EarthLocation, Angle, AltAz
-from astropy.time import Time, TimeDelta
+from astropy.time import Time
 import scipy.io
 
 
 from pyradiosky.data import DATA_PATH as SKY_DATA_PATH
 from pyradiosky import utils as skyutils
 from pyradiosky import skymodel
-
 
 GLEAM_vot = os.path.join(SKY_DATA_PATH, "gleam_50srcs.vot")
 
@@ -45,18 +43,16 @@ def test_source_zenith_from_icrs():
     dec = icrs_coord.dec
     # Check error cases
     with pytest.raises(ValueError) as cm:
-        skymodel.SkyModel("icrs_zen", ra.rad, dec.rad, [1, 0, 0, 0], 1e8, "flat")
-    assert str(cm.value).startswith(
-        "ra must be an astropy Angle object. " "value was: 3.14"
-    )
+        skymodel.SkyModel('icrs_zen', ra.rad, dec.rad, [1, 0, 0, 0], 1e8, 'flat')
+    assert str(cm.value).startswith('ra must be an astropy Angle object. '
+                                    'value was: 3.14')
 
     with pytest.raises(ValueError) as cm:
-        skymodel.SkyModel("icrs_zen", ra, dec.rad, [1, 0, 0, 0], 1e8, "flat")
-    assert str(cm.value).startswith(
-        "dec must be an astropy Angle object. " "value was: -0.53"
-    )
+        skymodel.SkyModel('icrs_zen', ra, dec.rad, [1, 0, 0, 0], 1e8, 'flat')
+    assert str(cm.value).startswith('dec must be an astropy Angle object. '
+                                    'value was: -0.53')
 
-    zenith_source = skymodel.SkyModel("icrs_zen", ra, dec, [1, 0, 0, 0], 1e8, "flat")
+    zenith_source = skymodel.SkyModel('icrs_zen', ra, dec, [1, 0, 0, 0], 1e8, 'flat')
 
     zenith_source.update_positions(time, array_location)
     zenith_source_lmn = zenith_source.pos_lmn.squeeze()
@@ -84,7 +80,7 @@ def test_source_zenith():
     names = "zen_source"
     stokes = [1, 0, 0, 0]
     freqs = [1e8]
-    zenith_source = skymodel.SkyModel(names, ra, dec, stokes, freqs, "flat")
+    zenith_source = skymodel.SkyModel(names, ra, dec, stokes, freqs, 'flat')
 
     zenith_source.update_positions(time, array_location)
     zenith_source_lmn = zenith_source.pos_lmn.squeeze()
@@ -97,20 +93,12 @@ def test_calc_basis_rotation_matrix():
     actually a rotation matrix (R R^T = R^T R = I)
     """
 
-    time = Time("2018-01-01 00:00")
+    time = Time('2018-01-01 00:00')
     telescope_location = EarthLocation(
-        lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0
-    )
+        lat='-30d43m17.5s', lon='21d25m41.9s', height=1073.)
 
-    source = skymodel.SkyModel(
-        "Test",
-        Angle(12.0 * units.hr),
-        Angle(-30.0 * units.deg),
-        [1.0, 0.0, 0.0, 0.0],
-        1e8,
-        "flat",
-    )
-
+    source = skymodel.SkyModel('Test', Angle(12. * units.hr),
+                               Angle(-30. * units.deg), [1., 0., 0., 0.], 1e8, 'flat')
     source.update_positions(time, telescope_location)
 
     basis_rot_matrix = source._calc_average_rotation_matrix(telescope_location)
@@ -125,20 +113,12 @@ def test_calc_vector_rotation():
     I suppose we could also have checked (R R^T = R^T R = I)
     """
 
-    time = Time("2018-01-01 00:00")
+    time = Time('2018-01-01 00:00')
     telescope_location = EarthLocation(
-        lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0
-    )
+        lat='-30d43m17.5s', lon='21d25m41.9s', height=1073.)
 
-    source = skymodel.SkyModel(
-        "Test",
-        Angle(12.0 * units.hr),
-        Angle(-30.0 * units.deg),
-        [1.0, 0.0, 0.0, 0.0],
-        1e8,
-        "flat",
-    )
-
+    source = skymodel.SkyModel('Test', Angle(12. * units.hr),
+                               Angle(-30. * units.deg), [1., 0., 0., 0.], 1e8, 'flat')
     source.update_positions(time, telescope_location)
 
     coherency_rotation = np.squeeze(source._calc_coherency_rotation(telescope_location))
@@ -194,14 +174,8 @@ def test_polarized_source_visibilities():
     decoff = 0.0 * units.arcmin  # -0.17 * units.arcsec
     raoff = 0.0 * units.arcsec
 
-    source = skymodel.SkyModel(
-        "icrs_zen",
-        zenith_icrs.ra + raoff,
-        zenith_icrs.dec + decoff,
-        stokes_radec,
-        1e8,
-        "flat",
-    )
+    source = skymodel.SkyModel('icrs_zen', zenith_icrs.ra + raoff,
+                               zenith_icrs.dec + decoff, stokes_radec, 1e8, 'flat')
 
     coherency_matrix_local = np.zeros([2, 2, ntimes], dtype="complex128")
     alts = np.zeros(ntimes)
@@ -263,24 +237,6 @@ def test_polarized_source_visibilities():
     assert np.allclose(coherency_instr_local, expected_instr_local)
 
 
-def test_coherency_calc_errors():
-    """Test that correct errors are raised when providing invalid location object."""
-    coord = SkyCoord(ra=30.0 * units.deg, dec=40 * units.deg, frame="icrs")
-
-    stokes_radec = [1, -0.2, 0.3, 0.1]
-
-    source = skymodel.SkyModel("test", coord.ra, coord.dec, stokes_radec, 1e8, "flat")
-    time = Time.now()
-    array_location = None
-    with pytest.raises(ValueError) as err:
-        source.update_positions(time, telescope_location=array_location)
-    assert str(err.value).startswith("telescope_location must be an")
-
-    with pytest.raises(ValueError) as err:
-        source.coherency_calc(array_location).squeeze()
-    assert str(err.value).startswith("telescope_location must be an")
-
-
 def test_polarized_source_smooth_visibilities():
     """Test that visibilities change smoothly as a polarized source transits."""
     array_location = EarthLocation(lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0)
@@ -312,9 +268,8 @@ def test_polarized_source_smooth_visibilities():
 
     stokes_radec = [1, -0.2, 0.3, 0.1]
 
-    source = skymodel.SkyModel(
-        "icrs_zen", zenith_icrs.ra, zenith_icrs.dec, stokes_radec, 1e8, "flat"
-    )
+    source = skymodel.SkyModel('icrs_zen', zenith_icrs.ra,
+                               zenith_icrs.dec, stokes_radec, 1e8, 'flat')
 
     coherency_matrix_local = np.zeros([2, 2, ntimes], dtype="complex128")
     alts = np.zeros(ntimes)
@@ -360,268 +315,114 @@ def test_polarized_source_smooth_visibilities():
         assert np.all(imag_stokes == 0)
 
 
-def test_read_healpix_hdf5():
-    pytest.importorskip("astropy_healpix")
-    import astropy_healpix
+class TestHealpixHdf5():
+    pytest.importorskip('astropy_healpix')
 
-    Nside = 32
-    # hp_obj = HEALPix(nside=Nside)
-    Npix = astropy_healpix.nside_to_npix(Nside)
-    # ipix_disc = hp_obj.cone_search_lonlat((np.pi / 2) * units.rad,
-    # (np.pi * 3 / 4) * units.rad, radius = 10 * units.rad)
-    # Npix = hp.nside2npix(Nside)
-    # vec = astropy_healpix.healpy.ang2vec(np.pi / 2, np.pi * 3 / 4)
-    # vec = hp.ang2vec(np.pi / 2, np.pi * 3 / 4)
-    # ipix_disc = hp.query_disc(nside=32, vec=vec, radius=np.radians(10))
-    m = np.arange(Npix)
-    ipix_disc = [
-        5103,
-        5104,
-        5231,
-        5232,
-        5233,
-        5358,
-        5359,
-        5360,
-        5361,
-        5486,
-        5487,
-        5488,
-        5489,
-        5490,
-        5613,
-        5614,
-        5615,
-        5616,
-        5617,
-        5618,
-        5741,
-        5742,
-        5743,
-        5744,
-        5745,
-        5746,
-        5747,
-        5869,
-        5870,
-        5871,
-        5872,
-        5873,
-        5874,
-        5997,
-        5998,
-        5999,
-        6000,
-        6001,
-        6002,
-        6003,
-        6124,
-        6125,
-        6126,
-        6127,
-        6128,
-        6129,
-        6130,
-        6131,
-        6253,
-        6254,
-        6255,
-        6256,
-        6257,
-        6258,
-        6259,
-        6381,
-        6382,
-        6383,
-        6384,
-        6385,
-        6386,
-        6509,
-        6510,
-        6511,
-        6512,
-        6513,
-        6514,
-        6515,
-        6637,
-        6638,
-        6639,
-        6640,
-        6641,
-        6642,
-        6766,
-        6767,
-        6768,
-        6769,
-        6770,
-        6894,
-        6895,
-        6896,
-        6897,
-        7023,
-        7024,
-        7025,
-        7151,
-        7152,
-    ]
-    m[ipix_disc] = m.max()
+    def setup(self):
+        # Common features of tests
+        import astropy_healpix
+        self.Nside = 32
+        self.Npix = astropy_healpix.nside_to_npix(self.Nside)
+        hp_obj = astropy_healpix.HEALPix(nside=self.Nside)
+        self.frequencies = np.linspace(100, 110, 10)
+        self.pixel_area = astropy_healpix.nside_to_pixel_area(self.Nside)
+        # Note that the cone search includes any pixels that overlap with the search
+        # region. With such a low resolution, this returns some slightly different
+        # results from the equivalent healpy search. Subtracting(0.75 * pixres) from
+        # the pixel area resolves this discrepancy for the test.
 
-    indices = np.arange(Npix)
+        pixres = hp_obj.pixel_resolution.to('deg').value
+        self.ipix_disc = hp_obj.cone_search_lonlat(
+            135 * units.deg, 0 * units.deg, radius=(10 - pixres * 0.75) * units.deg
+        )
 
-    frequencies = np.linspace(100, 110, 10)
+    def test_read_healpix_hdf5(self):
 
-    hpmap, inds, freqs = skymodel.read_healpix_hdf5(
-        os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
-    )
+        m = np.arange(self.Npix)
+        m[self.ipix_disc] = self.Npix - 1
 
-    assert np.allclose(hpmap[0, :], m)
-    assert np.allclose(inds, indices)
-    assert np.allclose(freqs, frequencies)
+        indices = np.arange(self.Npix)
+
+        hpmap, inds, freqs = skymodel.read_healpix_hdf5(
+            os.path.join(SKY_DATA_PATH, 'healpix_disk.hdf5')
+        )
+
+        assert np.allclose(hpmap[0, :], m)
+        assert np.allclose(inds, indices)
+        assert np.allclose(freqs, self.frequencies)
+
+    def test_healpix_to_sky(self):
+        hpmap, inds, freqs = skymodel.read_healpix_hdf5(
+            os.path.join(SKY_DATA_PATH, 'healpix_disk.hdf5')
+        )
+
+        hmap_orig = np.arange(self.Npix)
+        hmap_orig[self.ipix_disc] = self.Npix - 1
+
+        hmap_orig = np.repeat(hmap_orig[None, :], 10, axis=0)
+        hmap_orig = (hmap_orig.T / skyutils.jy_to_ksr(freqs)).T
+        hmap_orig = hmap_orig * self.pixel_area
+        sky = skymodel.healpix_to_sky(hpmap, inds, freqs)
+
+        assert np.allclose(sky.stokes[0], hmap_orig.value)
+
+    def test_units_healpix_to_sky(self):
+
+        hpmap, inds, freqs = skymodel.read_healpix_hdf5(
+            os.path.join(SKY_DATA_PATH, 'healpix_disk.hdf5')
+        )
+        freqs = freqs * units.Hz
+
+        brightness_temperature_conv = units.brightness_temperature(
+            freqs, beam_area=self.pixel_area
+        )
+        stokes = (hpmap.T * units.K).to(units.Jy, brightness_temperature_conv).T
+        sky = skymodel.healpix_to_sky(hpmap, inds, freqs)
+
+        assert np.allclose(sky.stokes[0, 0], stokes.value[0])
+
+    def test_read_write_healpix(self):
+
+        hpmap, inds, freqs = skymodel.read_healpix_hdf5(
+            os.path.join(SKY_DATA_PATH, 'healpix_disk.hdf5')
+        )
+        freqs = freqs * units.Hz
+        filename = 'tempfile.hdf5'
+        with pytest.raises(ValueError) as verr:
+            skymodel.write_healpix_hdf5(filename, hpmap, inds[:10], freqs)
+        assert str(verr.value).startswith("Need to provide Nside if giving a subset of the map.")
+
+        with pytest.raises(ValueError) as verr:
+            skymodel.write_healpix_hdf5(filename, hpmap, inds[:10], freqs.value, Nside=self.Nside)
+        assert str(verr.value).startswith("Invalid map shape")
+
+        skymodel.write_healpix_hdf5(filename, hpmap, inds, freqs)
+
+        hpmap_new, inds_new, freqs_new = skymodel.read_healpix_hdf5(filename)
+
+        os.remove(filename)
+
+        assert np.allclose(hpmap_new, hpmap)
+        assert np.allclose(inds_new, inds)
+        assert np.allclose(freqs_new, freqs.to("Hz").value)
 
 
-def test_healpix_to_sky():
-    hpmap, inds, freqs = skymodel.read_healpix_hdf5(
-        os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
-    )
-
+def test_healpix_import_err():
     try:
         import astropy_healpix
+        astropy_healpix.nside_to_npix(2**3)
     except ImportError:
         with pytest.raises(ImportError) as cm:
+            Npix = 12
+            hpmap = np.arange(Npix)
+            inds = hpmap
+            freqs = np.zeros(1)
             skymodel.healpix_to_sky(hpmap, inds, freqs)
-        assert str(cm.value).startswith(
-            "The astropy-healpix module must be installed to use HEALPix methods"
-        )
-        pytest.importorskip("astropy_healpix")
-
-    Nside = 32
-    Npix = astropy_healpix.nside_to_npix(Nside)
-    # vec = hp.ang2vec(np.pi / 2, np.pi * 3 / 4)
-    # ipix_disc = hp.query_disc(nside=32, vec=vec, radius=np.radians(10))
-    hmap_orig = np.arange(Npix)
-    ipix_disc = [
-        5103,
-        5104,
-        5231,
-        5232,
-        5233,
-        5358,
-        5359,
-        5360,
-        5361,
-        5486,
-        5487,
-        5488,
-        5489,
-        5490,
-        5613,
-        5614,
-        5615,
-        5616,
-        5617,
-        5618,
-        5741,
-        5742,
-        5743,
-        5744,
-        5745,
-        5746,
-        5747,
-        5869,
-        5870,
-        5871,
-        5872,
-        5873,
-        5874,
-        5997,
-        5998,
-        5999,
-        6000,
-        6001,
-        6002,
-        6003,
-        6124,
-        6125,
-        6126,
-        6127,
-        6128,
-        6129,
-        6130,
-        6131,
-        6253,
-        6254,
-        6255,
-        6256,
-        6257,
-        6258,
-        6259,
-        6381,
-        6382,
-        6383,
-        6384,
-        6385,
-        6386,
-        6509,
-        6510,
-        6511,
-        6512,
-        6513,
-        6514,
-        6515,
-        6637,
-        6638,
-        6639,
-        6640,
-        6641,
-        6642,
-        6766,
-        6767,
-        6768,
-        6769,
-        6770,
-        6894,
-        6895,
-        6896,
-        6897,
-        7023,
-        7024,
-        7025,
-        7151,
-        7152,
-    ]
-    hmap_orig[ipix_disc] = hmap_orig.max()
-
-    hmap_orig = np.repeat(hmap_orig[None, :], 10, axis=0)
-    hmap_orig = (hmap_orig.T / skyutils.jy_to_ksr(freqs)).T
-    hmap_orig = hmap_orig * astropy_healpix.nside_to_pixel_area(Nside)
-    sky = skymodel.healpix_to_sky(hpmap, inds, freqs)
-
-    assert np.allclose(sky.stokes[0], hmap_orig.value)
-
-
-def test_units_healpix_to_sky():
-    pytest.importorskip("astropy_healpix")
-    import astropy_healpix
-
-    Nside = 32
-    beam_area = astropy_healpix.nside_to_pixel_area(Nside)  # * units.sr
-    # beam_area = hp.pixelfunc.nside2pixarea(Nside) * units.sr
-
-    hpmap, inds, freqs = skymodel.read_healpix_hdf5(
-        os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
-    )
-    freqs = freqs * units.Hz
-    brightness_temperature_conv = units.brightness_temperature(
-        freqs, beam_area=beam_area
-    )
-    stokes = (hpmap.T * units.K).to(units.Jy, brightness_temperature_conv).T
-    sky = skymodel.healpix_to_sky(hpmap, inds, freqs)
-
-    assert np.allclose(sky.stokes[0, 0], stokes.value[0])
+        assert str(cm.value).startswith("The astropy-healpix module must be installed to use HEALPix methods")
 
 
 def test_healpix_positions():
-    pytest.importorskip("astropy_healpix")
+    pytest.importorskip('astropy_healpix')
     import astropy_healpix
 
     # write out a healpix file, read it back in check that it is as expected
@@ -629,65 +430,22 @@ def test_healpix_positions():
     Npix = astropy_healpix.nside_to_npix(Nside)
     freqs = np.arange(100, 100.5, 0.1) * 1e6
     Nfreqs = len(freqs)
-    hpx_map = np.zeros((Npix, Nfreqs))
+    hpx_map = np.zeros((Nfreqs, Npix))
     ipix = 357
     # Want 1 [Jy] converted to [K sr]
-    hpx_map[ipix, :] = skyutils.jy_to_ksr(freqs)
-
-    Nskies = 1
-    dataset = np.zeros((Nskies, Nfreqs, len(hpx_map)))
-    for j in range(0, len(hpx_map)):
-        dataset[0, :, j] = freqs
-    for i in range(0, Nfreqs):
-        dataset[0, i, :] = hpx_map[:, i]
+    hpx_map[:, ipix] = skyutils.jy_to_ksr(freqs)
 
     filename = os.path.join(SKY_DATA_PATH, "healpix_single.hdf5")
 
-    valid_params = {
-        "Npix": Npix,
-        "Nside": Nside,
-        "Nskies": Nskies,
-        "Nfreqs": Nfreqs,
-        "data": dataset,
-        "indices": np.arange(Npix),
-        "freqs": freqs,
-        "history": "1jy source written by test code",
-    }
-    dsets = {
-        "data": np.float64,
-        "indices": np.int32,
-        "freqs": np.float64,
-        "history": h5py.special_dtype(vlen=str),
-    }
-
-    history_string = ""
-    with h5py.File(filename, "w") as fileobj:
-        for k in valid_params:
-            d = valid_params[k]
-            if k == "history":
-                d += history_string
-            if k in dsets:
-                if np.isscalar(d):
-                    fileobj.create_dataset(k, data=d, dtype=dsets[k])
-                else:
-                    fileobj.create_dataset(
-                        k,
-                        data=d,
-                        dtype=dsets[k],
-                        compression="gzip",
-                        compression_opts=9,
-                    )
-            else:
-                fileobj.attrs[k] = d
+    skymodel.write_healpix_hdf5(filename, hpx_map, range(Npix), freqs * units.Hz)
 
     time = Time("2018-03-01 00:00:00", scale="utc")
     array_location = EarthLocation(lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0)
 
     ra, dec = astropy_healpix.healpix_to_lonlat(ipix, Nside)
-    skycoord_use = SkyCoord(ra, dec, frame="icrs")
+    skycoord_use = SkyCoord(ra, dec, frame='icrs')
     source_altaz = skycoord_use.transform_to(
-        AltAz(obstime=time, location=array_location)
-    )
+        AltAz(obstime=time, location=array_location))
     alt_az = np.array([source_altaz.alt.value, source_altaz.az.value])
 
     src_az = Angle(alt_az[1], unit="deg")
@@ -720,6 +478,7 @@ def test_param_flux_cuts():
     # Check that min/max flux limits in test params work.
 
     catalog_table = skymodel.read_votable_catalog(GLEAM_vot, return_table=True)
+
     catalog_table = skymodel.source_cuts(catalog_table, min_flux=0.2, max_flux=1.5)
 
     catalog = skymodel.array_to_skymodel(catalog_table)
@@ -728,7 +487,7 @@ def test_param_flux_cuts():
 
 
 def test_point_catalog_reader():
-    catfile = os.path.join(SKY_DATA_PATH, "pointsource_catalog.txt")
+    catfile = os.path.join(SKY_DATA_PATH, 'pointsource_catalog.txt')
     srcs = skymodel.read_text_catalog(catfile)
 
     with open(catfile, "r") as fhandle:
@@ -750,7 +509,7 @@ def test_point_catalog_reader():
     assert srcs.stokes[0] in catalog_table["flux_density_I"]
 
     # Check cuts
-    source_select_kwds = {"min_flux": 1.0}
+    source_select_kwds = {'min_flux': 1.0}
     catalog = skymodel.read_text_catalog(
         catfile, source_select_kwds=source_select_kwds, return_table=True
     )
@@ -800,7 +559,7 @@ def test_flux_cuts():
     maxI_cut = 2.3
 
     cut_sourcelist = skymodel.source_cuts(
-        catalog_table, latitude_deg=30.0, min_flux=minI_cut, max_flux=maxI_cut
+        catalog_table, latitude_deg=30., min_flux=minI_cut, max_flux=maxI_cut
     )
     assert np.all(cut_sourcelist["flux_density_I"] > minI_cut)
     assert np.all(cut_sourcelist["flux_density_I"] < maxI_cut)
@@ -818,9 +577,8 @@ def test_circumpolar_nonrising():
     Nsrcs = 50
 
     j2000 = 2451545.0
-    times = Time(
-        np.linspace(j2000 - 0.5, j2000 + 0.5, Ntimes), format="jd", scale="utc"
-    )
+    times = Time(np.linspace(j2000 - 0.5, j2000 + 0.5, Ntimes),
+                 format='jd', scale='utc')
 
     ra = np.zeros(Nsrcs)
     dec = np.linspace(-90, 90, Nsrcs)
@@ -855,10 +613,11 @@ def test_read_gleam():
     assert sourcelist.Ncomponents == 50
 
     # Check cuts
-    source_select_kwds = {"min_flux": 1.0}
-
+    source_select_kwds = {'min_flux': 1.0}
     catalog = skymodel.read_votable_catalog(
-        GLEAM_vot, source_select_kwds=source_select_kwds, return_table=True
+        GLEAM_vot,
+        source_select_kwds=source_select_kwds,
+        return_table=True
     )
 
     assert len(catalog) < sourcelist.Ncomponents
@@ -883,7 +642,7 @@ def test_catalog_file_writer():
     names = "zen_source"
     stokes = [1, 0, 0, 0]
     freqs = [1e8]
-    zenith_source = skymodel.SkyModel(names, ra, dec, stokes, freqs, "flat")
+    zenith_source = skymodel.SkyModel(names, ra, dec, stokes, freqs, 'flat')
 
     fname = os.path.join(SKY_DATA_PATH, "temp_cat.txt")
 
@@ -895,70 +654,10 @@ def test_catalog_file_writer():
 
 def test_array_to_skymodel_loop():
     sky = skymodel.read_votable_catalog(GLEAM_vot)
-    sky.ra = Angle(sky.ra.rad, "rad")
-    sky.dec = Angle(sky.dec.rad, "rad")
+    sky.ra = Angle(sky.ra.rad, 'rad')
+    sky.dec = Angle(sky.dec.rad, 'rad')
     arr = skymodel.skymodel_to_array(sky)
     sky2 = skymodel.array_to_skymodel(arr)
 
     assert np.allclose((sky.ra - sky2.ra).rad, 0.0)
     assert np.allclose((sky.dec - sky2.dec).rad, 0.0)
-
-
-class TestMoon:
-    """
-    Series of tests for Moon-based observers
-    """
-
-    def setup(self):
-        pytest.importorskip("lunarsky")
-
-        from lunarsky import MoonLocation, SkyCoord as SkyC
-
-        # Tranquility base
-        self.array_location = MoonLocation(lat="00d41m15s", lon="23d26m00s", height=0.0)
-
-        self.time = Time.now()
-        self.zen_coord = SkyC(
-            alt=Angle(90, unit=units.deg),
-            az=Angle(0, unit=units.deg),
-            obstime=self.time,
-            frame="lunartopo",
-            location=self.array_location,
-        )
-
-        icrs_coord = self.zen_coord.transform_to("icrs")
-
-        ra = icrs_coord.ra
-        dec = icrs_coord.dec
-        names = "zen_source"
-        stokes = [1, 0, 0, 0]
-        freqs = [1e8]
-        self.zenith_source = skymodel.SkyModel(names, ra, dec, stokes, freqs, "flat")
-
-        self.zenith_source.update_positions(self.time, self.array_location)
-
-    def test_zenith_on_moon(self):
-        """Source at zenith from the Moon."""
-
-        zenith_source_lmn = self.zenith_source.pos_lmn.squeeze()
-        assert np.allclose(zenith_source_lmn, np.array([0, 0, 1]))
-
-    def test_source_motion(self):
-        """ Check that period is about 28 days."""
-
-        Ntimes = 500
-        ets = np.linspace(0, 4 * 28 * 24 * 3600, Ntimes)
-        times = self.time + TimeDelta(ets, format="sec")
-
-        lmns = np.zeros((Ntimes, 3))
-        for ti in range(Ntimes):
-            self.zenith_source.update_positions(times[ti], self.array_location)
-            lmns[ti] = self.zenith_source.pos_lmn.squeeze()
-        _els = np.fft.fft(lmns[:, 0])
-        dt = np.diff(ets)[0]
-        _freqs = np.fft.fftfreq(Ntimes, d=dt)
-
-        f_28d = 1 / (28 * 24 * 3600.0)
-
-        maxf = _freqs[np.argmax(np.abs(_els[_freqs > 0]) ** 2)]
-        assert np.isclose(maxf, f_28d, atol=2 / ets[-1])
