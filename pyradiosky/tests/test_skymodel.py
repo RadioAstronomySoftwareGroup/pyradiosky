@@ -389,14 +389,14 @@ class TestHealpixHdf5():
         freqs = freqs * units.Hz
         filename = 'tempfile.hdf5'
         with pytest.raises(ValueError) as verr:
-            skymodel.write_healpix_hdf5(filename, hpmap, inds[:10], freqs)
+            skymodel.write_healpix_hdf5(filename, hpmap, inds[:10], freqs.to("Hz").value)
         assert str(verr.value).startswith("Need to provide Nside if giving a subset of the map.")
 
         with pytest.raises(ValueError) as verr:
-            skymodel.write_healpix_hdf5(filename, hpmap, inds[:10], freqs.value, Nside=self.Nside)
+            skymodel.write_healpix_hdf5(filename, hpmap, inds[:10], freqs.to("Hz").value, Nside=self.Nside)
         assert str(verr.value).startswith("Invalid map shape")
 
-        skymodel.write_healpix_hdf5(filename, hpmap, inds, freqs)
+        skymodel.write_healpix_hdf5(filename, hpmap, inds, freqs.to("Hz").value)
 
         hpmap_new, inds_new, freqs_new = skymodel.read_healpix_hdf5(filename)
 
@@ -437,7 +437,7 @@ def test_healpix_positions():
 
     filename = os.path.join(SKY_DATA_PATH, "healpix_single.hdf5")
 
-    skymodel.write_healpix_hdf5(filename, hpx_map, range(Npix), freqs * units.Hz)
+    skymodel.write_healpix_hdf5(filename, hpx_map, range(Npix), freqs)
 
     time = Time("2018-03-01 00:00:00", scale="utc")
     array_location = EarthLocation(lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0)

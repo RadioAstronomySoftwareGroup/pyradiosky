@@ -497,6 +497,27 @@ def read_healpix_hdf5(hdf5_filename):
 
 
 def write_healpix_hdf5(filename, hpmap, indices, freqs, Nside=None, history=None):
+    """
+    Write a set of HEALPix maps to an HDF5 file.
+
+    Parameters
+    ----------
+    filename: str
+        Name of file to write to.
+    hpmap: array_like of float
+        Pixel values in Kelvin. Shape (Nfreqs, Npix)
+    indices: array_like of int
+        HEALPix pixel indices corresponding with axis 1 of hpmap.
+    freqs: array_like of floats
+        Frequencies in Hz corresponding with axis 0 of hpmap.
+    Nside: int
+        Nside parameter of the map. Optional if the hpmap covers
+        the full sphere (i.e., has no missing pixels), since the Nside
+        can be inferred from the map size.
+    history: str
+        Optional history string to include in the file.
+
+    """
     try:
         import astropy_healpix
     except ImportError as e:
@@ -528,7 +549,7 @@ def write_healpix_hdf5(filename, hpmap, indices, freqs, Nside=None, history=None
         "Nfreqs": Nfreqs,
         "data": hpmap[None, ...],
         "indices": indices,
-        "freqs": freqs.to('Hz').value,
+        "freqs": freqs,
         "history": history,
     }
     dsets = {
