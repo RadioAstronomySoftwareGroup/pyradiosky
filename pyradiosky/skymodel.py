@@ -411,7 +411,7 @@ class SkyModel(object):
         if not isinstance(time, Time):
             raise ValueError(
                 "time must be an astropy Time object. " "value was: {t}".format(t=time)
-
+            )
 
         if not isinstance(telescope_location, (EarthLocation, MoonLocation)):
 
