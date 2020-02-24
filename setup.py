@@ -36,7 +36,7 @@ setup_args = {
     "scripts": glob.glob("scripts/*"),
     "version": version.version,
     "include_package_data": True,
-    "install_requires": ["numpy>=1.15", "scipy", "astropy>=3.0"],
+    "install_requires": ["numpy>=1.15", "scipy", "astropy>=4.0", "h5py"],
     "tests_require": ["pytest"],
     "extras_require": {"healpix": ["astropy-healpix"], "dev": ["pytest", "pre-commit"]},
     "classifiers": [
