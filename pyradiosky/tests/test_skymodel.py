@@ -238,6 +238,25 @@ def test_polarized_source_visibilities():
     assert np.allclose(coherency_instr_local, expected_instr_local)
 
 
+def test_coherency_calc_errors():
+    """Test that correct errors are raised when providing invalid location object."""
+    coord = SkyCoord(ra=30.0 * units.deg, dec=40 * units.deg, frame='icrs')
+
+    stokes_radec = [1, -0.2, 0.3, 0.1]
+
+    source = skymodel.SkyModel('test', coord.ra,
+                               coord.dec, stokes_radec, 1e8, 'flat')
+    time = Time.now()
+    array_location = None
+    with pytest.raises(ValueError) as err:
+        source.update_positions(time, telescope_location=array_location)
+    assert str(err.value).startswith("telescope_location must be an")
+
+    with pytest.raises(ValueError) as err:
+        source.coherency_calc(array_location).squeeze()
+    assert str(err.value).startswith("telescope_location must be an")
+
+
 def test_polarized_source_smooth_visibilities():
     """Test that visibilities change smoothly as a polarized source transits."""
     array_location = EarthLocation(lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0)
@@ -755,7 +774,6 @@ def test_flux_cuts():
     )
     assert np.all(cut_sourcelist["flux_density_I"] > minI_cut)
     assert np.all(cut_sourcelist["flux_density_I"] < maxI_cut)
-
 
 
 def test_circumpolar_nonrising():
