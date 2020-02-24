@@ -265,12 +265,11 @@ def test_polarized_source_visibilities():
 
 def test_coherency_calc_errors():
     """Test that correct errors are raised when providing invalid location object."""
-    coord = SkyCoord(ra=30.0 * units.deg, dec=40 * units.deg, frame='icrs')
+    coord = SkyCoord(ra=30.0 * units.deg, dec=40 * units.deg, frame="icrs")
 
     stokes_radec = [1, -0.2, 0.3, 0.1]
 
-    source = skymodel.SkyModel('test', coord.ra,
-                               coord.dec, stokes_radec, 1e8, 'flat')
+    source = skymodel.SkyModel("test", coord.ra, coord.dec, stokes_radec, 1e8, "flat")
     time = Time.now()
     array_location = None
     with pytest.raises(ValueError) as err:
@@ -905,32 +904,36 @@ def test_array_to_skymodel_loop():
     assert np.allclose((sky.dec - sky2.dec).rad, 0.0)
 
 
-class TestMoon():
+class TestMoon:
     """
     Series of tests for Moon-based observers
     """
 
     def setup(self):
-        pytest.importorskip('lunarsky')
+        pytest.importorskip("lunarsky")
 
-        from lunarsky import MoonLocation, SkyCoord as SC
+        from lunarsky import MoonLocation, SkyCoord as SkyC
 
         # Tranquility base
-        self.array_location = MoonLocation(lat='00d41m15s', lon='23d26m00s',
-                                           height=0.0)
+        self.array_location = MoonLocation(lat="00d41m15s", lon="23d26m00s", height=0.0)
 
         self.time = Time.now()
-        self.zen_coord = SC(alt=Angle(90, unit=units.deg), az=Angle(0, unit=units.deg),
-                            obstime=self.time, frame='lunartopo', location=self.array_location)
+        self.zen_coord = SkyC(
+            alt=Angle(90, unit=units.deg),
+            az=Angle(0, unit=units.deg),
+            obstime=self.time,
+            frame="lunartopo",
+            location=self.array_location,
+        )
 
-        icrs_coord = self.zen_coord.transform_to('icrs')
+        icrs_coord = self.zen_coord.transform_to("icrs")
 
         ra = icrs_coord.ra
         dec = icrs_coord.dec
-        names = 'zen_source'
+        names = "zen_source"
         stokes = [1, 0, 0, 0]
         freqs = [1e8]
-        self.zenith_source = skymodel.SkyModel(names, ra, dec, stokes, freqs, 'flat')
+        self.zenith_source = skymodel.SkyModel(names, ra, dec, stokes, freqs, "flat")
 
         self.zenith_source.update_positions(self.time, self.array_location)
 
@@ -945,7 +948,7 @@ class TestMoon():
 
         Ntimes = 500
         ets = np.linspace(0, 4 * 28 * 24 * 3600, Ntimes)
-        times = self.time + TimeDelta(ets, format='sec')
+        times = self.time + TimeDelta(ets, format="sec")
 
         lmns = np.zeros((Ntimes, 3))
         for ti in range(Ntimes):
@@ -955,7 +958,7 @@ class TestMoon():
         dt = np.diff(ets)[0]
         _freqs = np.fft.fftfreq(Ntimes, d=dt)
 
-        f_28d = 1 / (28 * 24 * 3600.)
+        f_28d = 1 / (28 * 24 * 3600.0)
 
-        maxf = _freqs[np.argmax(np.abs(_els[_freqs > 0])**2)]
+        maxf = _freqs[np.argmax(np.abs(_els[_freqs > 0]) ** 2)]
         assert np.isclose(maxf, f_28d, atol=2 / ets[-1])
