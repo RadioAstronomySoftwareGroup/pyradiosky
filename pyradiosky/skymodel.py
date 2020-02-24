@@ -20,25 +20,27 @@ from . import spherical_coords_transforms as sct
 
 
 __all__ = [
-    'hasmoon',
-    'SkyModel',
-    'read_healpix_hdf5',
-    'healpix_to_sky',
-    'skymodel_to_array',
-    'array_to_skymodel',
-    'source_cuts',
-    'read_votable_catalog',
-    'read_text_catalog',
-    'read_idl_catalog',
-    'write_catalog_to_file'
+    "hasmoon",
+    "SkyModel",
+    "read_healpix_hdf5",
+    "healpix_to_sky",
+    "skymodel_to_array",
+    "array_to_skymodel",
+    "source_cuts",
+    "read_votable_catalog",
+    "read_text_catalog",
+    "read_idl_catalog",
+    "write_catalog_to_file",
 ]
 
 
 try:
     from lunarsky import SkyCoord, MoonLocation, LunarTopo
+
     hasmoon = True
 except ImportError:
     from astropy.coordinates import SkyCoord
+
     hasmoon = False
 
     class MoonLocation:
@@ -46,6 +48,7 @@ except ImportError:
 
     class LunarTopo:
         pass
+
 
 # Nov 5 2019 notes
 #    Read/write methods to add:
@@ -424,7 +427,7 @@ class SkyModel(object):
         if self.time == time:  # Don't repeat calculations
             return
 
-        skycoord_use = SkyCoord(self.ra, self.dec, frame='icrs')
+        skycoord_use = SkyCoord(self.ra, self.dec, frame="icrs")
         if isinstance(telescope_location, MoonLocation):
             source_altaz = skycoord_use.transform_to(
                 LunarTopo(obstime=time, location=telescope_location)
