@@ -496,7 +496,7 @@ def read_healpix_hdf5(hdf5_filename):
     return hpmap, indices, freqs
 
 
-def write_healpix_hdf5(filename, hpmap, indices, freqs, Nside=None, history=None):
+def write_healpix_hdf5(filename, hpmap, indices, freqs, nside=None, history=None):
     """
     Write a set of HEALPix maps to an HDF5 file.
 
@@ -510,9 +510,9 @@ def write_healpix_hdf5(filename, hpmap, indices, freqs, Nside=None, history=None
         HEALPix pixel indices corresponding with axis 1 of hpmap.
     freqs: array_like of floats
         Frequencies in Hz corresponding with axis 0 of hpmap.
-    Nside: int
-        Nside parameter of the map. Optional if the hpmap covers
-        the full sphere (i.e., has no missing pixels), since the Nside
+    nside: int
+        nside parameter of the map. Optional if the hpmap covers
+        the full sphere (i.e., has no missing pixels), since the nside
         can be inferred from the map size.
     history: str
         Optional history string to include in the file.
@@ -522,17 +522,18 @@ def write_healpix_hdf5(filename, hpmap, indices, freqs, Nside=None, history=None
         import astropy_healpix
     except ImportError as e:
         raise ImportError(
-            'The astropy-healpix module must be installed to use HEALPix methods') from e
+            "The astropy-healpix module must be installed to use HEALPix methods"
+        ) from e
 
     import h5py
 
     Nfreqs = freqs.size
     Npix = len(indices)
-    if Nside is None:
+    if nside is None:
         try:
-            Nside = astropy_healpix.npix_to_nside(Npix)
+            nside = astropy_healpix.npix_to_nside(Npix)
         except ValueError:
-            raise ValueError("Need to provide Nside if giving a subset of the map.")
+            raise ValueError("Need to provide nside if giving a subset of the map.")
 
     try:
         assert hpmap.shape == (Nfreqs, Npix)
@@ -540,11 +541,11 @@ def write_healpix_hdf5(filename, hpmap, indices, freqs, Nside=None, history=None
         raise ValueError("Invalid map shape {}".format(str(hpmap.shape)))
 
     if history is None:
-        history = ''
+        history = ""
 
     valid_params = {
         "Npix": Npix,
-        "Nside": Nside,
+        "nside": nside,
         "Nskies": 1,
         "Nfreqs": Nfreqs,
         "data": hpmap[None, ...],
@@ -564,12 +565,15 @@ def write_healpix_hdf5(filename, hpmap, indices, freqs, Nside=None, history=None
             d = valid_params[k]
             if k in dsets:
                 if np.isscalar(d):
-                    fileobj.create_dataset(
-                        k, data=d, dtype=dsets[k])
+                    fileobj.create_dataset(k, data=d, dtype=dsets[k])
                 else:
                     fileobj.create_dataset(
-                        k, data=d, dtype=dsets[k], compression='gzip',
-                        compression_opts=9)
+                        k,
+                        data=d,
+                        dtype=dsets[k],
+                        compression="gzip",
+                        compression_opts=9,
+                    )
             else:
                 fileobj.attrs[k] = d
 
@@ -604,12 +608,12 @@ def healpix_to_sky(hpmap, indices, freqs):
             "The astropy-healpix module must be installed to use HEALPix methods"
         ) from e
 
-    Nside = astropy_healpix.npix_to_nside(hpmap.shape[-1])
-    ra, dec = astropy_healpix.healpix_to_lonlat(indices, Nside)
+    nside = astropy_healpix.npix_to_nside(hpmap.shape[-1])
+    ra, dec = astropy_healpix.healpix_to_lonlat(indices, nside)
     freq = Quantity(freqs, "hertz")
     stokes = np.zeros((4, len(freq), len(indices)))
     stokes[0] = (hpmap.T / skyutils.jy_to_ksr(freq)).T
-    stokes[0] = stokes[0] * astropy_healpix.nside_to_pixel_area(Nside)
+    stokes[0] = stokes[0] * astropy_healpix.nside_to_pixel_area(nside)
 
     sky = SkyModel(indices.astype("str"), ra, dec, stokes, freq, "full")
     return sky
