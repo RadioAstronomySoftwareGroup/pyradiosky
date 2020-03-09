@@ -315,7 +315,26 @@ def test_polarized_source_smooth_visibilities():
         assert np.all(imag_stokes == 0)
 
 
+def test_coherency_calc_errors():
+    """Test that correct errors are raised when providing invalid location object."""
+    coord = SkyCoord(ra=30.0 * units.deg, dec=40 * units.deg, frame="icrs")
+
+    stokes_radec = [1, -0.2, 0.3, 0.1]
+
+    source = skymodel.SkyModel("test", coord.ra, coord.dec, stokes_radec, 1e8, "flat")
+    time = Time.now()
+    array_location = None
+    with pytest.raises(ValueError) as err:
+        source.update_positions(time, telescope_location=array_location)
+    assert str(err.value).startswith("telescope_location must be an")
+
+    with pytest.raises(ValueError) as err:
+        source.coherency_calc(array_location).squeeze()
+    assert str(err.value).startswith("telescope_location must be an")
+
+
 class TestHealpixHdf5():
+
     pytest.importorskip('astropy_healpix')
 
     def setup(self):
@@ -337,7 +356,6 @@ class TestHealpixHdf5():
         )
 
     def test_read_healpix_hdf5(self):
-
         m = np.arange(self.Npix)
         m[self.ipix_disc] = self.Npix - 1
 
@@ -367,7 +385,6 @@ class TestHealpixHdf5():
         assert np.allclose(sky.stokes[0], hmap_orig.value)
 
     def test_units_healpix_to_sky(self):
-
         hpmap, inds, freqs = skymodel.read_healpix_hdf5(
             os.path.join(SKY_DATA_PATH, 'healpix_disk.hdf5')
         )
@@ -382,7 +399,6 @@ class TestHealpixHdf5():
         assert np.allclose(sky.stokes[0, 0], stokes.value[0])
 
     def test_read_write_healpix(self):
-
         hpmap, inds, freqs = skymodel.read_healpix_hdf5(
             os.path.join(SKY_DATA_PATH, 'healpix_disk.hdf5')
         )
