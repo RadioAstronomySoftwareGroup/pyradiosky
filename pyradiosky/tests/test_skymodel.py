@@ -8,7 +8,7 @@ import pytest
 import numpy as np
 from astropy import units
 from astropy.coordinates import SkyCoord, EarthLocation, Angle, AltAz
-from astropy.time import Time
+from astropy.time import Time, TimeDelta
 import scipy.io
 
 
@@ -710,3 +710,63 @@ def test_array_to_skymodel_loop():
 
     assert np.allclose((sky.ra - sky2.ra).rad, 0.0)
     assert np.allclose((sky.dec - sky2.dec).rad, 0.0)
+
+
+class TestMoon:
+    """
+    Series of tests for Moon-based observers
+    """
+
+    def setup(self):
+        pytest.importorskip("lunarsky")
+
+        from lunarsky import MoonLocation, SkyCoord as SkyC
+
+        # Tranquility base
+        self.array_location = MoonLocation(lat="00d41m15s", lon="23d26m00s", height=0.0)
+
+        self.time = Time.now()
+        self.zen_coord = SkyC(
+            alt=Angle(90, unit=units.deg),
+            az=Angle(0, unit=units.deg),
+            obstime=self.time,
+            frame="lunartopo",
+            location=self.array_location,
+        )
+
+        icrs_coord = self.zen_coord.transform_to("icrs")
+
+        ra = icrs_coord.ra
+        dec = icrs_coord.dec
+        names = "zen_source"
+        stokes = [1, 0, 0, 0]
+        freqs = [1e8]
+        self.zenith_source = skymodel.SkyModel(names, ra, dec, stokes, freqs, "flat")
+
+        self.zenith_source.update_positions(self.time, self.array_location)
+
+    def test_zenith_on_moon(self):
+        """Source at zenith from the Moon."""
+
+        zenith_source_lmn = self.zenith_source.pos_lmn.squeeze()
+        assert np.allclose(zenith_source_lmn, np.array([0, 0, 1]))
+
+    def test_source_motion(self):
+        """ Check that period is about 28 days."""
+
+        Ntimes = 500
+        ets = np.linspace(0, 4 * 28 * 24 * 3600, Ntimes)
+        times = self.time + TimeDelta(ets, format="sec")
+
+        lmns = np.zeros((Ntimes, 3))
+        for ti in range(Ntimes):
+            self.zenith_source.update_positions(times[ti], self.array_location)
+            lmns[ti] = self.zenith_source.pos_lmn.squeeze()
+        _els = np.fft.fft(lmns[:, 0])
+        dt = np.diff(ets)[0]
+        _freqs = np.fft.fftfreq(Ntimes, d=dt)
+
+        f_28d = 1 / (28 * 24 * 3600.0)
+
+        maxf = _freqs[np.argmax(np.abs(_els[_freqs > 0]) ** 2)]
+        assert np.isclose(maxf, f_28d, atol=2 / ets[-1])
