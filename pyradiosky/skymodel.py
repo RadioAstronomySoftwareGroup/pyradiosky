@@ -31,6 +31,7 @@ __all__ = [
     "read_text_catalog",
     "read_idl_catalog",
     "write_catalog_to_file",
+    "write_healpix_hdf5",
 ]
 
 
