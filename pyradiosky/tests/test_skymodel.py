@@ -357,11 +357,9 @@ def test_coherency_calc_errors():
 
 
 class TestHealpixHdf5:
-
-    pytest.importorskip("astropy_healpix")
-
     def setup(self):
         # Common features of tests
+        pytest.importorskip("astropy_healpix")
         import astropy_healpix
 
         self.nside = 32
