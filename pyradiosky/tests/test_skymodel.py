@@ -459,15 +459,18 @@ def test_healpix_import_err():
 
         astropy_healpix.nside_to_npix(2 ** 3)
     except ImportError:
+        errstr = "The astropy-healpix module must be installed to use HEALPix methods"
+        Npix = 12
+        hpmap = np.arange(Npix)
+        inds = hpmap
+        freqs = np.zeros(1)
         with pytest.raises(ImportError) as cm:
-            Npix = 12
-            hpmap = np.arange(Npix)
-            inds = hpmap
-            freqs = np.zeros(1)
             skymodel.healpix_to_sky(hpmap, inds, freqs)
-        assert str(cm.value).startswith(
-            "The astropy-healpix module must be installed to use HEALPix methods"
-        )
+        assert str(cm.value).startswith(errstr)
+
+        with pytest.raises(ImportError) as cm:
+            skymodel.write_healpix_hdf5("filename.hdf5", hpmap, inds, freqs)
+        assert str(cm.value).startswith(errstr)
 
 
 def test_healpix_positions():
