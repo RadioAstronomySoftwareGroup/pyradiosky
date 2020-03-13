@@ -744,7 +744,7 @@ class TestMoon:
         ra = icrs_coord.ra
         dec = icrs_coord.dec
         names = "zen_source"
-        stokes = [1, 0, 0, 0]
+        stokes = [1.0, 0, 0, 0]
         self.zenith_source = skymodel.SkyModel(names, ra, dec, stokes, "flat")
 
         self.zenith_source.update_positions(self.time, self.array_location)
