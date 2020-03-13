@@ -82,7 +82,7 @@ def stokes_to_coherency(stokes_vector):
     Returns
     -------
     coherency matrix : array of float
-        Array of coherencies, shape (2, 2) or (2, 2, Ncomponents)
+        Array of coherencies, shape (2, 2) or (2, 2, Nfreqs, Ncomponents)
     """
     stokes_arr = np.atleast_1d(np.asarray(stokes_vector))
     initial_shape = stokes_arr.shape

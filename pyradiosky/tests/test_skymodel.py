@@ -7,7 +7,14 @@ import os
 import pytest
 import numpy as np
 from astropy import units
-from astropy.coordinates import SkyCoord, EarthLocation, Angle, AltAz
+from astropy.coordinates import (
+    SkyCoord,
+    EarthLocation,
+    Angle,
+    AltAz,
+    Longitude,
+    Latitude,
+)
 from astropy.time import Time, TimeDelta
 import scipy.io
 
@@ -43,18 +50,20 @@ def test_source_zenith_from_icrs():
     dec = icrs_coord.dec
     # Check error cases
     with pytest.raises(ValueError) as cm:
-        skymodel.SkyModel("icrs_zen", ra.rad, dec.rad, [1, 0, 0, 0], 1e8, "flat")
+        skymodel.SkyModel("icrs_zen", ra.rad, dec, [1.0, 0, 0, 0], "flat")
     assert str(cm.value).startswith(
-        "ra must be an astropy Angle object. " "value was: 3.14"
+        "UVParameter _ra is not the appropriate type. Is: float64. "
+        "Should be: <class 'astropy.coordinates.angles.Longitude'>"
     )
 
     with pytest.raises(ValueError) as cm:
-        skymodel.SkyModel("icrs_zen", ra, dec.rad, [1, 0, 0, 0], 1e8, "flat")
+        skymodel.SkyModel("icrs_zen", ra, dec.rad, [1.0, 0, 0, 0], "flat")
     assert str(cm.value).startswith(
-        "dec must be an astropy Angle object. " "value was: -0.53"
+        "UVParameter _dec is not the appropriate type. Is: float64. "
+        "Should be: <class 'astropy.coordinates.angles.Latitude'>"
     )
 
-    zenith_source = skymodel.SkyModel("icrs_zen", ra, dec, [1, 0, 0, 0], 1e8, "flat")
+    zenith_source = skymodel.SkyModel("icrs_zen", ra, dec, [1.0, 0, 0, 0], "flat")
 
     zenith_source.update_positions(time, array_location)
     zenith_source_lmn = zenith_source.pos_lmn.squeeze()
@@ -80,9 +89,8 @@ def test_source_zenith():
     dec = icrs_coord.dec
 
     names = "zen_source"
-    stokes = [1, 0, 0, 0]
-    freqs = [1e8]
-    zenith_source = skymodel.SkyModel(names, ra, dec, stokes, freqs, "flat")
+    stokes = [1.0, 0, 0, 0]
+    zenith_source = skymodel.SkyModel(names, ra, dec, stokes, "flat")
 
     zenith_source.update_positions(time, array_location)
     zenith_source_lmn = zenith_source.pos_lmn.squeeze()
@@ -102,15 +110,14 @@ def test_calc_basis_rotation_matrix():
 
     source = skymodel.SkyModel(
         "Test",
-        Angle(12.0 * units.hr),
-        Angle(-30.0 * units.deg),
+        Longitude(12.0 * units.hr),
+        Latitude(-30.0 * units.deg),
         [1.0, 0.0, 0.0, 0.0],
-        1e8,
         "flat",
     )
     source.update_positions(time, telescope_location)
 
-    basis_rot_matrix = source._calc_average_rotation_matrix(telescope_location)
+    basis_rot_matrix = source._calc_average_rotation_matrix()
 
     assert np.allclose(np.matmul(basis_rot_matrix, basis_rot_matrix.T), np.eye(3))
     assert np.allclose(np.matmul(basis_rot_matrix.T, basis_rot_matrix), np.eye(3))
@@ -129,15 +136,14 @@ def test_calc_vector_rotation():
 
     source = skymodel.SkyModel(
         "Test",
-        Angle(12.0 * units.hr),
-        Angle(-30.0 * units.deg),
+        Longitude(12.0 * units.hr),
+        Latitude(-30.0 * units.deg),
         [1.0, 0.0, 0.0, 0.0],
-        1e8,
         "flat",
     )
     source.update_positions(time, telescope_location)
 
-    coherency_rotation = np.squeeze(source._calc_coherency_rotation(telescope_location))
+    coherency_rotation = np.squeeze(source._calc_coherency_rotation())
 
     assert np.isclose(np.linalg.det(coherency_rotation), 1)
 
@@ -192,10 +198,9 @@ def test_polarized_source_visibilities():
 
     source = skymodel.SkyModel(
         "icrs_zen",
-        zenith_icrs.ra + raoff,
-        zenith_icrs.dec + decoff,
+        Longitude(zenith_icrs.ra + raoff),
+        Latitude(zenith_icrs.dec + decoff),
         stokes_radec,
-        1e8,
         "flat",
     )
 
@@ -210,7 +215,7 @@ def test_polarized_source_visibilities():
         alts[ti] = alt
         azs[ti] = az
 
-        coherency_tmp = source.coherency_calc(array_location).squeeze()
+        coherency_tmp = source.coherency_calc().squeeze()
         coherency_matrix_local[:, :, ti] = coherency_tmp
 
     zas = np.pi / 2.0 - alts
@@ -291,7 +296,7 @@ def test_polarized_source_smooth_visibilities():
     stokes_radec = [1, -0.2, 0.3, 0.1]
 
     source = skymodel.SkyModel(
-        "icrs_zen", zenith_icrs.ra, zenith_icrs.dec, stokes_radec, 1e8, "flat"
+        "icrs_zen", zenith_icrs.ra, zenith_icrs.dec, stokes_radec, "flat"
     )
 
     coherency_matrix_local = np.zeros([2, 2, ntimes], dtype="complex128")
@@ -305,7 +310,7 @@ def test_polarized_source_smooth_visibilities():
         alts[ti] = alt
         azs[ti] = az
 
-        coherency_tmp = source.coherency_calc(array_location).squeeze()
+        coherency_tmp = source.coherency_calc().squeeze()
         coherency_matrix_local[:, :, ti] = coherency_tmp
 
     zas = np.pi / 2.0 - alts
@@ -344,15 +349,15 @@ def test_coherency_calc_errors():
 
     stokes_radec = [1, -0.2, 0.3, 0.1]
 
-    source = skymodel.SkyModel("test", coord.ra, coord.dec, stokes_radec, 1e8, "flat")
+    source = skymodel.SkyModel("test", coord.ra, coord.dec, stokes_radec, "flat")
     time = Time.now()
     array_location = None
     with pytest.raises(ValueError) as err:
-        source.update_positions(time, telescope_location=array_location)
+        source.update_positions(time, array_location)
     assert str(err.value).startswith("telescope_location must be an")
 
     with pytest.raises(ValueError) as err:
-        source.coherency_calc(array_location).squeeze()
+        source.coherency_calc().squeeze()
     assert str(err.value).startswith("telescope_location must be an")
 
 
@@ -690,9 +695,8 @@ def test_catalog_file_writer():
     dec = icrs_coord.dec
 
     names = "zen_source"
-    stokes = [1, 0, 0, 0]
-    freqs = [1e8]
-    zenith_source = skymodel.SkyModel(names, ra, dec, stokes, freqs, "flat")
+    stokes = [1.0, 0, 0, 0]
+    zenith_source = skymodel.SkyModel(names, ra, dec, stokes, "flat")
 
     fname = os.path.join(SKY_DATA_PATH, "temp_cat.txt")
 
@@ -704,8 +708,8 @@ def test_catalog_file_writer():
 
 def test_array_to_skymodel_loop():
     sky = skymodel.read_votable_catalog(GLEAM_vot)
-    sky.ra = Angle(sky.ra.rad, "rad")
-    sky.dec = Angle(sky.dec.rad, "rad")
+    sky.ra = Longitude(sky.ra.rad, "rad")
+    sky.dec = Latitude(sky.dec.rad, "rad")
     arr = skymodel.skymodel_to_array(sky)
     sky2 = skymodel.array_to_skymodel(arr)
 
@@ -741,8 +745,7 @@ class TestMoon:
         dec = icrs_coord.dec
         names = "zen_source"
         stokes = [1, 0, 0, 0]
-        freqs = [1e8]
-        self.zenith_source = skymodel.SkyModel(names, ra, dec, stokes, freqs, "flat")
+        self.zenith_source = skymodel.SkyModel(names, ra, dec, stokes, "flat")
 
         self.zenith_source.update_positions(self.time, self.array_location)
 

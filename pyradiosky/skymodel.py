@@ -4,16 +4,20 @@
 """Define SkyModel class and helper functions."""
 
 import warnings
+import copy
 
 import numpy as np
 from numpy.lib import recfunctions
 from scipy.linalg import orthogonal_procrustes as ortho_procr
-from astropy.coordinates import Angle, EarthLocation, AltAz
+import scipy.io
+from astropy.coordinates import Angle, EarthLocation, AltAz, Latitude, Longitude
 from astropy.time import Time
 import astropy.units as units
 from astropy.units import Quantity
 from astropy.io import votable
-import scipy.io
+import pyuvdata
+from pyuvdata.uvbase import UVBase
+from pyuvdata.parameter import UVParameter
 
 from . import utils as skyutils
 from . import spherical_coords_transforms as sct
@@ -61,7 +65,7 @@ except ImportError:
 #    Convert stokes and coherency to Astropy quantities.
 
 
-class SkyModel(object):
+class SkyModel(UVBase):
     """
     Object to hold point source and diffuse models.
 
@@ -80,9 +84,9 @@ class SkyModel(object):
     ----------
     name : array_like of str
         Unique identifier for each source component, shape (Ncomponents,).
-    ra : astropy Angle object
+    ra : astropy Longitude object
         source RA in J2000 (or ICRS) coordinates, shape (Ncomponents,).
-    dec : astropy Angle object
+    dec : astropy Latitude object
         source Dec in J2000 (or ICRS) coordinates, shape (Ncomponents,).
     stokes : array_like of float
         4 element vector giving the source [I, Q, U, V], shape (4, Nfreqs, Ncomponents).
@@ -90,14 +94,14 @@ class SkyModel(object):
         Reference frequencies of flux values, shape (Ncomponents,).
     spectral_type : str
         Indicates how fluxes should be calculated at each frequency.
-    spectral_index : array_like of float
-        Spectral index of each source, shape (Nfreqs, Ncomponents).
-        None if spectral_type is not 'spectral_index'.
         Options:
         - 'flat' : Flat spectrum.
         - 'full' : Flux is defined by a saved value at each frequency.
         - 'subband' : Flux is given at a set of band centers. (TODO)
         - 'spectral_index' : Flux is given at a reference frequency. (TODO)
+    spectral_index : array_like of float
+        Spectral index of each source, shape (Ncomponents).
+        None if spectral_type is not 'spectral_index'.
     rise_lst : array_like of float
         Approximate lst (radians) when the source rises, shape (Ncomponents,). Set by
         coarse horizon cut in simsetup. Default is nan, meaning the source never rises.
@@ -114,27 +118,8 @@ class SkyModel(object):
         Beam amplitude at the source position, shape (4, Nfreqs, Ncomponents).
         4 element vector corresponds to [XX, YY, XY, YX] instrumental
         polarizations.
+
     """
-
-    Ncomponents = None  # Number of point source components represented here.
-
-    _Ncomp_attrs = [
-        "ra",
-        "dec",
-        "coherency_radec",
-        "coherency_local",
-        "stokes",
-        "alt_az",
-        "rise_lst",
-        "set_lst",
-        "freq",
-        "pos_lmn",
-        "name",
-        "horizon_mask",
-    ]
-    _scalar_attrs = ["Ncomponents", "time", "pos_tol"]
-
-    _member_funcs = ["coherency_calc", "update_positions"]
 
     def __init__(
         self,
@@ -142,8 +127,9 @@ class SkyModel(object):
         ra,
         dec,
         stokes,
-        freq_array,
         spectral_type,
+        freq_array=None,
+        reference_freq=None,
         spectral_index=None,
         rise_lst=None,
         set_lst=None,
@@ -151,76 +137,282 @@ class SkyModel(object):
         extended_model_group=None,
         beam_amp=None,
     ):
+        # standard angle tolerance: 1 mas in radians.
+        angle_tol = Angle(1e-3, units.arcsec)
 
-        if not isinstance(ra, Angle):
-            raise ValueError(
-                "ra must be an astropy Angle object. " "value was: {ra}".format(ra=ra)
-            )
+        self._Ncomponents = UVParameter(
+            "Ncomponents", description="Number of components", expected_type=int
+        )
 
-        if not isinstance(dec, Angle):
-            raise ValueError(
-                "dec must be an astropy Angle object. "
-                "value was: {dec}".format(dec=dec)
-            )
+        desc = (
+            "Number of frequencies if spectral_type  is 'full' or 'subband', "
+            "1 otherwise."
+        )
+        self._Nfreqs = UVParameter("Nfreqs", description=desc, expected_type=int)
 
-        self.Ncomponents = ra.size
+        desc = "Right ascension of components in ICRS coordinates."
+        self._ra = UVParameter(
+            "ra",
+            description=desc,
+            form=("Ncomponents",),
+            expected_type=Longitude,
+            tols=angle_tol,
+        )
 
-        self.name = np.atleast_1d(np.asarray(name))
-        self.freq_array = np.atleast_1d(freq_array)
-        self.Nfreqs = self.freq_array.size
-        self.stokes = np.asarray(stokes)
+        desc = "Declination of components in ICRS coordinates."
+        self._dec = UVParameter(
+            "dec",
+            description=desc,
+            form=("Ncomponents",),
+            expected_type=Latitude,
+            tols=angle_tol,
+        )
+
+        desc = "Component name."
+        self._name = UVParameter(
+            "name", description=desc, form=("Ncomponents",), expected_type=str
+        )
+
+        desc = "Frequency array in Hz, only required if spectral_type is 'full' or 'subband'."
+        self._freq_array = UVParameter(
+            "freq_array",
+            description=desc,
+            form=("Nfreqs",),
+            expected_type=Quantity,
+            required=False,
+        )
+
+        desc = "Reference frequency in Hz, only required if spectral_type is 'spectral_index'."
+        self._reference_freq = UVParameter(
+            "reference_freq",
+            description=desc,
+            form=("Ncomponents",),
+            expected_type=Quantity,
+            required=False,
+        )
+
+        desc = "Component flux per frequency and Stokes parameter"
+        self._stokes = UVParameter(
+            "stokes",
+            description=desc,
+            form=(4, "Nfreqs", "Ncomponents"),
+            expected_type=float,
+        )
+
+        # The coherency is a 2x2 matrix giving electric field correlation in Jy
+        self._coherency_radec = UVParameter(
+            "coherency_radec",
+            description="Ra/Dec coherency per component",
+            form=(2, 2, "Nfreqs", "Ncomponents"),
+            expected_type=np.complex,
+        )
+
+        desc = (
+            "Type of spectral flux specification, options are: "
+            "'full','flat', 'subband', 'spectral_index'."
+        )
+        self._spectral_type = UVParameter(
+            "spectral_type",
+            description=desc,
+            expected_type=str,
+            acceptable_vals=["full", "flat", "subband", "spectral_index"],
+        )
+
+        self._spectral_index = UVParameter(
+            "spectral_index",
+            description="Spectral indexm only required if spectral_type is 'spectral_index'.",
+            form=("Ncomponents",),
+            expected_type=float,
+            required=False,
+        )
+
+        self._beam_amp = UVParameter(
+            "beam_amp",
+            description=(
+                "Beam amplitude at the source position as a function "
+                "of instrument polarization and frequency."
+            ),
+            form=(4, "Nfreqs", "Ncomponents"),
+            expected_type=float,
+            required=False,
+        )
+
+        self._extended_model_group = UVParameter(
+            "extended_model_group",
+            description=(
+                "Identifier that groups components of an extended "
+                "source model. Set to -1 for point sources."
+            ),
+            form=("Ncomponents",),
+            expected_type=int,
+            required=False,
+        )
+
+        self._rise_lst = UVParameter(
+            "rise_lst",
+            description=(
+                "Approximate lst (radians) when the source rises. "
+                "Set by coarse horizon cut in simsetup. "
+                "Default is nan, meaning the source never rises."
+            ),
+            form=("Ncomponents",),
+            expected_type=float,
+            required=False,
+        )
+
+        self._set_lst = UVParameter(
+            "set_lst",
+            description=(
+                "Approximate lst (radians) when the source sets. "
+                "Set by coarse horizon cut in simsetup. "
+                "Default is nan, meaning the source never sets."
+            ),
+            form=("Ncomponents",),
+            expected_type=float,
+            required=False,
+        )
+
+        desc = "Time for local position calculations."
+        self._time = UVParameter(
+            "time", description=desc, expected_type=Time, required=False
+        )
+
+        desc = "Telescope Location for local position calculations."
+        self._telescope_location = UVParameter(
+            "telescope_location",
+            description=desc,
+            expected_type=EarthLocation,
+            required=False,
+        )
+
+        desc = "Altitude and Azimuth of components in local coordinates."
+        self._alt_az = UVParameter(
+            "alt_az",
+            description=desc,
+            form=(2, "Ncomponents"),
+            expected_type=float,
+            tols=np.finfo(float).eps,
+            required=False,
+        )
+
+        desc = "Position cosines of components in local coordinates."
+        self._pos_lmn = UVParameter(
+            "pos_lmn",
+            description=desc,
+            form=(3, "Ncomponents"),
+            expected_type=float,
+            tols=np.finfo(float).eps,
+            required=False,
+        )
+
+        desc = (
+            "Boolean indicator of whether this source is below the horizon."
+            "True indicates the source is below the horizon."
+        )
+        self._horizon_mask = UVParameter(
+            "horizon_mask",
+            description=desc,
+            form=("Ncomponents",),
+            expected_type=bool,
+            required=False,
+        )
+
+        # initialize the underlying UVBase properties
+        super(SkyModel, self).__init__()
+
+        self.name = np.atleast_1d(name)
+        self.Ncomponents = self.name.size
         self.ra = np.atleast_1d(ra)
         self.dec = np.atleast_1d(dec)
-        self.pos_tol = pos_tol
-        self.spectral_type = spectral_type
-        self.beam_amp = beam_amp
-        self.extended_model_group = extended_model_group
 
-        if self.spectral_type == "spectral_index":
-            self.spectral_index = spectral_index
+        self.set_spectral_type_params(spectral_type)
 
-        self.has_rise_set_lsts = False
-        if (rise_lst is not None) and (set_lst is not None):
-            self.rise_lst = np.asarray(rise_lst)
-            self.set_lst = np.asarray(set_lst)
-            self.has_rise_set_lsts = True
+        if freq_array is not None:
+            self.freq_array = np.atleast_1d(freq_array)
+            self.Nfreqs = self.freq_array.size
+        else:
+            self.Nfreqs = 1
 
-        self.alt_az = np.zeros((2, self.Ncomponents), dtype=float)
-        self.pos_lmn = np.zeros((3, self.Ncomponents), dtype=float)
+        if reference_freq is not None:
+            self.reference_freq = np.atleast_1d(reference_freq)
 
-        self.horizon_mask = np.zeros(self.Ncomponents).astype(
-            bool
-        )  # If true, source component is below horizon.
+        if spectral_index is not None:
+            self.spectral_index = np.atleast_1d(spectral_index)
 
+        self.stokes = np.asarray(stokes)
         if self.Ncomponents == 1:
             self.stokes = self.stokes.reshape(4, self.Nfreqs, 1)
 
-        # The coherency is a 2x2 matrix giving electric field correlation in Jy
-        # Multiply by .5 to ensure that Trace sums to I not 2*I
-        # Shape = (2,2,Ncomponents)
-
         self.coherency_radec = skyutils.stokes_to_coherency(self.stokes)
 
-        self.time = None
+        self.check()
 
-        assert np.all(
-            [
-                self.Ncomponents == l
-                for l in [self.ra.size, self.dec.size, self.stokes.shape[2]]
-            ]
-        ), "Inconsistent quantity dimensions."
+    @property
+    def has_rise_set_lsts(self):
+        """Property that determines whether this object has rise and set LSTs set."""
+        if not hasattr(self, "rise_lst") and not hasattr(self, "set_lst"):
+            return False
 
-    def _calc_average_rotation_matrix(self, telescope_location):
+        has_rise_set_lsts = (self.rise_lst is not None) and (self.set_lst is not None)
+
+        return has_rise_set_lsts
+
+    def set_spectral_type_params(self, spectral_type):
+        """Set parameters depending on spectral_type."""
+        self.spectral_type = spectral_type
+
+        if spectral_type == "spectral_index":
+            self._spectral_index.required = True
+            self._reference_freq.required = True
+            self._Nfreqs.acceptable_vals = [1]
+            self._freq_array.required = False
+        elif spectral_type in ["full", "subband"]:
+            self._freq_array.required = True
+            self._spectral_index.required = False
+            self._reference_freq.required = False
+            self._Nfreqs.acceptable_vals = None
+        elif spectral_type == "flat":
+            self._freq_array.required = False
+            self._spectral_index.required = False
+            self._reference_freq.required = False
+            self._Nfreqs.acceptable_vals = [1]
+
+    def check(self, check_extra=True, run_check_acceptability=True):
+        """
+        Check that all required parameters are set reasonably.
+
+        Check that required parameters exist and have appropriate shapes.
+        Optionally check if the values are acceptable.
+
+        Parameters
+        ----------
+        check_extra : bool
+            Option to check optional parameters as well as required ones.
+        run_check_acceptability : bool
+            Option to check if values in required parameters are acceptable.
+
+        """
+        # first make sure the required parameters and forms are set properly
+        # for the spectral_type
+        self.set_spectral_type_params(self.spectral_type)
+
+        # make sure only one of freq_array and reference_freq is defined
+        if self.freq_array is not None and self.reference_freq is not None:
+            raise ValueError(
+                "Only one of freq_array and reference_freq can be specified, not both."
+            )
+
+        # Run the basic check from UVBase
+        super(SkyModel, self).check(
+            check_extra=check_extra, run_check_acceptability=run_check_acceptability
+        )
+
+    def _calc_average_rotation_matrix(self):
         """
         Calculate the "average" rotation matrix from RA/Dec to AltAz.
 
         This gets us close to the right value, then need to calculate a correction
         for each source separately.
-
-        Parameters
-        ----------
-        telescope_location : astropy EarthLocation or lunarsky MoonLocation object
-            Location of the telescope.
 
         Returns
         -------
@@ -238,7 +430,7 @@ class SkyModel(object):
             y=y_c,
             z=z_c,
             obstime=self.time,
-            location=telescope_location,
+            location=self.telescope_location,
             frame="icrs",
             representation_type="cartesian",
         )
@@ -257,14 +449,9 @@ class SkyModel(object):
 
         return R_really_orthogonal
 
-    def _calc_rotation_matrix(self, telescope_location):
+    def _calc_rotation_matrix(self):
         """
         Calculate the true rotation matrix from RA/Dec to AltAz for each component.
-
-        Parameters
-        ----------
-        telescope_location : astropy EarthLocation or lunarsky MoonLocation object
-            Location of the telescope.
 
         Returns
         -------
@@ -284,7 +471,7 @@ class SkyModel(object):
         altaz_vec = sct.r_hat(theta_altaz, phi_altaz)
         assert altaz_vec.shape == (3, self.Ncomponents)
 
-        R_avg = self._calc_average_rotation_matrix(telescope_location)
+        R_avg = self._calc_average_rotation_matrix()
 
         R_exact = np.zeros((3, 3, self.Ncomponents), dtype=np.float)
 
@@ -297,14 +484,9 @@ class SkyModel(object):
 
         return R_exact
 
-    def _calc_coherency_rotation(self, telescope_location):
+    def _calc_coherency_rotation(self):
         """
         Calculate the rotation matrix to apply to the RA/Dec coherency to get it into alt/az.
-
-        Parameters
-        ----------
-        telescope_location : astropy EarthLocation or lunarsky MoonLocation object
-            Location of the telescope.
 
         Returns
         -------
@@ -312,7 +494,7 @@ class SkyModel(object):
             Rotation matrix that takes the coherency from (RA,Dec) --> (Alt,Az),
             shape (2, 2, Ncomponents).
         """
-        basis_rotation_matrix = self._calc_rotation_matrix(telescope_location)
+        basis_rotation_matrix = self._calc_rotation_matrix()
 
         # Find mathematical points and vectors for RA/Dec
         theta_radec = np.pi / 2.0 - self.dec.rad
@@ -336,7 +518,7 @@ class SkyModel(object):
 
         return coherency_rot_matrix
 
-    def coherency_calc(self, telescope_location):
+    def coherency_calc(self):
         """
         Calculate the local coherency in alt/az basis for this source at a time & location.
 
@@ -344,24 +526,19 @@ class SkyModel(object):
         It's specified on the object as a coherency in the ra/dec basis,
         but must be rotated into local alt/az.
 
-        Parameters
-        ----------
-        telescope_location : astropy EarthLocation or lunarsky MoonLocation object
-            location of the telescope.
-
         Returns
         -------
         array of float
-            local coherency in alt/az basis, shape (2, 2, Ncomponents)
+            local coherency in alt/az basis, shape (2, 2, Nfreqs, Ncomponents)
         """
-        if not isinstance(telescope_location, (EarthLocation, MoonLocation)):
+        if not isinstance(self.telescope_location, (EarthLocation, MoonLocation)):
 
             errm = "telescope_location must be an astropy EarthLocation object"
             if hasmoon:
                 errm += " or a lunarsky MoonLocation object "
             errm += ". "
             raise ValueError(
-                errm + "value was: {al}".format(al=str(telescope_location))
+                errm + "value was: {al}".format(al=str(self.telescope_location))
             )
 
         Ionly_mask = np.sum(self.stokes[1:, :, :], axis=0) == 0.0
@@ -372,7 +549,7 @@ class SkyModel(object):
 
         if NstokesI < self.Ncomponents:
             # If there are any polarized sources, do rotation.
-            rotation_matrix = self._calc_coherency_rotation(telescope_location)
+            rotation_matrix = self._calc_coherency_rotation()
 
             polarized_sources = np.where(~Ionly_mask)[0]
 
@@ -425,22 +602,23 @@ class SkyModel(object):
                 errm + "value was: {al}".format(al=str(telescope_location))
             )
 
-        if self.time == time:  # Don't repeat calculations
+        # Don't repeat calculations
+        if self.time == time and self.telescope_location == telescope_location:
             return
 
+        self.time = time
+        self.telescope_location = telescope_location
+
         skycoord_use = SkyCoord(self.ra, self.dec, frame="icrs")
-        if isinstance(telescope_location, MoonLocation):
+        if isinstance(self.telescope_location, MoonLocation):
             source_altaz = skycoord_use.transform_to(
-                LunarTopo(obstime=time, location=telescope_location)
+                LunarTopo(obstime=self.time, location=self.telescope_location)
             )
         else:
             source_altaz = skycoord_use.transform_to(
-                AltAz(obstime=time, location=telescope_location)
+                AltAz(obstime=self.time, location=self.telescope_location)
             )
 
-        time.location = telescope_location
-
-        self.time = time
         alt_az = np.array([source_altaz.alt.rad, source_altaz.az.rad])
 
         self.alt_az = alt_az
@@ -449,24 +627,14 @@ class SkyModel(object):
         pos_m = np.cos(alt_az[1, :]) * np.cos(alt_az[0, :])
         pos_n = np.sin(alt_az[0, :])
 
+        if self.pos_lmn is None:
+            self.pos_lmn = np.zeros((3, self.Ncomponents), dtype=float)
         self.pos_lmn[0, :] = pos_l
         self.pos_lmn[1, :] = pos_m
         self.pos_lmn[2, :] = pos_n
 
         # Horizon mask:
         self.horizon_mask = self.alt_az[0, :] < 0.0
-
-    def __eq__(self, other):
-        """Test equality with another sky model."""
-        time_check = self.time is None and other.time is None
-        if not time_check:
-            time_check = np.isclose(self.time, other.time)
-        return (
-            np.allclose(self.ra.deg, other.ra.deg, atol=self.pos_tol)
-            and np.allclose(self.stokes, other.stokes)
-            and np.all(self.name == other.name)
-            and time_check
-        )
 
 
 def read_healpix_hdf5(hdf5_filename):
@@ -616,13 +784,13 @@ def healpix_to_sky(hpmap, indices, freqs):
     stokes[0] = (hpmap.T / skyutils.jy_to_ksr(freq)).T
     stokes[0] = stokes[0] * astropy_healpix.nside_to_pixel_area(nside)
 
-    sky = SkyModel(indices.astype("str"), ra, dec, stokes, freq, "full")
+    sky = SkyModel(indices.astype("str"), ra, dec, stokes, "full", freq_array=freq)
     return sky
 
 
 def skymodel_to_array(sky):
     """
-    Make a recarrayof source components from a SkyModel object.
+    Make a recarray of source components from a SkyModel object.
 
     Parameters
     ----------
@@ -635,20 +803,39 @@ def skymodel_to_array(sky):
         recarray to turn into a SkyModel object.
 
     """
-    fieldtypes = ["U10", "f8", "f8", "f8", "f8"]
-    fieldnames = ["source_id", "ra_j2000", "dec_j2000", "flux_density_I", "frequency"]
-    fieldshapes = [()] * 3 + [(sky.Nfreqs,)] * 2
+    sky.check()
+    fieldtypes = ["U10", "f8", "f8", "f8"]
+    fieldnames = ["source_id", "ra_j2000", "dec_j2000", "flux_density_I"]
+    fieldshapes = [()] * 3
+    if sky.freq_array is not None:
+        fieldnames.append("frequency")
+        fieldtypes.append("f8")
+        fieldshapes.extend([(sky.Nfreqs,)] * 2)
+    elif sky.reference_freq is not None:
+        fieldnames.append("reference_frequency")
+        fieldtypes.append("f8")
+        fieldshapes.extend([()] * 2)
+        if sky.spectral_index is not None:
+            fieldnames.append("spectral_index")
+            fieldtypes.append("f8")
+            fieldshapes.append(())
+    else:
+        # flat spectrum, no freq info
+        fieldshapes.append(())
 
     dt = np.dtype(list(zip(fieldnames, fieldtypes, fieldshapes)))
-    if sky.Nfreqs == 1:
-        sky.freq_array = sky.freq_array[:, None]
 
     arr = np.empty(sky.Ncomponents, dtype=dt)
     arr["source_id"] = sky.name
     arr["ra_j2000"] = sky.ra.deg
     arr["dec_j2000"] = sky.dec.deg
-    arr["flux_density_I"] = sky.stokes[0, :, :].T  # Swaps component and frequency axes
-    arr["frequency"] = sky.freq_array
+    arr["flux_density_I"] = sky.stokes[0, :, :]
+    if sky.freq_array is not None:
+        arr["frequency"] = sky.freq_array
+    elif sky.reference_freq is not None:
+        arr["reference_frequency"] = sky.reference_freq
+        if sky.spectral_index is not None:
+            arr["spectral_index"] = sky.spectral_index
 
     return arr
 
@@ -667,32 +854,72 @@ def array_to_skymodel(catalog_table):
     :class:`pyradiosky.SkyModel`
 
     """
-    ra = Angle(catalog_table["ra_j2000"], units.deg)
-    dec = Angle(catalog_table["dec_j2000"], units.deg)
-    ids = catalog_table["source_id"]
+    ra = Longitude(catalog_table["ra_j2000"], units.deg)
+    dec = Latitude(catalog_table["dec_j2000"], units.deg)
+    ids = np.asarray(catalog_table["source_id"]).astype(str)
     flux_I = np.atleast_1d(catalog_table["flux_density_I"])
 
-    if flux_I.ndim == 1:
-        flux_I = flux_I[:, None]
-    stokes = np.pad(np.expand_dims(flux_I, 2), ((0, 0), (0, 0), (0, 3)), "constant").T
     rise_lst = None
     set_lst = None
-    source_freqs = np.atleast_1d(catalog_table["frequency"][0])
+
+    fieldnames = catalog_table.dtype.names
+    if "frequency" in fieldnames:
+        freq_array = Quantity(np.atleast_1d(catalog_table["frequency"]), "hertz")
+        if freq_array.size > 1:
+            spectral_type = "full"  # how should we tell if this should be subband?
+        else:
+            spectral_type = "flat"
+        reference_freq = None
+        spectral_index = None
+    elif "reference_frequency" in fieldnames:
+        reference_freq = Quantity(
+            np.atleast_1d(catalog_table["reference_frequency"]), "hertz"
+        )
+        if "spectral_index" in fieldnames:
+            spectral_index = np.atleast_1d(catalog_table["spectral_index"])
+            spectral_type = "spectral_index"
+        else:
+            spectral_type = "flat"
+            spectral_index = None
+        freq_array = None
+    else:
+        # flat spectrum, no freq info
+        spectral_type = "flat"
+        freq_array = None
+        reference_freq = None
+        spectral_index = None
 
     if "rise_lst" in catalog_table.dtype.names:
         rise_lst = catalog_table["rise_lst"]
         set_lst = catalog_table["set_lst"]
 
-    spectral_type = "flat"
-    if source_freqs.size > 1:
-        spectral_type = "full"
+    n_components = ids.size
+    if freq_array is not None:
+        n_freqs = freq_array.size
+    else:
+        n_freqs = 1
+
+    flux_I = flux_I
+
+    if flux_I.ndim == 1:
+        flux_I = flux_I[np.newaxis, :]
+
+    assert flux_I.shape == (n_freqs, n_components)
+
+    # pad non-I flux values with zeros
+    stokes = np.pad(flux_I[np.newaxis, :, :], ((0, 3), (0, 0), (0, 0)))
+
+    assert stokes.shape == (4, n_freqs, n_components)
+
     sourcelist = SkyModel(
         ids,
         ra,
         dec,
         stokes,
-        source_freqs,
         spectral_type,
+        freq_array=freq_array,
+        reference_freq=reference_freq,
+        spectral_index=spectral_index,
         rise_lst=rise_lst,
         set_lst=set_lst,
     )
@@ -748,8 +975,8 @@ def source_cuts(
     if max_flux:
         catalog_table = catalog_table[catalog_table["flux_density_I"] < max_flux]
 
-    ra = Angle(catalog_table["ra_j2000"], units.deg)
-    dec = Angle(catalog_table["dec_j2000"], units.deg)
+    ra = Longitude(catalog_table["ra_j2000"], units.deg)
+    dec = Latitude(catalog_table["dec_j2000"], units.deg)
 
     if coarse_horizon_cut:
         tans = np.tan(lat_rad) * np.tan(dec.rad)
@@ -822,8 +1049,10 @@ def read_votable_catalog(gleam_votable, source_select_kwds={}, return_table=Fals
     except Found:
         table = tab.to_table()  # Convert to astropy Table
 
+    print(table.colnames)
+
     fieldnames = ["GLEAM", "RAJ2000", "DEJ2000", "Fintwide"]
-    newnames = ["source_id", "ra_j2000", "dec_j2000", "flux_density_I", "frequency"]
+    newnames = ["source_id", "ra_j2000", "dec_j2000", "flux_density_I"]
     data = table[fieldnames]
     Nsrcs = len(data)
     freq = 200e6
@@ -831,7 +1060,7 @@ def read_votable_catalog(gleam_votable, source_select_kwds={}, return_table=Fals
         i = fieldnames.index(t)
         data[t] = data[t]
         data[t].name = newnames[i]
-    data.add_column(table.Column(np.ones(Nsrcs) * freq, name="frequency"))
+    data.add_column(table.Column(np.ones(Nsrcs) * freq, name="reference_frequency"))
     data = data.as_array().data
 
     if len(source_select_kwds) > 0:
@@ -850,14 +1079,22 @@ def read_text_catalog(catalog_csv, source_select_kwds={}, return_table=False):
     Parameters
     ----------
     catalog_csv: str
-        Path to tab separated value file with the following expected columns
-        (For now, all sources are flat spectrum):
-
+        Path to tab separated value file with the following required columns:
         *  `Source_ID`: source name as a string of maximum 10 characters
         *  `ra_j2000`: right ascension at J2000 epoch, in decimal degrees
         *  `dec_j2000`: declination at J2000 epoch, in decimal degrees
-        *  `flux_density_I`: Stokes I flux density in Janskys
-        *  `frequency`: reference frequency (for future spectral indexing) [Hz]
+        *  `Flux [Jy]`: Stokes I flux density in Janskys
+
+        If flux is specified at multiple frequencies (must be the same set for all
+        components), the frequencies must be included in each column name,
+        e.g. `Flux at 150 MHz [Jy]`. Recognized units are ('Hz', 'kHz', 'MHz' or 'GHz'):
+
+        If flux is only specified at one reference frequency (can be different per
+        component), a frequency column should be added (note: assumed to be in Hz):
+        *  `Frequency`: reference frequency [Hz]
+
+        Optionally a spectral index can be specified per component with:
+        *  `Spectral_Index`: spectral index
 
     source_select_kwds : dict, optional
         Dictionary of keywords for source selection. Valid options:
@@ -879,17 +1116,58 @@ def read_text_catalog(catalog_csv, source_select_kwds={}, return_table=False):
     with open(catalog_csv, "r") as cfile:
         header = cfile.readline()
     header = [
-        h.strip() for h in header.split() if not h[0] == "["
+        h.strip().lower() for h in header.split() if not h[0] == "["
     ]  # Ignore units in header
-    dt = np.format_parser(
-        ["U10", "f8", "f8", "f8", "f8"],
-        ["source_id", "ra_j2000", "dec_j2000", "flux_density_I", "frequency"],
-        header,
-    )
+    print(header)
+    flux_fields = [colname for colname in header if colname.startswith("flux")]
+    expected_cols = ["source_id", "ra_j2000", "dec_j2000"]
+    fieldnames = copy.copy(expected_cols)
+    fieldtypes = ["U10", "f8", "f8"]
+    fieldshapes = [()] * 3
+    if "frequency" in header:
+        if len(flux_fields) != 1:
+            raise ValueError(
+                "If frequency column is present, only one flux " "columns allowed."
+            )
+        expected_cols.extend([flux_fields[0], "frequency"])
+        fieldnames.extend(["flux_density_I", "reference_frequency"])
+        fieldtypes.extend(["f8", "f8"])
+        fieldshapes.extend([()] * 2)
+        if "spectral_index" in header:
+            fieldnames.append("spectral_index")
+            fieldtypes.append("f8")
+            fieldshapes.append(())
+    else:
+        frequencies = []
+        for fluxname in flux_fields:
+            if "Hz" in fluxname:
+                frequencies.append(pyuvdata.uvbeam.cst_beam.name2freq(fluxname))
+            else:
+                if len(flux_fields) > 1:
+                    raise ValueError(
+                        "Multiple flux fields, but they do not "
+                        "all contain a frequency."
+                    )
+        if len(frequencies) > 0:
+            # This has a freq_array
+            expected_cols.extend(flux_fields)
+            fieldnames.append("flux_density_I")
+            fieldtypes.append(["f8"])
+            fieldshapes.append((len(frequencies)))
+        else:
+            # This is a flat spectrum (no freq info)
+            expected_cols.append("flux")
+            fieldnames.append("flux_density_I")
+            fieldtypes.append("f8")
+            fieldshapes.append(())
 
-    catalog_table = np.genfromtxt(
-        catalog_csv, autostrip=True, skip_header=1, dtype=dt.dtype
-    )
+    for col in expected_cols:
+        if col not in header:
+            raise ValueError(f"Expected column {col} is not present.")
+
+    dt = np.dtype(list(zip(fieldnames, fieldtypes, fieldshapes)))
+
+    catalog_table = np.genfromtxt(catalog_csv, autostrip=True, skip_header=1, dtype=dt)
 
     catalog_table = np.atleast_1d(catalog_table)
 
@@ -920,7 +1198,7 @@ def read_idl_catalog(filename_sav, expand_extended=True):
     :class:`pyradiosky.SkyModel`
     """
     catalog = scipy.io.readsav(filename_sav)["catalog"]
-    ids = catalog["id"]
+    ids = catalog["id"].astype(str)
     ra = catalog["ra"]
     dec = catalog["dec"]
     source_freqs = catalog["freq"]
@@ -1007,16 +1285,16 @@ def read_idl_catalog(filename_sav, expand_extended=True):
                 spectral_index = np.insert(spectral_index, use_index, src["alpha"])
                 source_inds = np.insert(source_inds, use_index, np.full(Ncomps, ext))
 
-    ra = Angle(ra, units.deg)
-    dec = Angle(dec, units.deg)
+    ra = Longitude(ra, units.deg)
+    dec = Latitude(dec, units.deg)
     stokes = stokes[:, np.newaxis, :]  # Add frequency axis
     sourcelist = SkyModel(
         ids,
         ra,
         dec,
         stokes,
-        source_freqs,
         spectral_type="spectral_index",
+        reference_freq=Quantity(source_freqs, "hertz"),
         spectral_index=spectral_index,
         beam_amp=beam_amp,
         extended_model_group=extended_model_group,
@@ -1024,29 +1302,65 @@ def read_idl_catalog(filename_sav, expand_extended=True):
     return sourcelist
 
 
-def write_catalog_to_file(filename, catalog):
+def write_catalog_to_file(filename, skymodel):
     """
     Write out a catalog to a text file.
 
-    Readable with :meth:`simsetup.read_catalog_text()`.
+    Readable with :meth:`simsetup.read_text_catalog()`.
 
     Parameters
     ----------
     filename : str
         Path to output file (string)
-    catalog : :class:`SkyModel`
+    skymodel : :class:`SkyModel`
         The sky model to write to file.
     """
-    with open(filename, "w+") as fo:
-        fo.write(
-            "SOURCE_ID\tRA_J2000 [deg]\tDec_J2000 [deg]\tFlux [Jy]\tFrequency [Hz]\n"
-        )
-        arr = skymodel_to_array(catalog)
-        for src in arr:
-            srcid, ra, dec, flux_i, freq = src
+    header = "SOURCE_ID\tRA_J2000 [deg]\tDec_J2000 [deg]"
+    format_str = "{}\t{:0.8f}\t{:0.8f}"
+    if skymodel.reference_freq is not None:
+        header += "\tFlux [Jy]\tFrequency [Hz]"
+        format_str += "\t{:0.2f}\t{:0.2f}"
+        if skymodel.spectral_index is not None:
+            header += "\tSpectral_Index"
+        format_str += "\t{:0.2f}"
+    elif skymodel.freq_array:
+        for freq in skymodel.freq_array:
+            if freq > 1e9:
+                freq_str = "{:g} GHz".format(freq * 1e-9)
+            elif freq > 1e6:
+                freq_str = "{:g} MHz".format(freq * 1e-6)
+            elif freq > 1e3:
+                freq_str = "{:g} kHz".format(freq * 1e-3)
+            else:
+                freq_str = "{:g} Hz".format(freq)
 
-            fo.write(
-                "{}\t{:f}\t{:f}\t{:0.2f}\t{:0.2f}\n".format(
-                    srcid, ra, dec, flux_i[0], freq[0]
-                )
-            )
+            header += f"\tFlux at {freq_str} [Jy]"
+            format_str += "\t{:0.2f}"
+    else:
+        # flat spectral response, no freq info
+        header += "\tFlux [Jy]"
+        format_str += "\t{:0.2f}"
+
+    header += "\n"
+    format_str += "\n"
+
+    with open(filename, "w+") as fo:
+        fo.write(header)
+        arr = skymodel_to_array(skymodel)
+        for src in arr:
+            if skymodel.reference_freq is not None:
+                if skymodel.spectral_index is not None:
+                    srcid, ra, dec, flux_i, freq, spec_index = src
+                    fo.write(
+                        format_str.format(srcid, ra, dec, flux_i, freq, spec_index)
+                    )
+                else:
+                    srcid, ra, dec, flux_i, freq = src
+                    fo.write(format_str.format(srcid, ra, dec, flux_i, freq))
+            elif skymodel.freq_array is not None:
+                srcid, ra, dec, flux_i, freq = src
+                fo.write(format_str.format(srcid, ra, dec, flux_i))
+            else:
+                # flat spectral response, no freq info
+                srcid, ra, dec, flux_i = src
+                fo.write(format_str.format(srcid, ra, dec, flux_i))
