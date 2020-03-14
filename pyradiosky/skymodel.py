@@ -90,8 +90,6 @@ class SkyModel(UVBase):
         source Dec in J2000 (or ICRS) coordinates, shape (Ncomponents,).
     stokes : array_like of float
         4 element vector giving the source [I, Q, U, V], shape (4, Nfreqs, Ncomponents).
-    freq : astropy Quantity
-        Reference frequencies of flux values, shape (Ncomponents,).
     spectral_type : str
         Indicates how fluxes should be calculated at each frequency.
         Options:
@@ -99,6 +97,10 @@ class SkyModel(UVBase):
         - 'full' : Flux is defined by a saved value at each frequency.
         - 'subband' : Flux is given at a set of band centers. (TODO)
         - 'spectral_index' : Flux is given at a reference frequency. (TODO)
+    freq_array : astropy Quantity
+        Array of frequencies that fluxes are provided for, shape (Nfreqs,).
+    reference_freq : astropy Quantity
+        Reference frequencies of flux values, shape (Ncomponents,).
     spectral_index : array_like of float
         Spectral index of each source, shape (Ncomponents).
         None if spectral_type is not 'spectral_index'.
@@ -138,7 +140,8 @@ class SkyModel(UVBase):
         beam_amp=None,
     ):
         # standard angle tolerance: 1 mas in radians.
-        angle_tol = Angle(1e-3, units.arcsec)
+        angle_tol = Angle(1, units.arcsec)
+        self.future_angle_tol = Angle(1e-3, units.arcsec)
 
         self._Ncomponents = UVParameter(
             "Ncomponents", description="Number of components", expected_type=int
@@ -325,21 +328,54 @@ class SkyModel(UVBase):
         self.ra = np.atleast_1d(ra)
         self.dec = np.atleast_1d(dec)
 
+        # handle old parameter order
+        # (use to be: name, ra, dec, stokes, freq_array spectral_type)
+        if isinstance(spectral_type, (np.ndarray, list, float, Quantity)):
+            warnings.warn(
+                "The input parameters to SkyModel.__init__ have changed. Please "
+                "update the call.",
+                category=DeprecationWarning,
+            )
+            freqs_use = spectral_type
+            spectral_type = freq_array
+
+            if spectral_type == "flat" and np.unique(freqs_use).size == 1:
+                reference_freq = np.zeros((self.Ncomponents), dtype=np.float)
+                reference_freq.fill(freqs_use[0])
+                freq_array = None
+            else:
+                freq_array = freqs_use
+                reference_freq = None
+
         self.set_spectral_type_params(spectral_type)
 
         if freq_array is not None:
+            if not isinstance(freq_array, (Quantity,)):
+                warnings.warn(
+                    "freq_array must be an astropy Quantity with units that "
+                    "are convertable to Hz.",
+                    category=DeprecationWarning,
+                )
+                freq_array = freq_array * units.Hz
             self.freq_array = np.atleast_1d(freq_array)
             self.Nfreqs = self.freq_array.size
         else:
             self.Nfreqs = 1
 
         if reference_freq is not None:
+            if not isinstance(reference_freq, (Quantity,)):
+                warnings.warn(
+                    "reference_freq must be an astropy Quantity with units that "
+                    "are convertable to Hz.",
+                    category=DeprecationWarning,
+                )
+                reference_freq = reference_freq * units.Hz
             self.reference_freq = np.atleast_1d(reference_freq)
 
         if spectral_index is not None:
             self.spectral_index = np.atleast_1d(spectral_index)
 
-        self.stokes = np.asarray(stokes)
+        self.stokes = np.asarray(stokes, dtype=np.float)
         if self.Ncomponents == 1:
             self.stokes = self.stokes.reshape(4, self.Nfreqs, 1)
 
@@ -406,6 +442,53 @@ class SkyModel(UVBase):
         super(SkyModel, self).check(
             check_extra=check_extra, run_check_acceptability=run_check_acceptability
         )
+
+        # make sure freq_array or reference_freq if present is compatible with Hz
+        if self.freq_array is not None:
+            try:
+                self.freq_array.to("Hz")
+            except (units.UnitConversionError) as e:
+                raise ValueError(
+                    "freq_array must have a unit that can be " "converted to Hz."
+                ) from e
+
+        if self.reference_freq is not None:
+            try:
+                self.reference_freq.to("Hz")
+            except (units.UnitConversionError) as e:
+                raise ValueError(
+                    "reference_freq must have a unit that can be " "converted to Hz."
+                ) from e
+
+    def __eq__(self, other, check_extra=True):
+        """Check for equality, check for future equality."""
+        # Run the basic __eq__ from UVBase
+        equal = super(SkyModel, self).__eq__(other, check_extra=check_extra)
+
+        # Issue deprecation warning if ra/decs aren't close to future_angle_tol levels
+        if not np.allclose(self.ra, other.ra, rtol=0, atol=self.future_angle_tol):
+            warnings.warn(
+                "The _ra parameters are not within the future tolerance. "
+                f"Left is {self.ra}, right is {other.ra}",
+                category=DeprecationWarning,
+            )
+
+        if not np.allclose(self.dec, other.dec, rtol=0, atol=self.future_angle_tol):
+            warnings.warn(
+                "The _dec parameters are not within the future tolerance. "
+                f"Left is {self.dec}, right is {other.dec}",
+                category=DeprecationWarning,
+            )
+
+        if not equal:
+            warnings.warn(
+                "Future equality does not pass, probably because the "
+                "frequencies were not checked in the deprecated equality checking.",
+                category=DeprecationWarning,
+            )
+            equal = super(SkyModel, self).__eq__(other, check_extra=False)
+
+        return equal
 
     def _calc_average_rotation_matrix(self):
         """
@@ -518,7 +601,7 @@ class SkyModel(UVBase):
 
         return coherency_rot_matrix
 
-    def coherency_calc(self):
+    def coherency_calc(self, deprecated_location=None):
         """
         Calculate the local coherency in alt/az basis for this source at a time & location.
 
@@ -526,11 +609,25 @@ class SkyModel(UVBase):
         It's specified on the object as a coherency in the ra/dec basis,
         but must be rotated into local alt/az.
 
+        Parameters
+        ----------
+        deprecated_location : EarthLocation object
+            This keyword is deprecated. It is preserved to maintain backwards
+            compatibility and sets the EarthLocation on this SkyModel object.
+
         Returns
         -------
         array of float
             local coherency in alt/az basis, shape (2, 2, Nfreqs, Ncomponents)
         """
+        if deprecated_location is not None:
+            warnings.warn(
+                "Passing telescope_location to SkyModel.coherency_calc is "
+                "deprecated. Set the telescope_location via SkyModel.update_positions.",
+                category=DeprecationWarning,
+            )
+            self.update_positions(self.time, deprecated_location)
+
         if not isinstance(self.telescope_location, (EarthLocation, MoonLocation)):
 
             errm = "telescope_location must be an astropy EarthLocation object"
@@ -812,9 +909,17 @@ def skymodel_to_array(sky):
         fieldtypes.append("f8")
         fieldshapes.extend([(sky.Nfreqs,)] * 2)
     elif sky.reference_freq is not None:
-        fieldnames.append("reference_frequency")
-        fieldtypes.append("f8")
-        fieldshapes.extend([()] * 2)
+        # add frequency field (a copy of reference_frequency) for backwards
+        # compatibility.
+        warnings.warn(
+            "The frequency field is included in the recarray as a copy of the "
+            "reference_frequency field for backwards compatibility. In future "
+            "only the reference_frequency will be included.",
+            category=DeprecationWarning,
+        )
+        fieldnames.extend(["frequency", "reference_frequency"])
+        fieldtypes.extend(["f8"] * 2)
+        fieldshapes.extend([()] * 3)
         if sky.spectral_index is not None:
             fieldnames.append("spectral_index")
             fieldtypes.append("f8")
@@ -829,13 +934,18 @@ def skymodel_to_array(sky):
     arr["source_id"] = sky.name
     arr["ra_j2000"] = sky.ra.deg
     arr["dec_j2000"] = sky.dec.deg
-    arr["flux_density_I"] = sky.stokes[0, :, :]
     if sky.freq_array is not None:
         arr["frequency"] = sky.freq_array
+        arr["flux_density_I"] = sky.stokes[0, :, :].T
     elif sky.reference_freq is not None:
         arr["reference_frequency"] = sky.reference_freq
+        arr["frequency"] = sky.reference_freq
+        arr["flux_density_I"] = np.squeeze(sky.stokes[0, :, :])
         if sky.spectral_index is not None:
             arr["spectral_index"] = sky.spectral_index
+    else:
+        # flat spectral type, no freq info
+        arr["flux_density_I"] = np.squeeze(sky.stokes[0, :, :])
 
     return arr
 
@@ -863,15 +973,7 @@ def array_to_skymodel(catalog_table):
     set_lst = None
 
     fieldnames = catalog_table.dtype.names
-    if "frequency" in fieldnames:
-        freq_array = Quantity(np.atleast_1d(catalog_table["frequency"]), "hertz")
-        if freq_array.size > 1:
-            spectral_type = "full"  # how should we tell if this should be subband?
-        else:
-            spectral_type = "flat"
-        reference_freq = None
-        spectral_index = None
-    elif "reference_frequency" in fieldnames:
+    if "reference_frequency" in fieldnames:
         reference_freq = Quantity(
             np.atleast_1d(catalog_table["reference_frequency"]), "hertz"
         )
@@ -882,6 +984,14 @@ def array_to_skymodel(catalog_table):
             spectral_type = "flat"
             spectral_index = None
         freq_array = None
+    elif "frequency" in fieldnames:
+        freq_array = Quantity(np.atleast_1d(catalog_table["frequency"]), "hertz")
+        if freq_array.size > 1:
+            spectral_type = "full"  # how should we tell if this should be subband?
+        else:
+            spectral_type = "flat"
+        reference_freq = None
+        spectral_index = None
     else:
         # flat spectrum, no freq info
         spectral_type = "flat"
@@ -895,11 +1005,13 @@ def array_to_skymodel(catalog_table):
 
     n_components = ids.size
     if freq_array is not None:
+        # freq_array gets copied for every component, so it's zeroth axis is
+        # length Ncomponents. Just take the first one.
+        freq_array = freq_array[0, :]
         n_freqs = freq_array.size
+        flux_I = flux_I.T
     else:
         n_freqs = 1
-
-    flux_I = flux_I
 
     if flux_I.ndim == 1:
         flux_I = flux_I[np.newaxis, :]
@@ -1066,10 +1178,13 @@ def read_votable_catalog(gleam_votable, source_select_kwds={}, return_table=Fals
     if len(source_select_kwds) > 0:
         data = source_cuts(data, **source_select_kwds)
 
+    # To make sure the deprecated 'frequency' field is in the recarray always
+    # go to the object then back the array if needed.
+    skymodel_obj = array_to_skymodel(data)
     if return_table:
-        return data
+        return skymodel_to_array(skymodel_obj)
 
-    return array_to_skymodel(data)
+    return skymodel_obj
 
 
 def read_text_catalog(catalog_csv, source_select_kwds={}, return_table=False):
@@ -1118,7 +1233,6 @@ def read_text_catalog(catalog_csv, source_select_kwds={}, return_table=False):
     header = [
         h.strip().lower() for h in header.split() if not h[0] == "["
     ]  # Ignore units in header
-    print(header)
     flux_fields = [colname for colname in header if colname.startswith("flux")]
     expected_cols = ["source_id", "ra_j2000", "dec_j2000"]
     fieldnames = copy.copy(expected_cols)
@@ -1174,10 +1288,13 @@ def read_text_catalog(catalog_csv, source_select_kwds={}, return_table=False):
     if len(source_select_kwds) > 0:
         catalog_table = source_cuts(catalog_table, **source_select_kwds)
 
+    # To make sure the deprecated 'frequency' field is in the recarray always
+    # go to the object then back the array if needed.
+    skymodel_obj = array_to_skymodel(catalog_table)
     if return_table:
-        return catalog_table
+        return skymodel_to_array(skymodel_obj)
 
-    return array_to_skymodel(catalog_table)
+    return skymodel_obj
 
 
 def read_idl_catalog(filename_sav, expand_extended=True):
