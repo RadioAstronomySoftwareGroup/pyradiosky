@@ -64,6 +64,7 @@ def test_source_zenith_from_icrs():
     )
 
     zenith_source = skymodel.SkyModel("icrs_zen", ra, dec, [1.0, 0, 0, 0], "flat")
+    zenith_source = skymodel.SkyModel("icrs_zen", ra, dec, [1.0, 0, 0, 0], "flat")
 
     zenith_source.update_positions(time, array_location)
     zenith_source_lmn = zenith_source.pos_lmn.squeeze()
@@ -95,6 +96,122 @@ def test_source_zenith():
     zenith_source.update_positions(time, array_location)
     zenith_source_lmn = zenith_source.pos_lmn.squeeze()
     assert np.allclose(zenith_source_lmn, np.array([0, 0, 1]))
+
+
+def test_skymodel_deprecated():
+    """Test that old init works with deprecation."""
+    source_new = skymodel.SkyModel(
+        "Test",
+        Longitude(12.0 * units.hr),
+        Latitude(-30.0 * units.deg),
+        [1.0, 0.0, 0.0, 0.0],
+        "flat",
+        reference_freq=np.array([1e8]) * units.Hz,
+    )
+
+    with pytest.warns(
+        DeprecationWarning,
+        match="The input parameters to SkyModel.__init__ have changed",
+    ):
+        source_old = skymodel.SkyModel(
+            "Test",
+            Longitude(12.0 * units.hr),
+            Latitude(-30.0 * units.deg),
+            [1.0, 0.0, 0.0, 0.0],
+            np.array([1e8]) * units.Hz,
+            "flat",
+        )
+    assert source_new == source_old
+
+    with pytest.warns(
+        DeprecationWarning, match="reference_freq must be an astropy Quantity"
+    ):
+        source_old = skymodel.SkyModel(
+            "Test",
+            Longitude(12.0 * units.hr),
+            Latitude(-30.0 * units.deg),
+            [1.0, 0.0, 0.0, 0.0],
+            "flat",
+            reference_freq=np.array([1e8]),
+        )
+    assert source_new == source_old
+
+    source_old = skymodel.SkyModel(
+        "Test",
+        Longitude(12.0 * units.hr),
+        Latitude(-30.0 * units.deg),
+        [1.0, 0.0, 0.0, 0.0],
+        "flat",
+        reference_freq=np.array([1.5e8]) * units.Hz,
+    )
+    with pytest.warns(
+        DeprecationWarning,
+        match=(
+            "Future equality does not pass, probably because the frequencies "
+            "were not checked"
+        ),
+    ):
+        assert source_new == source_old
+
+    source_old = skymodel.SkyModel(
+        "Test",
+        Longitude(12.0 * units.hr),
+        Latitude(-30.0 * units.deg + 2e-3 * units.arcsec),
+        [1.0, 0.0, 0.0, 0.0],
+        "flat",
+        reference_freq=np.array([1e8]) * units.Hz,
+    )
+    with pytest.warns(
+        DeprecationWarning,
+        match=("The _dec parameters are not within the future tolerance"),
+    ):
+        assert source_new == source_old
+
+    source_old = skymodel.SkyModel(
+        "Test",
+        Longitude(Longitude(12.0 * units.hr) + Longitude(2e-3 * units.arcsec)),
+        Latitude(-30.0 * units.deg),
+        [1.0, 0.0, 0.0, 0.0],
+        "flat",
+        reference_freq=np.array([1e8]) * units.Hz,
+    )
+    with pytest.warns(
+        DeprecationWarning,
+        match=("The _ra parameters are not within the future tolerance"),
+    ):
+        assert source_new == source_old
+
+    source_new = skymodel.SkyModel(
+        "Test",
+        Longitude(12.0 * units.hr),
+        Latitude(-30.0 * units.deg),
+        [1.0, 0.0, 0.0, 0.0],
+        "flat",
+        freq_array=np.array([1e8]) * units.Hz,
+    )
+    with pytest.warns(
+        DeprecationWarning, match="freq_array must be an astropy Quantity"
+    ):
+        source_old = skymodel.SkyModel(
+            "Test",
+            Longitude(12.0 * units.hr),
+            Latitude(-30.0 * units.deg),
+            [1.0, 0.0, 0.0, 0.0],
+            "flat",
+            freq_array=np.array([1e8]),
+        )
+    assert source_new == source_old
+
+    telescope_location = EarthLocation(
+        lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0
+    )
+    time = Time("2018-01-01 00:00")
+    with pytest.warns(
+        DeprecationWarning,
+        match="Passing telescope_location to SkyModel.coherency_calc is deprecated",
+    ):
+        source_new.update_positions(time, telescope_location)
+        source_new.coherency_calc(telescope_location)
 
 
 def test_calc_basis_rotation_matrix():

@@ -449,7 +449,7 @@ class SkyModel(UVBase):
                 self.freq_array.to("Hz")
             except (units.UnitConversionError) as e:
                 raise ValueError(
-                    "freq_array must have a unit that can be " "converted to Hz."
+                    "freq_array must have a unit that can be converted to Hz."
                 ) from e
 
         if self.reference_freq is not None:
@@ -457,7 +457,7 @@ class SkyModel(UVBase):
                 self.reference_freq.to("Hz")
             except (units.UnitConversionError) as e:
                 raise ValueError(
-                    "reference_freq must have a unit that can be " "converted to Hz."
+                    "reference_freq must have a unit that can be converted to Hz."
                 ) from e
 
     def __eq__(self, other, check_extra=True):
@@ -686,7 +686,7 @@ class SkyModel(UVBase):
         """
         if not isinstance(time, Time):
             raise ValueError(
-                "time must be an astropy Time object. " "value was: {t}".format(t=time)
+                "time must be an astropy Time object. value was: {t}".format(t=time)
             )
 
         if not isinstance(telescope_location, (EarthLocation, MoonLocation)):
@@ -1241,7 +1241,7 @@ def read_text_catalog(catalog_csv, source_select_kwds={}, return_table=False):
     if "frequency" in header:
         if len(flux_fields) != 1:
             raise ValueError(
-                "If frequency column is present, only one flux " "columns allowed."
+                "If frequency column is present, only one flux columns allowed."
             )
         expected_cols.extend([flux_fields[0], "frequency"])
         fieldnames.extend(["flux_density_I", "reference_frequency"])
