@@ -26,10 +26,48 @@ from pyradiosky import skymodel
 GLEAM_vot = os.path.join(SKY_DATA_PATH, "gleam_50srcs.vot")
 
 
-def test_source_zenith_from_icrs():
-    """Test single source position at zenith constructed using icrs."""
+@pytest.fixture
+def time_location():
     array_location = EarthLocation(lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0)
+
     time = Time("2018-03-01 00:00:00", scale="utc", location=array_location)
+
+    return time, array_location
+
+
+@pytest.fixture
+def zenith_skycoord(time_location):
+    time, array_location = time_location
+
+    source_coord = SkyCoord(
+        alt=Angle(90, unit=units.deg),
+        az=Angle(0, unit=units.deg),
+        obstime=time,
+        frame="altaz",
+        location=array_location,
+    )
+    icrs_coord = source_coord.transform_to("icrs")
+
+    return icrs_coord
+
+
+@pytest.fixture
+def zenith_skymodel(zenith_skycoord):
+    icrs_coord = zenith_skycoord
+
+    ra = icrs_coord.ra
+    dec = icrs_coord.dec
+
+    names = "zen_source"
+    stokes = [1.0, 0, 0, 0]
+    zenith_source = skymodel.SkyModel(names, ra, dec, stokes, "flat")
+
+    return zenith_source
+
+
+def test_source_zenith_from_icrs(time_location):
+    """Test single source position at zenith constructed using icrs."""
+    time, array_location = time_location
 
     lst = time.sidereal_time("apparent")
 
@@ -48,22 +86,7 @@ def test_source_zenith_from_icrs():
 
     ra = icrs_coord.ra
     dec = icrs_coord.dec
-    # Check error cases
-    with pytest.raises(ValueError) as cm:
-        skymodel.SkyModel("icrs_zen", ra.rad, dec, [1.0, 0, 0, 0], "flat")
-    assert str(cm.value).startswith(
-        "UVParameter _ra is not the appropriate type. Is: float64. "
-        "Should be: <class 'astropy.coordinates.angles.Longitude'>"
-    )
 
-    with pytest.raises(ValueError) as cm:
-        skymodel.SkyModel("icrs_zen", ra, dec.rad, [1.0, 0, 0, 0], "flat")
-    assert str(cm.value).startswith(
-        "UVParameter _dec is not the appropriate type. Is: float64. "
-        "Should be: <class 'astropy.coordinates.angles.Latitude'>"
-    )
-
-    zenith_source = skymodel.SkyModel("icrs_zen", ra, dec, [1.0, 0, 0, 0], "flat")
     zenith_source = skymodel.SkyModel("icrs_zen", ra, dec, [1.0, 0, 0, 0], "flat")
 
     zenith_source.update_positions(time, array_location)
@@ -71,31 +94,75 @@ def test_source_zenith_from_icrs():
     assert np.allclose(zenith_source_lmn, np.array([0, 0, 1]), atol=1e-5)
 
 
-def test_source_zenith():
+def test_source_zenith(time_location, zenith_skymodel):
     """Test single source position at zenith."""
-    time = Time("2018-03-01 00:00:00", scale="utc")
+    time, array_location = time_location
 
-    array_location = EarthLocation(lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0)
+    zenith_skymodel.update_positions(time, array_location)
+    zenith_source_lmn = zenith_skymodel.pos_lmn.squeeze()
+    assert np.allclose(zenith_source_lmn, np.array([0, 0, 1]))
 
-    source_coord = SkyCoord(
-        alt=Angle(90, unit=units.deg),
-        az=Angle(0, unit=units.deg),
-        obstime=time,
-        frame="altaz",
-        location=array_location,
-    )
-    icrs_coord = source_coord.transform_to("icrs")
+
+def test_skymodel_init_errors(zenith_skycoord):
+    icrs_coord = zenith_skycoord
 
     ra = icrs_coord.ra
     dec = icrs_coord.dec
 
-    names = "zen_source"
-    stokes = [1.0, 0, 0, 0]
-    zenith_source = skymodel.SkyModel(names, ra, dec, stokes, "flat")
+    # Check error cases
+    with pytest.raises(
+        ValueError,
+        match=(
+            "UVParameter _ra is not the appropriate type. Is: float64. "
+            "Should be: <class 'astropy.coordinates.angles.Longitude'>"
+        ),
+    ):
+        skymodel.SkyModel("icrs_zen", ra.rad, dec, [1.0, 0, 0, 0], "flat")
 
-    zenith_source.update_positions(time, array_location)
-    zenith_source_lmn = zenith_source.pos_lmn.squeeze()
-    assert np.allclose(zenith_source_lmn, np.array([0, 0, 1]))
+    with pytest.raises(
+        ValueError,
+        match=(
+            "UVParameter _dec is not the appropriate type. Is: float64. "
+            "Should be: <class 'astropy.coordinates.angles.Latitude'>"
+        ),
+    ):
+        skymodel.SkyModel("icrs_zen", ra, dec.rad, [1.0, 0, 0, 0], "flat")
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Only one of freq_array and reference_frequency can be specified, not both."
+        ),
+    ):
+        skymodel.SkyModel(
+            "icrs_zen",
+            ra,
+            dec,
+            [1.0, 0, 0, 0],
+            "flat",
+            reference_frequency=[1e8] * units.Hz,
+            freq_array=[1e8] * units.Hz,
+        )
+
+    with pytest.raises(
+        ValueError, match=("freq_array must have a unit that can be converted to Hz.")
+    ):
+        skymodel.SkyModel(
+            "icrs_zen", ra, dec, [1.0, 0, 0, 0], "flat", freq_array=[1e8] * units.m
+        )
+
+    with pytest.raises(
+        ValueError,
+        match=("reference_frequency must have a unit that can be converted to Hz."),
+    ):
+        skymodel.SkyModel(
+            "icrs_zen",
+            ra,
+            dec,
+            [1.0, 0, 0, 0],
+            "flat",
+            reference_frequency=[1e8] * units.m,
+        )
 
 
 def test_skymodel_deprecated():
@@ -181,14 +248,30 @@ def test_skymodel_deprecated():
     ):
         assert source_new == source_old
 
+    stokes = np.zeros((4, 2, 1), dtype=np.float)
+    stokes[0, :, :] = 1.0
     source_new = skymodel.SkyModel(
         "Test",
         Longitude(12.0 * units.hr),
         Latitude(-30.0 * units.deg),
-        [1.0, 0.0, 0.0, 0.0],
-        "flat",
-        freq_array=np.array([1e8]) * units.Hz,
+        stokes,
+        "subband",
+        freq_array=np.array([1e8, 1.5e8]) * units.Hz,
     )
+    with pytest.warns(
+        DeprecationWarning,
+        match="The input parameters to SkyModel.__init__ have changed",
+    ):
+        source_old = skymodel.SkyModel(
+            "Test",
+            Longitude(12.0 * units.hr),
+            Latitude(-30.0 * units.deg),
+            stokes,
+            np.array([1e8, 1.5e8]) * units.Hz,
+            "subband",
+        )
+    assert source_new == source_old
+
     with pytest.warns(
         DeprecationWarning, match="freq_array must be an astropy Quantity"
     ):
@@ -196,9 +279,9 @@ def test_skymodel_deprecated():
             "Test",
             Longitude(12.0 * units.hr),
             Latitude(-30.0 * units.deg),
-            [1.0, 0.0, 0.0, 0.0],
-            "flat",
-            freq_array=np.array([1e8]),
+            stokes,
+            "subband",
+            freq_array=np.array([1e8, 1.5e8]),
         )
     assert source_new == source_old
 
@@ -212,6 +295,24 @@ def test_skymodel_deprecated():
     ):
         source_new.update_positions(time, telescope_location)
         source_new.coherency_calc(telescope_location)
+
+
+def test_update_position_errors(zenith_skymodel, time_location):
+    time, array_location = time_location
+    with pytest.raises(ValueError, match=("time must be an astropy Time object.")):
+        zenith_skymodel.update_positions("2018-03-01 00:00:00", array_location)
+
+
+def test_coherency_calc_errors():
+    """Test that correct errors are raised when providing invalid location object."""
+    coord = SkyCoord(ra=30.0 * units.deg, dec=40 * units.deg, frame="icrs")
+
+    stokes_radec = [1, -0.2, 0.3, 0.1]
+
+    source = skymodel.SkyModel("test", coord.ra, coord.dec, stokes_radec, "flat")
+
+    with pytest.raises(ValueError, match="telescope_location must be an"):
+        source.coherency_calc().squeeze()
 
 
 def test_calc_basis_rotation_matrix():
@@ -458,24 +559,6 @@ def test_polarized_source_smooth_visibilities():
         assert np.max(np.abs(real_derivative_diff)) < 1e-6
         imag_stokes = stokes_instr_local[pol_i, :].imag
         assert np.all(imag_stokes == 0)
-
-
-def test_coherency_calc_errors():
-    """Test that correct errors are raised when providing invalid location object."""
-    coord = SkyCoord(ra=30.0 * units.deg, dec=40 * units.deg, frame="icrs")
-
-    stokes_radec = [1, -0.2, 0.3, 0.1]
-
-    source = skymodel.SkyModel("test", coord.ra, coord.dec, stokes_radec, "flat")
-    time = Time.now()
-    array_location = None
-    with pytest.raises(ValueError) as err:
-        source.update_positions(time, array_location)
-    assert str(err.value).startswith("telescope_location must be an")
-
-    with pytest.raises(ValueError) as err:
-        source.coherency_calc().squeeze()
-    assert str(err.value).startswith("telescope_location must be an")
 
 
 class TestHealpixHdf5:
@@ -800,6 +883,14 @@ def test_read_gleam():
 
     assert sourcelist.Ncomponents == 50
     assert sourcelist.Nfreqs == 20
+
+    # Check cuts
+    source_select_kwds = {"min_flux": 1.0}
+    catalog = skymodel.read_gleam_catalog(
+        GLEAM_vot, source_select_kwds=source_select_kwds, return_table=True
+    )
+
+    assert len(catalog) < sourcelist.Ncomponents
 
 
 def test_catalog_file_writer():

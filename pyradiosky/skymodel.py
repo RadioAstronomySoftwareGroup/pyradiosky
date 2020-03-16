@@ -1148,7 +1148,7 @@ def read_votable_catalog(
     ra_column="RAJ2000",
     dec_column="DEJ2000",
     flux_columns="Fintwide",
-    reference_frequency=200e6,
+    reference_frequency=200e6 * units.Hz,
     freq_array=None,
     source_select_kwds=None,
     return_table=False,
@@ -1172,6 +1172,11 @@ def read_votable_catalog(
         Part of expected Dec column. Should match only one column in the table.
     flux_columns : str or list of str
         Part of expected Flux column(s). Each one should match only one column in the table.
+    reference_frequency : astropy Quantity
+        Reference frequency for flux values, assumed to be the same value for all rows.
+    freq_array : astropy Quantity
+        Frequencies corresponding to flux_columns (should be same length).
+        Required for multiple flux columns.
     return_table : bool, optional
         Whether to return the astropy table instead of a list of Source objects.
     source_select_kwds : dict, optional
@@ -1252,13 +1257,12 @@ def read_votable_catalog(
     if reference_frequency is not None or len(flux_cols_use) == 1:
         spectral_type = "flat"
         if reference_frequency is not None:
-            if (
-                isinstance(reference_frequency, (float, np.float))
-                or len(reference_frequency) == 1
-            ):
-                reference_frequency = (
-                    np.array([reference_frequency] * len(astropy_table)) * units.Hz
-                )
+            if not isinstance(reference_frequency, (Quantity,)):
+                raise ValueError("reference_frequency must be an astropy Quantity.")
+            reference_frequency = (
+                np.array([reference_frequency.value] * len(astropy_table))
+                * reference_frequency.unit
+            )
     else:
         spectral_type = "subband"
 
@@ -1327,7 +1331,7 @@ def read_gleam_catalog(
     if spectral_type == "flat":
         flux_columns = "Fintwide"
         freq_array = None
-        reference_frequency = 200e6
+        reference_frequency = 200e6 * units.Hz
     else:
         # fmt: off
         flux_columns = ["Fint076", "Fint084", "Fint092", "Fint099", "Fint107",
@@ -1336,6 +1340,7 @@ def read_gleam_catalog(
                         "Fint197", "Fint204", "Fint212", "Fint220", "Fint227"]
         freq_array = [76, 84, 92, 99, 107, 115, 122, 130, 143, 151, 158, 166,
                       174, 181, 189, 197, 204, 212, 220, 227]
+        freq_array = np.array(freq_array) * units.Hz
         reference_frequency = None
         # fmt: on
 
