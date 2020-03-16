@@ -106,7 +106,7 @@ def test_skymodel_deprecated():
         Latitude(-30.0 * units.deg),
         [1.0, 0.0, 0.0, 0.0],
         "flat",
-        reference_freq=np.array([1e8]) * units.Hz,
+        reference_frequency=np.array([1e8]) * units.Hz,
     )
 
     with pytest.warns(
@@ -124,7 +124,7 @@ def test_skymodel_deprecated():
     assert source_new == source_old
 
     with pytest.warns(
-        DeprecationWarning, match="reference_freq must be an astropy Quantity"
+        DeprecationWarning, match="reference_frequency must be an astropy Quantity"
     ):
         source_old = skymodel.SkyModel(
             "Test",
@@ -132,7 +132,7 @@ def test_skymodel_deprecated():
             Latitude(-30.0 * units.deg),
             [1.0, 0.0, 0.0, 0.0],
             "flat",
-            reference_freq=np.array([1e8]),
+            reference_frequency=np.array([1e8]),
         )
     assert source_new == source_old
 
@@ -142,7 +142,7 @@ def test_skymodel_deprecated():
         Latitude(-30.0 * units.deg),
         [1.0, 0.0, 0.0, 0.0],
         "flat",
-        reference_freq=np.array([1.5e8]) * units.Hz,
+        reference_frequency=np.array([1.5e8]) * units.Hz,
     )
     with pytest.warns(
         DeprecationWarning,
@@ -159,7 +159,7 @@ def test_skymodel_deprecated():
         Latitude(-30.0 * units.deg + 2e-3 * units.arcsec),
         [1.0, 0.0, 0.0, 0.0],
         "flat",
-        reference_freq=np.array([1e8]) * units.Hz,
+        reference_frequency=np.array([1e8]) * units.Hz,
     )
     with pytest.warns(
         DeprecationWarning,
@@ -173,7 +173,7 @@ def test_skymodel_deprecated():
         Latitude(-30.0 * units.deg),
         [1.0, 0.0, 0.0, 0.0],
         "flat",
-        reference_freq=np.array([1e8]) * units.Hz,
+        reference_frequency=np.array([1e8]) * units.Hz,
     )
     with pytest.warns(
         DeprecationWarning,
@@ -782,17 +782,24 @@ def test_circumpolar_nonrising():
 
 
 def test_read_gleam():
-    sourcelist = skymodel.read_votable_catalog(GLEAM_vot)
+    # first with just flat spectral type
+    sourcelist = skymodel.read_gleam_catalog(GLEAM_vot)
 
     assert sourcelist.Ncomponents == 50
 
     # Check cuts
     source_select_kwds = {"min_flux": 1.0}
-    catalog = skymodel.read_votable_catalog(
+    catalog = skymodel.read_gleam_catalog(
         GLEAM_vot, source_select_kwds=source_select_kwds, return_table=True
     )
 
     assert len(catalog) < sourcelist.Ncomponents
+
+    # then with all subbands
+    sourcelist = skymodel.read_gleam_catalog(GLEAM_vot, spectral_type="subband")
+
+    assert sourcelist.Ncomponents == 50
+    assert sourcelist.Nfreqs == 20
 
 
 def test_catalog_file_writer():
