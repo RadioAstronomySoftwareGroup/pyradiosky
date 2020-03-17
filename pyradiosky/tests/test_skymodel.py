@@ -866,31 +866,36 @@ def test_circumpolar_nonrising():
 
 def test_read_gleam():
     # first with just flat spectral type
-    sourcelist = skymodel.read_gleam_catalog(GLEAM_vot)
+    skymodel_obj = skymodel.read_gleam_catalog(GLEAM_vot)
 
-    assert sourcelist.Ncomponents == 50
+    assert skymodel_obj.Ncomponents == 50
 
     # Check cuts
     source_select_kwds = {"min_flux": 1.0}
-    catalog = skymodel.read_gleam_catalog(
+    cut_catalog = skymodel.read_gleam_catalog(
         GLEAM_vot, source_select_kwds=source_select_kwds, return_table=True
     )
 
-    assert len(catalog) < sourcelist.Ncomponents
+    assert len(cut_catalog) < skymodel_obj.Ncomponents
 
     # then with all subbands
-    sourcelist = skymodel.read_gleam_catalog(GLEAM_vot, spectral_type="subband")
+    skymodel_obj_subband = skymodel.read_gleam_catalog(
+        GLEAM_vot, spectral_type="subband"
+    )
 
-    assert sourcelist.Ncomponents == 50
-    assert sourcelist.Nfreqs == 20
+    assert skymodel_obj_subband.Ncomponents == 50
+    assert skymodel_obj_subband.Nfreqs == 20
 
     # Check cuts
     source_select_kwds = {"min_flux": 1.0}
-    catalog = skymodel.read_gleam_catalog(
-        GLEAM_vot, source_select_kwds=source_select_kwds, return_table=True
+    cut_catalog_subband = skymodel.read_gleam_catalog(
+        GLEAM_vot,
+        spectral_type="subband",
+        source_select_kwds=source_select_kwds,
+        return_table=True,
     )
 
-    assert len(catalog) < sourcelist.Ncomponents
+    assert len(cut_catalog_subband) <= len(cut_catalog)
 
 
 def test_catalog_file_writer():
@@ -922,9 +927,25 @@ def test_catalog_file_writer():
 
 
 def test_array_to_skymodel_loop():
-    sky = skymodel.read_votable_catalog(GLEAM_vot)
-    sky.ra = Longitude(sky.ra.rad, "rad")
-    sky.dec = Latitude(sky.dec.rad, "rad")
+    sky = skymodel.read_gleam_catalog(GLEAM_vot)
+    arr = skymodel.skymodel_to_array(sky)
+    sky2 = skymodel.array_to_skymodel(arr)
+
+    assert np.allclose((sky.ra - sky2.ra).rad, 0.0)
+    assert np.allclose((sky.dec - sky2.dec).rad, 0.0)
+
+    # again with subband
+    sky = skymodel.read_gleam_catalog(GLEAM_vot, spectral_type="subband")
+    arr = skymodel.skymodel_to_array(sky)
+    sky2 = skymodel.array_to_skymodel(arr)
+
+    assert np.allclose((sky.ra - sky2.ra).rad, 0.0)
+    assert np.allclose((sky.dec - sky2.dec).rad, 0.0)
+
+    # again with spectral_index
+    sky = skymodel.read_gleam_catalog(GLEAM_vot)
+    sky.spectral_type = "spectral_index"
+    sky.spectral_index = np.zeros((sky.Ncomponents), dtype=np.float) - 0.8
     arr = skymodel.skymodel_to_array(sky)
     sky2 = skymodel.array_to_skymodel(arr)
 

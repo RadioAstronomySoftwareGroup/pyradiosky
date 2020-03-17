@@ -1037,6 +1037,7 @@ def source_cuts(
     horizon_buffer=0.04364,
     min_flux=None,
     max_flux=None,
+    freq_range=None,
 ):
     """
     Perform flux and horizon selections on recarray of source components.
@@ -1045,7 +1046,9 @@ def source_cuts(
     ----------
     catalog_table : recarray
         recarray of source catalog information. Must have the columns:
-        'source_id', 'ra_j2000', 'dec_j2000', 'flux_density_I', 'frequency'
+        'source_id', 'ra_j2000', 'dec_j2000', 'flux_density_I'
+        may also have the colums:
+        'frequency' or 'reference_frequency'
     latitude_deg : float
         Latitude of telescope in degrees. Used to estimate rise/set lst.
     horizon_buffer : float
@@ -1061,6 +1064,9 @@ def source_cuts(
         Minimum stokes I flux to select [Jy]
     max_flux : float
         Maximum stokes I flux to select [Jy]
+    freq_range : astropy Quantity
+        Frequency range over which the min and max flux tests should be performed.
+        Must be length 2. If None, use the range over which the object is defined.
 
     Returns
     -------
@@ -1073,11 +1079,56 @@ def source_cuts(
         lat_rad = np.radians(latitude_deg)
         buff = horizon_buffer
 
-    if min_flux:
-        catalog_table = catalog_table[catalog_table["flux_density_I"] > min_flux]
+    if freq_range is not None:
+        if not isinstance(freq_range, (Quantity,)):
+            raise ValueError("freq_range must be an astropy Quantity.")
+        if not np.atleast_1d(freq_range).size == 2:
+            raise ValueError("freq_range must have 2 elements.")
 
-    if max_flux:
-        catalog_table = catalog_table[catalog_table["flux_density_I"] < max_flux]
+    fieldnames = catalog_table.dtype.names
+    if min_flux or max_flux:
+        if "reference_frequency" in fieldnames:
+            if "spectral_index" in fieldnames:
+                raise NotImplementedError(
+                    "Flux cuts with spectral index type objects is not supported yet."
+                )
+            else:
+                # flat spectral type
+                if min_flux:
+                    catalog_table = catalog_table[
+                        catalog_table["flux_density_I"] > min_flux
+                    ]
+                if max_flux:
+                    catalog_table = catalog_table[
+                        catalog_table["flux_density_I"] < max_flux
+                    ]
+        elif "frequency" in fieldnames:
+            freq_array = Quantity(np.atleast_1d(catalog_table["frequency"]), "hertz")
+            if freq_range is not None:
+                freqs_inds_use = np.where(
+                    (freq_array >= np.min(freq_range))
+                    & (freq_array <= np.max(freq_range))
+                )[0]
+                if freqs_inds_use.size == 0:
+                    raise ValueError("No frequencies in freq_range.")
+            else:
+                # freq_array gets copied for every component, so it's zeroth axis is
+                # length Ncomponents. Just take the first one.
+                freq_array = freq_array[0, :]
+                freqs_inds_use = np.arange(freq_array.size)
+            flux_data = np.atleast_1d(catalog_table["flux_density_I"])
+            if flux_data.ndim > 1:
+                flux_data = flux_data[:, freqs_inds_use]
+            else:
+                flux_data = flux_data[:, np.newaxis]
+            if min_flux:
+                row_inds = np.where(np.min(flux_data, axis=1) > min_flux)
+                catalog_table = catalog_table[row_inds]
+                flux_data = flux_data[row_inds]
+            if max_flux:
+                catalog_table = catalog_table[
+                    np.where(np.max(flux_data, axis=1) < max_flux)
+                ]
 
     ra = Longitude(catalog_table["ra_j2000"], units.deg)
     dec = Latitude(catalog_table["dec_j2000"], units.deg)
