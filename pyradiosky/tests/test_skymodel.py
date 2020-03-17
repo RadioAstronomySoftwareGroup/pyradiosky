@@ -795,25 +795,45 @@ def test_idl_catalog_reader_extended_sources():
 def test_flux_cuts():
     Nsrcs = 20
 
-    dt = np.format_parser(
-        ["U10", "f8", "f8", "f8", "f8"],
-        ["source_id", "ra_j2000", "dec_j2000", "flux_density_I", "frequency"],
-        [],
-    )
-
     minflux = 0.5
     maxflux = 3.0
 
-    catalog_table = np.recarray(Nsrcs, dtype=dt.dtype)
-    catalog_table["source_id"] = ["src{}".format(i) for i in range(Nsrcs)]
-    catalog_table["ra_j2000"] = np.random.uniform(0, 360.0, Nsrcs)
-    catalog_table["dec_j2000"] = np.linspace(-90, 90, Nsrcs)
-    catalog_table["flux_density_I"] = np.linspace(minflux, maxflux, Nsrcs)
-    catalog_table["frequency"] = np.ones(Nsrcs) * 200e6
+    ids = ["src{}".format(i) for i in range(Nsrcs)]
+    ras = Longitude(np.random.uniform(0, 360.0, Nsrcs), units.deg)
+    decs = Latitude(np.linspace(-90, 90, Nsrcs), units.deg)
+    stokes = np.zeros((4, 1, Nsrcs), dtype=np.float)
+    stokes[0, :, :] = np.linspace(minflux, maxflux, Nsrcs)
+
+    skymodel_obj = skymodel.SkyModel(ids, ras, decs, stokes, "flat")
+    catalog_table = skymodel.skymodel_to_array(skymodel_obj)
 
     minI_cut = 1.0
     maxI_cut = 2.3
 
+    cut_sourcelist = skymodel.source_cuts(
+        catalog_table, latitude_deg=30.0, min_flux=minI_cut, max_flux=maxI_cut
+    )
+    assert np.all(cut_sourcelist["flux_density_I"] > minI_cut)
+    assert np.all(cut_sourcelist["flux_density_I"] < maxI_cut)
+
+    # Again with reference_frequency
+    freqs = np.ones(Nsrcs) * 200e6
+    skymodel_obj = skymodel.SkyModel(
+        ids, ras, decs, stokes, "flat", reference_frequency=freqs
+    )
+    cut_sourcelist = skymodel.source_cuts(
+        catalog_table, latitude_deg=30.0, min_flux=minI_cut, max_flux=maxI_cut
+    )
+    assert np.all(cut_sourcelist["flux_density_I"] > minI_cut)
+    assert np.all(cut_sourcelist["flux_density_I"] < maxI_cut)
+
+    # Again with freq_array
+    freqs = [1e8, 1.5e8]
+    stokes = np.zeros((4, 2, Nsrcs), dtype=np.float)
+    stokes[0, 0, :] = np.linspace(minflux, maxflux / 2.0, Nsrcs)
+    stokes[0, 1, :] = np.linspace(minflux * 2.0, maxflux, Nsrcs)
+
+    skymodel_obj = skymodel.SkyModel(ids, ras, decs, stokes, "full", freq_array=freqs)
     cut_sourcelist = skymodel.source_cuts(
         catalog_table, latitude_deg=30.0, min_flux=minI_cut, max_flux=maxI_cut
     )

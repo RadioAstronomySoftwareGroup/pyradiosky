@@ -1129,6 +1129,16 @@ def source_cuts(
                 catalog_table = catalog_table[
                     np.where(np.max(flux_data, axis=1) < max_flux)
                 ]
+        else:
+            # flat spectral type
+            if min_flux:
+                catalog_table = catalog_table[
+                    catalog_table["flux_density_I"] > min_flux
+                ]
+            if max_flux:
+                catalog_table = catalog_table[
+                    catalog_table["flux_density_I"] < max_flux
+                ]
 
     ra = Longitude(catalog_table["ra_j2000"], units.deg)
     dec = Latitude(catalog_table["dec_j2000"], units.deg)
