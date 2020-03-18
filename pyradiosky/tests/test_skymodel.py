@@ -65,6 +65,37 @@ def zenith_skymodel(zenith_skycoord):
     return zenith_source
 
 
+@pytest.fixture
+def healpix_data():
+    pytest.importorskip("astropy_healpix")
+    import astropy_healpix
+
+    nside = 32
+    npix = astropy_healpix.nside_to_npix(nside)
+    hp_obj = astropy_healpix.HEALPix(nside=nside)
+
+    frequencies = np.linspace(100, 110, 10)
+    pixel_area = astropy_healpix.nside_to_pixel_area(nside)
+
+    # Note that the cone search includes any pixels that overlap with the search
+    # region. With such a low resolution, this returns some slightly different
+    # results from the equivalent healpy search. Subtracting(0.75 * pixres) from
+    # the pixel area resolves this discrepancy for the test.
+
+    pixres = hp_obj.pixel_resolution.to("deg").value
+    ipix_disc = hp_obj.cone_search_lonlat(
+        135 * units.deg, 0 * units.deg, radius=(10 - pixres * 0.75) * units.deg
+    )
+
+    return {
+        "nside": nside,
+        "npix": npix,
+        "frequencies": frequencies,
+        "pixel_area": pixel_area,
+        "ipix_disc": ipix_disc,
+    }
+
+
 def test_source_zenith_from_icrs(time_location):
     """Test single source position at zenith constructed using icrs."""
     time, array_location = time_location
@@ -561,99 +592,83 @@ def test_polarized_source_smooth_visibilities():
         assert np.all(imag_stokes == 0)
 
 
-class TestHealpixHdf5:
-    def setup(self):
-        # Common features of tests
-        pytest.importorskip("astropy_healpix")
-        import astropy_healpix
+def test_read_healpix_hdf5(healpix_data):
+    m = np.arange(healpix_data["npix"])
+    m[healpix_data["ipix_disc"]] = healpix_data["npix"] - 1
 
-        self.nside = 32
-        self.Npix = astropy_healpix.nside_to_npix(self.nside)
-        hp_obj = astropy_healpix.HEALPix(nside=self.nside)
-        self.frequencies = np.linspace(100, 110, 10)
-        self.pixel_area = astropy_healpix.nside_to_pixel_area(self.nside)
-        # Note that the cone search includes any pixels that overlap with the search
-        # region. With such a low resolution, this returns some slightly different
-        # results from the equivalent healpy search. Subtracting(0.75 * pixres) from
-        # the pixel area resolves this discrepancy for the test.
+    indices = np.arange(healpix_data["npix"])
 
-        pixres = hp_obj.pixel_resolution.to("deg").value
-        self.ipix_disc = hp_obj.cone_search_lonlat(
-            135 * units.deg, 0 * units.deg, radius=(10 - pixres * 0.75) * units.deg
+    hpmap, inds, freqs = skymodel.read_healpix_hdf5(
+        os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
+    )
+
+    assert np.allclose(hpmap[0, :], m)
+    assert np.allclose(inds, indices)
+    assert np.allclose(freqs, healpix_data["frequencies"])
+
+
+def test_healpix_to_sky(healpix_data):
+    hpmap, inds, freqs = skymodel.read_healpix_hdf5(
+        os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
+    )
+
+    hmap_orig = np.arange(healpix_data["npix"])
+    hmap_orig[healpix_data["ipix_disc"]] = healpix_data["npix"] - 1
+
+    hmap_orig = np.repeat(hmap_orig[None, :], 10, axis=0)
+    hmap_orig = (hmap_orig.T / skyutils.jy_to_ksr(freqs)).T
+    hmap_orig = hmap_orig * healpix_data["pixel_area"]
+    sky = skymodel.healpix_to_sky(hpmap, inds, freqs)
+
+    assert np.allclose(sky.stokes[0], hmap_orig.value)
+
+
+def test_units_healpix_to_sky(healpix_data):
+    hpmap, inds, freqs = skymodel.read_healpix_hdf5(
+        os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
+    )
+    freqs = freqs * units.Hz
+
+    brightness_temperature_conv = units.brightness_temperature(
+        freqs, beam_area=healpix_data["pixel_area"]
+    )
+    stokes = (hpmap.T * units.K).to(units.Jy, brightness_temperature_conv).T
+    sky = skymodel.healpix_to_sky(hpmap, inds, freqs)
+
+    assert np.allclose(sky.stokes[0, 0], stokes.value[0])
+
+
+def test_read_write_healpix(healpix_data):
+    hpmap, inds, freqs = skymodel.read_healpix_hdf5(
+        os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
+    )
+    freqs = freqs * units.Hz
+    filename = "tempfile.hdf5"
+    with pytest.raises(ValueError) as verr:
+        skymodel.write_healpix_hdf5(filename, hpmap, inds[:10], freqs.to("Hz").value)
+    assert str(verr.value).startswith(
+        "Need to provide nside if giving a subset of the map."
+    )
+
+    with pytest.raises(ValueError) as verr:
+        skymodel.write_healpix_hdf5(
+            filename,
+            hpmap,
+            inds[:10],
+            freqs.to("Hz").value,
+            nside=healpix_data["nside"],
         )
+    assert str(verr.value).startswith("Invalid map shape")
 
-    def test_read_healpix_hdf5(self):
-        m = np.arange(self.Npix)
-        m[self.ipix_disc] = self.Npix - 1
+    skymodel.write_healpix_hdf5(filename, hpmap, inds, freqs.to("Hz").value)
 
-        indices = np.arange(self.Npix)
+    hpmap_new, inds_new, freqs_new = skymodel.read_healpix_hdf5(filename)
 
-        hpmap, inds, freqs = skymodel.read_healpix_hdf5(
-            os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
-        )
+    os.remove(filename)
 
-        assert np.allclose(hpmap[0, :], m)
-        assert np.allclose(inds, indices)
-        assert np.allclose(freqs, self.frequencies)
-
-    def test_healpix_to_sky(self):
-        hpmap, inds, freqs = skymodel.read_healpix_hdf5(
-            os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
-        )
-
-        hmap_orig = np.arange(self.Npix)
-        hmap_orig[self.ipix_disc] = self.Npix - 1
-
-        hmap_orig = np.repeat(hmap_orig[None, :], 10, axis=0)
-        hmap_orig = (hmap_orig.T / skyutils.jy_to_ksr(freqs)).T
-        hmap_orig = hmap_orig * self.pixel_area
-        sky = skymodel.healpix_to_sky(hpmap, inds, freqs)
-
-        assert np.allclose(sky.stokes[0], hmap_orig.value)
-
-    def test_units_healpix_to_sky(self):
-        hpmap, inds, freqs = skymodel.read_healpix_hdf5(
-            os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
-        )
-        freqs = freqs * units.Hz
-
-        brightness_temperature_conv = units.brightness_temperature(
-            freqs, beam_area=self.pixel_area
-        )
-        stokes = (hpmap.T * units.K).to(units.Jy, brightness_temperature_conv).T
-        sky = skymodel.healpix_to_sky(hpmap, inds, freqs)
-
-        assert np.allclose(sky.stokes[0, 0], stokes.value[0])
-
-    def test_read_write_healpix(self):
-        hpmap, inds, freqs = skymodel.read_healpix_hdf5(
-            os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
-        )
-        freqs = freqs * units.Hz
-        filename = "tempfile.hdf5"
-        with pytest.raises(ValueError) as verr:
-            skymodel.write_healpix_hdf5(
-                filename, hpmap, inds[:10], freqs.to("Hz").value
-            )
-        assert str(verr.value).startswith(
-            "Need to provide nside if giving a subset of the map."
-        )
-
-        with pytest.raises(ValueError) as verr:
-            skymodel.write_healpix_hdf5(
-                filename, hpmap, inds[:10], freqs.to("Hz").value, nside=self.nside
-            )
-        assert str(verr.value).startswith("Invalid map shape")
-
-        skymodel.write_healpix_hdf5(filename, hpmap, inds, freqs.to("Hz").value)
-
-        hpmap_new, inds_new, freqs_new = skymodel.read_healpix_hdf5(filename)
-
-        os.remove(filename)
-
-        assert np.allclose(hpmap_new, hpmap)
-        assert np.allclose(inds_new, inds)
-        assert np.allclose(freqs_new, freqs.to("Hz").value)
+    assert np.allclose(hpmap_new, hpmap)
+    assert np.allclose(inds_new, inds)
+    assert np.allclose(freqs_new, freqs.to("Hz").value)
 
 
 def test_healpix_import_err():
@@ -730,6 +745,39 @@ def test_healpix_positions():
     assert np.isclose(src_lmn[2][ipix], src_n)
 
 
+def test_array_to_skymodel_loop():
+    sky = skymodel.read_gleam_catalog(GLEAM_vot)
+    arr = skymodel.skymodel_to_array(sky)
+    sky2 = skymodel.array_to_skymodel(arr)
+
+    assert sky == sky2
+
+    # again with subband
+    sky = skymodel.read_gleam_catalog(GLEAM_vot, spectral_type="subband")
+    arr = skymodel.skymodel_to_array(sky)
+    sky2 = skymodel.array_to_skymodel(arr)
+
+    assert sky == sky2
+
+    # again with spectral_index
+    sky = skymodel.read_gleam_catalog(GLEAM_vot)
+    sky.spectral_type = "spectral_index"
+    sky.spectral_index = np.zeros((sky.Ncomponents), dtype=np.float) - 0.8
+    arr = skymodel.skymodel_to_array(sky)
+    sky2 = skymodel.array_to_skymodel(arr)
+
+    assert sky == sky2
+
+    # again with flat & freq_array
+    sky = skymodel.read_gleam_catalog(GLEAM_vot)
+    sky.freq_array = np.atleast_1d(np.unique(sky.reference_frequency))
+    sky.reference_frequency = None
+    arr = skymodel.skymodel_to_array(sky)
+    sky2 = skymodel.array_to_skymodel(arr)
+
+    assert sky == sky2
+
+
 def test_param_flux_cuts():
     # Check that min/max flux limits in test params work.
 
@@ -740,6 +788,306 @@ def test_param_flux_cuts():
     catalog = skymodel.array_to_skymodel(catalog_table)
     for sI in catalog.stokes[0, 0, :]:
         assert np.all(0.2 < sI < 1.5)
+
+
+@pytest.mark.parametrize(
+    "spec_type, init_kwargs, cut_kwargs",
+    [
+        ("flat", {}, {}),
+        ("flat", {"reference_frequency": np.ones(20) * 200e6 * units.Hz}, {}),
+        ("full", {"freq_array": np.array([1e8, 1.5e8]) * units.Hz}, {}),
+        (
+            "subband",
+            {"freq_array": np.array([1e8, 1.5e8]) * units.Hz},
+            {"freq_range": np.array([0.9e8, 2e8]) * units.Hz},
+        ),
+        (
+            "subband",
+            {"freq_array": np.array([1e8, 1.5e8]) * units.Hz},
+            {"freq_range": np.array([1.1e8, 2e8]) * units.Hz},
+        ),
+        (
+            "flat",
+            {"freq_array": np.array([1e8]) * units.Hz},
+            {"freq_range": np.array([0.9e8, 2e8]) * units.Hz},
+        ),
+    ],
+)
+def test_flux_cuts(spec_type, init_kwargs, cut_kwargs):
+    Nsrcs = 20
+
+    minflux = 0.5
+    maxflux = 3.0
+
+    ids = ["src{}".format(i) for i in range(Nsrcs)]
+    ras = Longitude(np.random.uniform(0, 360.0, Nsrcs), units.deg)
+    decs = Latitude(np.linspace(-90, 90, Nsrcs), units.deg)
+    stokes = np.zeros((4, 1, Nsrcs), dtype=np.float)
+    if spec_type == "flat":
+        stokes[0, :, :] = np.linspace(minflux, maxflux, Nsrcs)
+    else:
+        stokes = np.zeros((4, 2, Nsrcs), dtype=np.float)
+        stokes[0, 0, :] = np.linspace(minflux, maxflux / 2.0, Nsrcs)
+        stokes[0, 1, :] = np.linspace(minflux * 2.0, maxflux, Nsrcs)
+
+    skymodel_obj = skymodel.SkyModel(ids, ras, decs, stokes, spec_type, **init_kwargs)
+    catalog_table = skymodel.skymodel_to_array(skymodel_obj)
+
+    minI_cut = 1.0
+    maxI_cut = 2.3
+
+    cut_sourcelist = skymodel.source_cuts(
+        catalog_table,
+        latitude_deg=30.0,
+        min_flux=minI_cut,
+        max_flux=maxI_cut,
+        **cut_kwargs,
+    )
+
+    if "freq_range" in cut_kwargs and np.min(
+        cut_kwargs["freq_range"] > np.min(init_kwargs["freq_array"])
+    ):
+        assert np.all(cut_sourcelist["flux_density_I"] < maxI_cut)
+    else:
+        assert np.all(cut_sourcelist["flux_density_I"] > minI_cut)
+        assert np.all(cut_sourcelist["flux_density_I"] < maxI_cut)
+
+
+@pytest.mark.parametrize(
+    "spec_type, init_kwargs, cut_kwargs, error_category, error_message",
+    [
+        (
+            "spectral_index",
+            {
+                "reference_frequency": np.ones(20) * 200e6 * units.Hz,
+                "spectral_index": np.ones(20) * 0.8,
+            },
+            {},
+            NotImplementedError,
+            "Flux cuts with spectral index type objects is not supported yet.",
+        ),
+        (
+            "full",
+            {"freq_array": np.array([1e8, 1.5e8]) * units.Hz},
+            {"freq_range": [0.9e8, 2e8]},
+            ValueError,
+            "freq_range must be an astropy Quantity.",
+        ),
+        (
+            "subband",
+            {"freq_array": np.array([1e8, 1.5e8]) * units.Hz},
+            {"freq_range": 0.9e8 * units.Hz},
+            ValueError,
+            "freq_range must have 2 elements.",
+        ),
+        (
+            "subband",
+            {"freq_array": np.array([1e8, 1.5e8]) * units.Hz},
+            {"freq_range": np.array([1.1e8, 1.4e8]) * units.Hz},
+            ValueError,
+            "No frequencies in freq_range.",
+        ),
+    ],
+)
+def test_source_cut_error(
+    spec_type, init_kwargs, cut_kwargs, error_category, error_message
+):
+    Nsrcs = 20
+
+    minflux = 0.5
+    maxflux = 3.0
+
+    ids = ["src{}".format(i) for i in range(Nsrcs)]
+    ras = Longitude(np.random.uniform(0, 360.0, Nsrcs), units.deg)
+    decs = Latitude(np.linspace(-90, 90, Nsrcs), units.deg)
+    stokes = np.zeros((4, 1, Nsrcs), dtype=np.float)
+    stokes = np.zeros((4, 1, Nsrcs), dtype=np.float)
+    if spec_type == "flat" or spec_type == "spectral_index":
+        stokes[0, :, :] = np.linspace(minflux, maxflux, Nsrcs)
+    else:
+        stokes = np.zeros((4, 2, Nsrcs), dtype=np.float)
+        stokes[0, 0, :] = np.linspace(minflux, maxflux / 2.0, Nsrcs)
+        stokes[0, 1, :] = np.linspace(minflux * 2.0, maxflux, Nsrcs)
+
+    skymodel_obj = skymodel.SkyModel(ids, ras, decs, stokes, spec_type, **init_kwargs)
+    catalog_table = skymodel.skymodel_to_array(skymodel_obj)
+
+    minI_cut = 1.0
+    maxI_cut = 2.3
+
+    with pytest.raises(error_category, match=error_message):
+        skymodel.source_cuts(
+            catalog_table,
+            latitude_deg=30.0,
+            min_flux=minI_cut,
+            max_flux=maxI_cut,
+            **cut_kwargs,
+        )
+
+
+def test_circumpolar_nonrising():
+    # Check that the source_cut function correctly identifies sources that are circumpolar or
+    # won't rise.
+    # Working with an observatory at the HERA latitude
+
+    lat = -31.0
+    lon = 0.0
+
+    Ntimes = 100
+    Nsrcs = 50
+
+    j2000 = 2451545.0
+    times = Time(
+        np.linspace(j2000 - 0.5, j2000 + 0.5, Ntimes), format="jd", scale="utc"
+    )
+
+    ra = np.zeros(Nsrcs)
+    dec = np.linspace(-90, 90, Nsrcs)
+
+    ra = Angle(ra, units.deg)
+    dec = Angle(dec, units.deg)
+
+    coord = SkyCoord(ra=ra, dec=dec, frame="icrs")
+    alts = []
+    azs = []
+
+    loc = EarthLocation.from_geodetic(lat=lat, lon=lon)
+    for i in range(Ntimes):
+        altaz = coord.transform_to(AltAz(obstime=times[i], location=loc))
+        alts.append(altaz.alt.deg)
+        azs.append(altaz.az.deg)
+    alts = np.array(alts)
+
+    nonrising = np.where(np.all(alts < 0, axis=0))[0]
+    circumpolar = np.where(np.all(alts > 0, axis=0))[0]
+
+    tans = np.tan(np.radians(lat)) * np.tan(dec.rad)
+    nonrising_check = np.where(tans < -1)
+    circumpolar_check = np.where(tans > 1)
+    assert np.all(circumpolar_check == circumpolar)
+    assert np.all(nonrising_check == nonrising)
+
+
+@pytest.mark.parametrize(
+    "name_to_match, name_list, kwargs, result",
+    [
+        ("gle", ["_RAJ2000", "_DEJ2000", "RAJ2000", "DEJ2000", "GLEAM"], {}, "GLEAM"),
+        (
+            "raj2000",
+            ["_RAJ2000", "_DEJ2000", "RAJ2000", "DEJ2000", "GLEAM"],
+            {},
+            "RAJ2000",
+        ),
+        (
+            "ra",
+            ["_RAJ2000", "_DEJ2000", "RAJ2000", "DEJ2000", "GLEAM"],
+            {"exclude_start_pattern": "_"},
+            "RAJ2000",
+        ),
+        (
+            "foo",
+            ["_RAJ2000", "_DEJ2000", "RAJ2000", "DEJ2000", "GLEAM"],
+            {"brittle": False},
+            None,
+        ),
+    ],
+)
+def test_get_matching_fields(name_to_match, name_list, kwargs, result):
+    assert skymodel._get_matching_fields(name_to_match, name_list, **kwargs) == result
+
+
+@pytest.mark.parametrize(
+    "name_to_match, name_list, error_message",
+    [
+        (
+            "j2000",
+            ["_RAJ2000", "_DEJ2000", "RAJ2000", "DEJ2000", "GLEAM"],
+            "More than one match for j2000 in",
+        ),
+        (
+            "foo",
+            ["_RAJ2000", "_DEJ2000", "RAJ2000", "DEJ2000", "GLEAM"],
+            "No match for foo in",
+        ),
+    ],
+)
+def test_get_matching_fields_errors(name_to_match, name_list, error_message):
+    with pytest.raises(ValueError, match=error_message):
+        skymodel._get_matching_fields(name_to_match, name_list)
+
+
+@pytest.mark.parametrize("spec_type", [("flat",), ("subband",)])
+def test_read_gleam(spec_type):
+    skymodel_obj = skymodel.read_gleam_catalog(GLEAM_vot, spectral_type=spec_type)
+
+    assert skymodel_obj.Ncomponents == 50
+    if spec_type == "subband":
+        assert skymodel_obj.Nfreqs == 20
+
+    # Check cuts
+    source_select_kwds = {"min_flux": 0.5}
+    cut_catalog = skymodel.read_gleam_catalog(
+        GLEAM_vot,
+        spectral_type=spec_type,
+        source_select_kwds=source_select_kwds,
+        return_table=True,
+    )
+
+    assert len(cut_catalog) < skymodel_obj.Ncomponents
+
+    cut_obj = skymodel.read_gleam_catalog(
+        GLEAM_vot, spectral_type=spec_type, source_select_kwds=source_select_kwds
+    )
+
+    assert len(cut_catalog) == cut_obj.Ncomponents
+
+    source_select_kwds = {"min_flux": 10.0}
+    with pytest.warns(UserWarning, match="All sources eliminated by cuts."):
+        skymodel.read_gleam_catalog(
+            GLEAM_vot,
+            spectral_type=spec_type,
+            source_select_kwds=source_select_kwds,
+            return_table=True,
+        )
+
+
+def test_read_deprecated_votable():
+    votable_file = os.path.join(SKY_DATA_PATH, "single_source.vot")
+
+    with pytest.warns(
+        DeprecationWarning,
+        match=(
+            f"File {votable_file} contains tables with no name or ID, "
+            "Support for such files is deprecated."
+        ),
+    ):
+        skymodel_obj = skymodel.read_votable_catalog(votable_file)
+
+    assert skymodel_obj.Ncomponents == 1
+
+    with pytest.raises(ValueError, match=("More than one matching table.")):
+        skymodel.read_votable_catalog(votable_file, id_column="de")
+
+
+def test_read_votable_errors():
+
+    # fmt: off
+    flux_columns = ["Fint076", "Fint084", "Fint092", "Fint099", "Fint107",
+                    "Fint115", "Fint122", "Fint130", "Fint143", "Fint151",
+                    "Fint158", "Fint166", "Fint174", "Fint181", "Fint189",
+                    "Fint197", "Fint204", "Fint212", "Fint220", "Fint227"]
+    # fmt: on
+    with pytest.raises(
+        ValueError, match="freq_array must be provided for multiple flux columns."
+    ):
+        skymodel.read_votable_catalog(
+            GLEAM_vot, flux_columns=flux_columns, reference_frequency=200e6 * units.Hz
+        )
+
+    with pytest.raises(
+        ValueError, match="reference_frequency must be an astropy Quantity."
+    ):
+        skymodel.read_votable_catalog(GLEAM_vot, reference_frequency=200e6)
 
 
 def test_point_catalog_reader():
@@ -792,132 +1140,6 @@ def test_idl_catalog_reader_extended_sources():
     assert len(sourcelist.ra) == len(catalog) - len(ext_inds) + sum(ext_Ncomps)
 
 
-def test_flux_cuts():
-    Nsrcs = 20
-
-    minflux = 0.5
-    maxflux = 3.0
-
-    ids = ["src{}".format(i) for i in range(Nsrcs)]
-    ras = Longitude(np.random.uniform(0, 360.0, Nsrcs), units.deg)
-    decs = Latitude(np.linspace(-90, 90, Nsrcs), units.deg)
-    stokes = np.zeros((4, 1, Nsrcs), dtype=np.float)
-    stokes[0, :, :] = np.linspace(minflux, maxflux, Nsrcs)
-
-    skymodel_obj = skymodel.SkyModel(ids, ras, decs, stokes, "flat")
-    catalog_table = skymodel.skymodel_to_array(skymodel_obj)
-
-    minI_cut = 1.0
-    maxI_cut = 2.3
-
-    cut_sourcelist = skymodel.source_cuts(
-        catalog_table, latitude_deg=30.0, min_flux=minI_cut, max_flux=maxI_cut
-    )
-    assert np.all(cut_sourcelist["flux_density_I"] > minI_cut)
-    assert np.all(cut_sourcelist["flux_density_I"] < maxI_cut)
-
-    # Again with reference_frequency
-    freqs = np.ones(Nsrcs) * 200e6
-    skymodel_obj = skymodel.SkyModel(
-        ids, ras, decs, stokes, "flat", reference_frequency=freqs
-    )
-    cut_sourcelist = skymodel.source_cuts(
-        catalog_table, latitude_deg=30.0, min_flux=minI_cut, max_flux=maxI_cut
-    )
-    assert np.all(cut_sourcelist["flux_density_I"] > minI_cut)
-    assert np.all(cut_sourcelist["flux_density_I"] < maxI_cut)
-
-    # Again with freq_array
-    freqs = [1e8, 1.5e8]
-    stokes = np.zeros((4, 2, Nsrcs), dtype=np.float)
-    stokes[0, 0, :] = np.linspace(minflux, maxflux / 2.0, Nsrcs)
-    stokes[0, 1, :] = np.linspace(minflux * 2.0, maxflux, Nsrcs)
-
-    skymodel_obj = skymodel.SkyModel(ids, ras, decs, stokes, "full", freq_array=freqs)
-    cut_sourcelist = skymodel.source_cuts(
-        catalog_table, latitude_deg=30.0, min_flux=minI_cut, max_flux=maxI_cut
-    )
-    assert np.all(cut_sourcelist["flux_density_I"] > minI_cut)
-    assert np.all(cut_sourcelist["flux_density_I"] < maxI_cut)
-
-
-def test_circumpolar_nonrising():
-    # Check that the source_cut function correctly identifies sources that are circumpolar or
-    # won't rise.
-    # Working with an observatory at the HERA latitude
-
-    lat = -31.0
-    lon = 0.0
-
-    Ntimes = 100
-    Nsrcs = 50
-
-    j2000 = 2451545.0
-    times = Time(
-        np.linspace(j2000 - 0.5, j2000 + 0.5, Ntimes), format="jd", scale="utc"
-    )
-
-    ra = np.zeros(Nsrcs)
-    dec = np.linspace(-90, 90, Nsrcs)
-
-    ra = Angle(ra, units.deg)
-    dec = Angle(dec, units.deg)
-
-    coord = SkyCoord(ra=ra, dec=dec, frame="icrs")
-    alts = []
-    azs = []
-
-    loc = EarthLocation.from_geodetic(lat=lat, lon=lon)
-    for i in range(Ntimes):
-        altaz = coord.transform_to(AltAz(obstime=times[i], location=loc))
-        alts.append(altaz.alt.deg)
-        azs.append(altaz.az.deg)
-    alts = np.array(alts)
-
-    nonrising = np.where(np.all(alts < 0, axis=0))[0]
-    circumpolar = np.where(np.all(alts > 0, axis=0))[0]
-
-    tans = np.tan(np.radians(lat)) * np.tan(dec.rad)
-    nonrising_check = np.where(tans < -1)
-    circumpolar_check = np.where(tans > 1)
-    assert np.all(circumpolar_check == circumpolar)
-    assert np.all(nonrising_check == nonrising)
-
-
-def test_read_gleam():
-    # first with just flat spectral type
-    skymodel_obj = skymodel.read_gleam_catalog(GLEAM_vot)
-
-    assert skymodel_obj.Ncomponents == 50
-
-    # Check cuts
-    source_select_kwds = {"min_flux": 1.0}
-    cut_catalog = skymodel.read_gleam_catalog(
-        GLEAM_vot, source_select_kwds=source_select_kwds, return_table=True
-    )
-
-    assert len(cut_catalog) < skymodel_obj.Ncomponents
-
-    # then with all subbands
-    skymodel_obj_subband = skymodel.read_gleam_catalog(
-        GLEAM_vot, spectral_type="subband"
-    )
-
-    assert skymodel_obj_subband.Ncomponents == 50
-    assert skymodel_obj_subband.Nfreqs == 20
-
-    # Check cuts
-    source_select_kwds = {"min_flux": 1.0}
-    cut_catalog_subband = skymodel.read_gleam_catalog(
-        GLEAM_vot,
-        spectral_type="subband",
-        source_select_kwds=source_select_kwds,
-        return_table=True,
-    )
-
-    assert len(cut_catalog_subband) <= len(cut_catalog)
-
-
 def test_catalog_file_writer():
     time = Time(2458098.27471265, scale="utc", format="jd")
     array_location = EarthLocation(lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0)
@@ -944,33 +1166,6 @@ def test_catalog_file_writer():
     zenith_loop = skymodel.read_text_catalog(fname)
     assert np.all(zenith_loop == zenith_source)
     os.remove(fname)
-
-
-def test_array_to_skymodel_loop():
-    sky = skymodel.read_gleam_catalog(GLEAM_vot)
-    arr = skymodel.skymodel_to_array(sky)
-    sky2 = skymodel.array_to_skymodel(arr)
-
-    assert np.allclose((sky.ra - sky2.ra).rad, 0.0)
-    assert np.allclose((sky.dec - sky2.dec).rad, 0.0)
-
-    # again with subband
-    sky = skymodel.read_gleam_catalog(GLEAM_vot, spectral_type="subband")
-    arr = skymodel.skymodel_to_array(sky)
-    sky2 = skymodel.array_to_skymodel(arr)
-
-    assert np.allclose((sky.ra - sky2.ra).rad, 0.0)
-    assert np.allclose((sky.dec - sky2.dec).rad, 0.0)
-
-    # again with spectral_index
-    sky = skymodel.read_gleam_catalog(GLEAM_vot)
-    sky.spectral_type = "spectral_index"
-    sky.spectral_index = np.zeros((sky.Ncomponents), dtype=np.float) - 0.8
-    arr = skymodel.skymodel_to_array(sky)
-    sky2 = skymodel.array_to_skymodel(arr)
-
-    assert np.allclose((sky.ra - sky2.ra).rad, 0.0)
-    assert np.allclose((sky.dec - sky2.dec).rad, 0.0)
 
 
 class TestMoon:

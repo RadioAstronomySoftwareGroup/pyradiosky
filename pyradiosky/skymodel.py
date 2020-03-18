@@ -901,11 +901,15 @@ def skymodel_to_array(sky):
 
     """
     sky.check()
-    fieldtypes = ["U10", "f8", "f8", "f8"]
+    max_name_len = np.max([len(name) for name in sky.name])
+    fieldtypes = ["U" + str(max_name_len), "f8", "f8", "f8"]
     fieldnames = ["source_id", "ra_j2000", "dec_j2000", "flux_density_I"]
     fieldshapes = [()] * 3
     if sky.freq_array is not None:
-        fieldnames.append("frequency")
+        if sky.spectral_type == "subband":
+            fieldnames.append("subband_frequency")
+        else:
+            fieldnames.append("frequency")
         fieldtypes.append("f8")
         fieldshapes.extend([(sky.Nfreqs,)] * 2)
     elif sky.reference_frequency is not None:
@@ -935,7 +939,10 @@ def skymodel_to_array(sky):
     arr["ra_j2000"] = sky.ra.deg
     arr["dec_j2000"] = sky.dec.deg
     if sky.freq_array is not None:
-        arr["frequency"] = sky.freq_array
+        if sky.spectral_type == "subband":
+            arr["subband_frequency"] = sky.freq_array
+        else:
+            arr["frequency"] = sky.freq_array
         arr["flux_density_I"] = sky.stokes[0, :, :].T
     elif sky.reference_frequency is not None:
         arr["reference_frequency"] = sky.reference_frequency
@@ -984,10 +991,20 @@ def array_to_skymodel(catalog_table):
             spectral_type = "flat"
             spectral_index = None
         freq_array = None
-    elif "frequency" in fieldnames:
-        freq_array = Quantity(np.atleast_1d(catalog_table["frequency"]), "hertz")
+    elif "frequency" in fieldnames or "subband_frequency" in fieldnames:
+        if "frequency" in fieldnames:
+            freq_array = Quantity(np.atleast_1d(catalog_table["frequency"]), "hertz")
+        else:
+            spectral_type = "subband"
+            freq_array = Quantity(
+                np.atleast_1d(catalog_table["subband_frequency"]), "hertz"
+            )
+        # freq_array gets copied for every component, so it's zeroth axis is
+        # length Ncomponents. Just take the first one.
+        freq_array = freq_array[0, :]
         if freq_array.size > 1:
-            spectral_type = "full"  # how should we tell if this should be subband?
+            if "subband_frequency" not in fieldnames:
+                spectral_type = "full"
         else:
             spectral_type = "flat"
         reference_frequency = None
@@ -1004,9 +1021,6 @@ def array_to_skymodel(catalog_table):
         set_lst = catalog_table["set_lst"]
 
     if freq_array is not None:
-        # freq_array gets copied for every component, so it's zeroth axis is
-        # length Ncomponents. Just take the first one.
-        freq_array = freq_array[0, :]
         flux_I = flux_I.T
 
     if flux_I.ndim == 1:
@@ -1102,8 +1116,18 @@ def source_cuts(
                     catalog_table = catalog_table[
                         catalog_table["flux_density_I"] < max_flux
                     ]
-        elif "frequency" in fieldnames:
-            freq_array = Quantity(np.atleast_1d(catalog_table["frequency"]), "hertz")
+        elif "frequency" in fieldnames or "subband_frequency" in fieldnames:
+            if "frequency" in fieldnames:
+                freq_array = Quantity(
+                    np.atleast_1d(catalog_table["frequency"]), "hertz"
+                )
+            else:
+                freq_array = Quantity(
+                    np.atleast_1d(catalog_table["subband_frequency"]), "hertz"
+                )
+            # freq_array gets copied for every component, so it's zeroth axis is
+            # length Ncomponents. Just take the first one.
+            freq_array = freq_array[0, :]
             if freq_range is not None:
                 freqs_inds_use = np.where(
                     (freq_array >= np.min(freq_range))
@@ -1112,15 +1136,10 @@ def source_cuts(
                 if freqs_inds_use.size == 0:
                     raise ValueError("No frequencies in freq_range.")
             else:
-                # freq_array gets copied for every component, so it's zeroth axis is
-                # length Ncomponents. Just take the first one.
-                freq_array = freq_array[0, :]
                 freqs_inds_use = np.arange(freq_array.size)
             flux_data = np.atleast_1d(catalog_table["flux_density_I"])
             if flux_data.ndim > 1:
                 flux_data = flux_data[:, freqs_inds_use]
-            else:
-                flux_data = flux_data[:, np.newaxis]
             if min_flux:
                 row_inds = np.where(np.min(flux_data, axis=1) > min_flux)
                 catalog_table = catalog_table[row_inds]
@@ -1169,11 +1188,14 @@ def source_cuts(
             catalog_table, ["rise_lst", "set_lst"], [rise_lst, set_lst], usemask=False
         )
 
+    if len(catalog_table) == 0:
+        warnings.warn("All sources eliminated by cuts.")
+
     return catalog_table
 
 
 def _get_matching_fields(
-    name_to_match, name_list, exclude_start_pattern=None, error_if_no_match=True
+    name_to_match, name_list, exclude_start_pattern=None, brittle=True
 ):
     match_list = [name for name in name_list if name_to_match.lower() in name.lower()]
     if len(match_list) > 1:
@@ -1193,9 +1215,14 @@ def _get_matching_fields(
             if len(match_list_temp) == 1:
                 match_list = match_list_temp
         if len(match_list) > 1:
-            raise ValueError(f"More than one match for {name_to_match} in {name_list}.")
+            if brittle:
+                raise ValueError(
+                    f"More than one match for {name_to_match} in {name_list}."
+                )
+            else:
+                return match_list
     elif len(match_list) == 0:
-        if error_if_no_match:
+        if brittle:
             raise ValueError(f"No match for {name_to_match} in {name_list}.")
         else:
             return None
@@ -1277,7 +1304,7 @@ def read_votable_catalog(
             tables_match = []
             for table in tables:
                 id_col_use = _get_matching_fields(
-                    id_column, table.to_table().colnames, error_if_no_match=False
+                    id_column, table.to_table().colnames, brittle=False
                 )
                 if id_col_use is not None:
                     tables_match.append(table)
