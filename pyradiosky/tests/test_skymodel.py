@@ -745,37 +745,30 @@ def test_healpix_positions():
     assert np.isclose(src_lmn[2][ipix], src_n)
 
 
-def test_array_to_skymodel_loop():
-    sky = skymodel.read_gleam_catalog(GLEAM_vot)
+@pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index", "full"])
+def test_array_to_skymodel_loop(spec_type):
+    if spec_type == "full":
+        spectral_type = "subband"
+    else:
+        spectral_type = spec_type
+
+    sky = skymodel.read_gleam_catalog(GLEAM_vot, spectral_type=spectral_type)
+    if spec_type == "full":
+        sky.spectral_type = "full"
     arr = skymodel.skymodel_to_array(sky)
     sky2 = skymodel.array_to_skymodel(arr)
 
     assert sky == sky2
 
-    # again with subband
-    sky = skymodel.read_gleam_catalog(GLEAM_vot, spectral_type="subband")
-    arr = skymodel.skymodel_to_array(sky)
-    sky2 = skymodel.array_to_skymodel(arr)
+    if spec_type == "flat":
+        # again with flat & freq_array
+        sky = skymodel.read_gleam_catalog(GLEAM_vot)
+        sky.freq_array = np.atleast_1d(np.unique(sky.reference_frequency))
+        sky.reference_frequency = None
+        arr = skymodel.skymodel_to_array(sky)
+        sky2 = skymodel.array_to_skymodel(arr)
 
-    assert sky == sky2
-
-    # again with spectral_index
-    sky = skymodel.read_gleam_catalog(GLEAM_vot)
-    sky.spectral_type = "spectral_index"
-    sky.spectral_index = np.zeros((sky.Ncomponents), dtype=np.float) - 0.8
-    arr = skymodel.skymodel_to_array(sky)
-    sky2 = skymodel.array_to_skymodel(arr)
-
-    assert sky == sky2
-
-    # again with flat & freq_array
-    sky = skymodel.read_gleam_catalog(GLEAM_vot)
-    sky.freq_array = np.atleast_1d(np.unique(sky.reference_frequency))
-    sky.reference_frequency = None
-    arr = skymodel.skymodel_to_array(sky)
-    sky2 = skymodel.array_to_skymodel(arr)
-
-    assert sky == sky2
+        assert sky == sky2
 
 
 def test_param_flux_cuts():
@@ -1016,7 +1009,7 @@ def test_get_matching_fields_errors(name_to_match, name_list, error_message):
         skymodel._get_matching_fields(name_to_match, name_list)
 
 
-@pytest.mark.parametrize("spec_type", [("flat",), ("subband",)])
+@pytest.mark.parametrize("spec_type", ["flat", "subband"])
 def test_read_gleam(spec_type):
     skymodel_obj = skymodel.read_gleam_catalog(GLEAM_vot, spectral_type=spec_type)
 
@@ -1090,6 +1083,26 @@ def test_read_votable_errors():
         skymodel.read_votable_catalog(GLEAM_vot, reference_frequency=200e6)
 
 
+def test_idl_catalog_reader():
+    catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
+    sourcelist = skymodel.read_idl_catalog(catfile, expand_extended=False)
+
+    catalog = scipy.io.readsav(catfile)["catalog"]
+    assert len(sourcelist.ra) == len(catalog)
+
+
+def test_idl_catalog_reader_extended_sources():
+    catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
+    sourcelist = skymodel.read_idl_catalog(catfile, expand_extended=True)
+
+    catalog = scipy.io.readsav(catfile)["catalog"]
+    ext_inds = np.where(
+        [catalog["extend"][ind] is not None for ind in range(len(catalog))]
+    )[0]
+    ext_Ncomps = [len(catalog[ext]["extend"]) for ext in ext_inds]
+    assert len(sourcelist.ra) == len(catalog) - len(ext_inds) + sum(ext_Ncomps)
+
+
 def test_point_catalog_reader():
     catfile = os.path.join(SKY_DATA_PATH, "pointsource_catalog.txt")
     srcs = skymodel.read_text_catalog(catfile)
@@ -1120,26 +1133,6 @@ def test_point_catalog_reader():
     assert len(catalog) == 2
 
 
-def test_idl_catalog_reader():
-    catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
-    sourcelist = skymodel.read_idl_catalog(catfile, expand_extended=False)
-
-    catalog = scipy.io.readsav(catfile)["catalog"]
-    assert len(sourcelist.ra) == len(catalog)
-
-
-def test_idl_catalog_reader_extended_sources():
-    catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
-    sourcelist = skymodel.read_idl_catalog(catfile, expand_extended=True)
-
-    catalog = scipy.io.readsav(catfile)["catalog"]
-    ext_inds = np.where(
-        [catalog["extend"][ind] is not None for ind in range(len(catalog))]
-    )[0]
-    ext_Ncomps = [len(catalog[ext]["extend"]) for ext in ext_inds]
-    assert len(sourcelist.ra) == len(catalog) - len(ext_inds) + sum(ext_Ncomps)
-
-
 def test_catalog_file_writer():
     time = Time(2458098.27471265, scale="utc", format="jd")
     array_location = EarthLocation(lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0)
@@ -1166,6 +1159,34 @@ def test_catalog_file_writer():
     zenith_loop = skymodel.read_text_catalog(fname)
     assert np.all(zenith_loop == zenith_source)
     os.remove(fname)
+
+
+@pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index", "full"])
+def test_text_catalog_loop(spec_type):
+    if spec_type == "full":
+        spectral_type = "subband"
+    else:
+        spectral_type = spec_type
+
+    sky = skymodel.read_gleam_catalog(GLEAM_vot, spectral_type=spectral_type)
+    if spec_type == "full":
+        sky.spectral_type = "full"
+
+    fname = os.path.join(SKY_DATA_PATH, "temp_cat.txt")
+    skymodel.write_catalog_to_file(fname, sky)
+    sky2 = skymodel.read_text_catalog(fname)
+
+    assert sky == sky2
+
+    if spec_type == "flat":
+        # again with flat & freq_array
+        sky = skymodel.read_gleam_catalog(GLEAM_vot)
+        sky.freq_array = np.atleast_1d(np.unique(sky.reference_frequency))
+        sky.reference_frequency = None
+        arr = skymodel.skymodel_to_array(sky)
+        sky2 = skymodel.array_to_skymodel(arr)
+
+        assert sky == sky2
 
 
 class TestMoon:

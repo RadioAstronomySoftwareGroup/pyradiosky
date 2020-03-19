@@ -15,9 +15,9 @@ from astropy.time import Time
 import astropy.units as units
 from astropy.units import Quantity
 from astropy.io import votable
-import pyuvdata
 from pyuvdata.uvbase import UVBase
 from pyuvdata.parameter import UVParameter
+from pyuvdata.uvbeam.cst_beam import CSTBeam
 
 from . import utils as skyutils
 from . import spherical_coords_transforms as sct
@@ -1238,6 +1238,7 @@ def read_votable_catalog(
     flux_columns="Fintwide",
     reference_frequency=200e6 * units.Hz,
     freq_array=None,
+    spectral_index_column=None,
     source_select_kwds=None,
     return_table=False,
 ):
@@ -1343,7 +1344,6 @@ def read_votable_catalog(
         raise ValueError("freq_array must be provided for multiple flux columns.")
 
     if reference_frequency is not None or len(flux_cols_use) == 1:
-        spectral_type = "flat"
         if reference_frequency is not None:
             if not isinstance(reference_frequency, (Quantity,)):
                 raise ValueError("reference_frequency must be an astropy Quantity.")
@@ -1351,8 +1351,18 @@ def read_votable_catalog(
                 np.array([reference_frequency.value] * len(astropy_table))
                 * reference_frequency.unit
             )
+        if spectral_index_column is not None:
+            spectral_type = "spectral_index"
+            spec_index_col_use = _get_matching_fields(
+                spectral_index_column, astropy_table.colnames
+            )
+            spectral_index = astropy_table[spec_index_col_use].data.data
+        else:
+            spectral_type = "flat"
+            spectral_index = None
     else:
         spectral_type = "subband"
+        spectral_index = None
 
     stokes = np.zeros((4, len(flux_cols_use), len(astropy_table)), dtype=np.float)
     for index, col in enumerate(flux_cols_use):
@@ -1366,6 +1376,7 @@ def read_votable_catalog(
         spectral_type,
         freq_array=freq_array,
         reference_frequency=reference_frequency,
+        spectral_index=spectral_index,
     )
 
     if source_select_kwds is not None:
@@ -1395,8 +1406,9 @@ def read_gleam_catalog(
     votable_file : str
         Path to GLEAM votable catalog file.
     spectral_type : str
-        Either 'flat' or 'subband'. If set to 'flat', the wide band integrated
-        flux will be used.
+        One of 'flat', 'subband' or 'spectral_index'. If set to 'flat', the
+        wide band integrated flux will be used, if set to 'spectral_index' the
+        fitted flux at 200 MHz will be used for the flux column.
     return_table : bool, optional
         Whether to return the astropy table instead of a SkyModel object.
     source_select_kwds : dict, optional
@@ -1416,10 +1428,23 @@ def read_gleam_catalog(
     recarray or :class:`pyradiosky.SkyModel`
         if return_table, recarray of source parameters, otherwise :class:`pyradiosky.SkyModel` instance
     """
+    spec_type_list = ["flat", "spectral_index", "subband"]
+    if spectral_type not in spec_type_list:
+        raise ValueError(
+            f"spectral_type {spectral_type} is not an allowed type. "
+            f"Allowed types are: {spec_type_list}"
+        )
+
     if spectral_type == "flat":
         flux_columns = "Fintwide"
-        freq_array = None
         reference_frequency = 200e6 * units.Hz
+        freq_array = None
+        spectral_index_column = None
+    elif spectral_type == "spectral_index":
+        flux_columns = "Fintfit200"
+        reference_frequency = 200e6 * units.Hz
+        spectral_index_column = "alpha"
+        freq_array = None
     else:
         # fmt: off
         flux_columns = ["Fint076", "Fint084", "Fint092", "Fint099", "Fint107",
@@ -1428,11 +1453,12 @@ def read_gleam_catalog(
                         "Fint197", "Fint204", "Fint212", "Fint220", "Fint227"]
         freq_array = [76, 84, 92, 99, 107, 115, 122, 130, 143, 151, 158, 166,
                       174, 181, 189, 197, 204, 212, 220, 227]
-        freq_array = np.array(freq_array) * units.Hz
+        freq_array = np.array(freq_array) * 1e6 * units.Hz
         reference_frequency = None
+        spectral_index_column = None
         # fmt: on
 
-    return read_votable_catalog(
+    gleam_skymodel = read_votable_catalog(
         votable_file,
         table_name="GLEAM",
         id_column="GLEAM",
@@ -1441,9 +1467,12 @@ def read_gleam_catalog(
         flux_columns=flux_columns,
         freq_array=freq_array,
         reference_frequency=reference_frequency,
+        spectral_index_column=spectral_index_column,
         source_select_kwds=source_select_kwds,
         return_table=return_table,
     )
+
+    return gleam_skymodel
 
 
 def read_text_catalog(catalog_csv, source_select_kwds=None, return_table=False):
@@ -1489,53 +1518,77 @@ def read_text_catalog(catalog_csv, source_select_kwds=None, return_table=False):
     """
     with open(catalog_csv, "r") as cfile:
         header = cfile.readline()
+        first_data_line = cfile.readline()
     header = [
-        h.strip().lower() for h in header.split() if not h[0] == "["
+        h.strip() for h in header.split() if not h[0] == "["
     ]  # Ignore units in header
-    flux_fields = [colname for colname in header if colname.startswith("flux")]
+
+    data_elems = first_data_line.split()
+    id_len = len(data_elems[0])
+
+    flux_fields = [colname for colname in header if colname.lower().startswith("flux")]
+
+    header_lower = [colname.lower() for colname in header]
+
     expected_cols = ["source_id", "ra_j2000", "dec_j2000"]
     fieldnames = copy.copy(expected_cols)
-    fieldtypes = ["U10", "f8", "f8"]
+    fieldtypes = ["U" + str(id_len), "f8", "f8"]
     fieldshapes = [()] * 3
-    if "frequency" in header:
+    if "frequency" in header_lower:
         if len(flux_fields) != 1:
             raise ValueError(
                 "If frequency column is present, only one flux columns allowed."
             )
+        freq_array = None
         expected_cols.extend([flux_fields[0], "frequency"])
         fieldnames.extend(["flux_density_I", "reference_frequency"])
         fieldtypes.extend(["f8", "f8"])
         fieldshapes.extend([()] * 2)
-        if "spectral_index" in header:
+        if "spectral_index" in header_lower:
+            spectral_type = "spectral_index"
             fieldnames.append("spectral_index")
             fieldtypes.append("f8")
             fieldshapes.append(())
+            freq_array = None
+        else:
+            spectral_type = "flat"
+        n_freqs = 1
     else:
         frequencies = []
         for fluxname in flux_fields:
             if "Hz" in fluxname:
-                frequencies.append(pyuvdata.uvbeam.cst_beam.name2freq(fluxname))
+                cst_obj = CSTBeam()
+                freq = cst_obj.name2freq(fluxname)
+                frequencies.append(freq)
             else:
                 if len(flux_fields) > 1:
                     raise ValueError(
-                        "Multiple flux fields, but they do not "
-                        "all contain a frequency."
+                        "Multiple flux fields, but they do not all contain a frequency."
                     )
         if len(frequencies) > 0:
+            n_freqs = len(frequencies)
+            if "subband" in flux_fields[0]:
+                spectral_type = "subband"
+            else:
+                spectral_type = "full"
             # This has a freq_array
             expected_cols.extend(flux_fields)
             fieldnames.append("flux_density_I")
-            fieldtypes.append(["f8"])
+            fieldtypes.append("f8")
             fieldshapes.append((len(frequencies)))
+            freq_array = np.array(frequencies) * units.Hz
         else:
             # This is a flat spectrum (no freq info)
+            n_freqs = 1
+            spectral_type = "flat"
+            freq_array = None
             expected_cols.append("flux")
             fieldnames.append("flux_density_I")
             fieldtypes.append("f8")
             fieldshapes.append(())
 
     for col in expected_cols:
-        if col not in header:
+        if col not in header_lower and col not in header:
             raise ValueError(f"Expected column {col} is not present.")
 
     dt = np.dtype(list(zip(fieldnames, fieldtypes, fieldshapes)))
@@ -1544,12 +1597,38 @@ def read_text_catalog(catalog_csv, source_select_kwds=None, return_table=False):
 
     catalog_table = np.atleast_1d(catalog_table)
 
-    if source_select_kwds is not None:
-        catalog_table = source_cuts(catalog_table, **source_select_kwds)
+    stokes = np.zeros((4, n_freqs, len(catalog_table)), dtype=np.float)
+    stokes[0, :, :] = catalog_table["flux_density_I"].T
 
-    # To make sure the deprecated 'frequency' field is in the recarray always
-    # go to the object then back the array if needed.
-    skymodel_obj = array_to_skymodel(catalog_table)
+    if "frequency" in header_lower and freq_array is None:
+        reference_frequency = catalog_table["reference_frequency"] * units.Hz
+        if "spectral_index" in header_lower:
+            spectral_index = catalog_table["spectral_index"]
+        else:
+            spectral_index = None
+    else:
+        reference_frequency = None
+        spectral_index = None
+
+    skymodel_obj = SkyModel(
+        catalog_table["source_id"].astype("str"),
+        Longitude(catalog_table["ra_j2000"], units.deg),
+        Latitude(catalog_table["dec_j2000"], units.deg),
+        stokes,
+        spectral_type,
+        freq_array=freq_array,
+        reference_frequency=reference_frequency,
+        spectral_index=spectral_index,
+    )
+
+    if source_select_kwds is not None:
+        sky_array = skymodel_to_array(skymodel_obj)
+        sky_array = source_cuts(sky_array, **source_select_kwds)
+        if return_table:
+            return sky_array
+
+        skymodel_obj = array_to_skymodel(sky_array)
+
     if return_table:
         return skymodel_to_array(skymodel_obj)
 
@@ -1692,30 +1771,35 @@ def write_catalog_to_file(filename, skymodel):
         The sky model to write to file.
     """
     header = "SOURCE_ID\tRA_J2000 [deg]\tDec_J2000 [deg]"
+
     format_str = "{}\t{:0.8f}\t{:0.8f}"
     if skymodel.reference_frequency is not None:
         header += "\tFlux [Jy]\tFrequency [Hz]"
-        format_str += "\t{:0.2f}\t{:0.2f}"
+        format_str += "\t{:0.8f}\t{:0.8f}"
         if skymodel.spectral_index is not None:
             header += "\tSpectral_Index"
-        format_str += "\t{:0.2f}"
-    elif skymodel.freq_array:
+            format_str += "\t{:0.8f}"
+    elif skymodel.freq_array is not None:
         for freq in skymodel.freq_array:
-            if freq > 1e9:
-                freq_str = "{:g} GHz".format(freq * 1e-9)
-            elif freq > 1e6:
-                freq_str = "{:g} MHz".format(freq * 1e-6)
-            elif freq > 1e3:
-                freq_str = "{:g} kHz".format(freq * 1e-3)
+            freq_hz_val = freq.to(units.Hz).value
+            if freq_hz_val > 1e9:
+                freq_str = "{:g}_GHz".format(freq_hz_val * 1e-9)
+            elif freq_hz_val > 1e6:
+                freq_str = "{:g}_MHz".format(freq_hz_val * 1e-6)
+            elif freq_hz_val > 1e3:
+                freq_str = "{:g}_kHz".format(freq_hz_val * 1e-3)
             else:
-                freq_str = "{:g} Hz".format(freq)
+                freq_str = "{:g}_Hz".format(freq_hz_val)
 
-            header += f"\tFlux at {freq_str} [Jy]"
-            format_str += "\t{:0.2f}"
+            if skymodel.spectral_type == "subband":
+                header += f"\tFlux_subband_{freq_str} [Jy]"
+            else:
+                header += f"\tFlux_{freq_str} [Jy]"
+            format_str += "\t{:0.8f}"
     else:
         # flat spectral response, no freq info
         header += "\tFlux [Jy]"
-        format_str += "\t{:0.2f}"
+        format_str += "\t{:0.8f}"
 
     header += "\n"
     format_str += "\n"
@@ -1726,16 +1810,16 @@ def write_catalog_to_file(filename, skymodel):
         for src in arr:
             if skymodel.reference_frequency is not None:
                 if skymodel.spectral_index is not None:
-                    srcid, ra, dec, flux_i, freq, spec_index = src
+                    srcid, ra, dec, flux_i, rfreq, freq, spec_index = src
                     fo.write(
                         format_str.format(srcid, ra, dec, flux_i, freq, spec_index)
                     )
                 else:
-                    srcid, ra, dec, flux_i, freq = src
-                    fo.write(format_str.format(srcid, ra, dec, flux_i, freq))
+                    srcid, ra, dec, flux_i, rfreq, freq = src
+                    fo.write(format_str.format(srcid, ra, dec, flux_i, rfreq))
             elif skymodel.freq_array is not None:
                 srcid, ra, dec, flux_i, freq = src
-                fo.write(format_str.format(srcid, ra, dec, flux_i))
+                fo.write(format_str.format(srcid, ra, dec, *flux_i))
             else:
                 # flat spectral response, no freq info
                 srcid, ra, dec, flux_i = src
