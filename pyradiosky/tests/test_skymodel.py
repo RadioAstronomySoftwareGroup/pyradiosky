@@ -16,7 +16,6 @@ from astropy.coordinates import (
     Longitude,
     Latitude,
 )
-from astropy.io import votable
 from astropy.time import Time, TimeDelta
 import scipy.io
 
@@ -1087,18 +1086,6 @@ def test_read_deprecated_votable():
         skymodel_obj = skymodel.read_votable_catalog(votable_file)
 
     assert skymodel_obj.Ncomponents == 1
-
-    parsed_vo = votable.parse(votable_file)
-
-    tables = list(parsed_vo.iter_tables())
-    tables[1]._name = "VIII/100/gleamegc"
-    fname = os.path.join(SKY_DATA_PATH, "test_cat.vot")
-    parsed_vo.to_xml(fname)
-
-    skymodel_obj2 = skymodel.read_votable_catalog(fname)
-    os.remove(fname)
-
-    assert skymodel_obj == skymodel_obj2
 
     with pytest.raises(ValueError, match=("More than one matching table.")):
         skymodel.read_votable_catalog(votable_file, id_column="de")

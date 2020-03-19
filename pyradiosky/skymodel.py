@@ -1293,30 +1293,23 @@ def read_votable_catalog(
         table_name_use = _get_matching_fields(table_name, table_ids)
         table_match = [table for table in tables if table._ID == table_name_use][0]
     else:
-        table_names = [table._name for table in tables]
-        if None in table_names:
-            warnings.warn(
-                f"File {votable_file} contains tables with no name or ID, Support for "
-                "such files is deprecated.",
-                category=DeprecationWarning,
+        warnings.warn(
+            f"File {votable_file} contains tables with no name or ID, Support for "
+            "such files is deprecated.",
+            category=DeprecationWarning,
+        )
+        # Find correct table using the field names
+        tables_match = []
+        for table in tables:
+            id_col_use = _get_matching_fields(
+                id_column, table.to_table().colnames, brittle=False
             )
-            # Find correct table using the field names
-            tables_match = []
-            for table in tables:
-                id_col_use = _get_matching_fields(
-                    id_column, table.to_table().colnames, brittle=False
-                )
-                if id_col_use is not None:
-                    tables_match.append(table)
-            if len(tables_match) > 1:
-                raise ValueError("More than one matching table.")
-            else:
-                table_match = tables_match[0]
+            if id_col_use is not None:
+                tables_match.append(table)
+        if len(tables_match) > 1:
+            raise ValueError("More than one matching table.")
         else:
-            table_name_use = _get_matching_fields(table_name, table_names)
-            table_match = [table for table in tables if table._names == table_name_use][
-                0
-            ]
+            table_match = tables_match[0]
 
     # Convert to astropy Table
     astropy_table = table_match.to_table()
