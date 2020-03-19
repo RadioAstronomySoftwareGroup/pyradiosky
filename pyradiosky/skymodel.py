@@ -16,7 +16,11 @@ from astropy.units import Quantity
 from astropy.io import votable
 from pyuvdata.uvbase import UVBase
 from pyuvdata.parameter import UVParameter
-from pyuvdata.uvbeam.cst_beam import CSTBeam
+
+try:
+    from pyuvdata.uvbeam.cst_beam import CSTBeam
+except ImportError:
+    from pyuvdata.cst_beam import CSTBeam
 
 from . import utils as skyutils
 from . import spherical_coords_transforms as sct
