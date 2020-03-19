@@ -1208,6 +1208,7 @@ def test_text_catalog_loop(spec_type):
     fname = os.path.join(SKY_DATA_PATH, "temp_cat.txt")
     skymodel.write_catalog_to_file(fname, sky)
     sky2 = skymodel.read_text_catalog(fname)
+    os.remove(fname)
 
     assert sky == sky2
 
