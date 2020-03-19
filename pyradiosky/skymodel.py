@@ -109,7 +109,7 @@ class SkyModel(UVBase):
         None if spectral_type is not 'spectral_index'.
     rise_lst : array_like of float
         Approximate lst (radians) when the source rises, shape (Ncomponents,). Set by
-        coarse horizon cut in simsetup. Default is nan, meaning the source never rises.
+        coarse horizon cut in `source_cuts`. Default is nan, meaning the source never rises.
     set_lst : array_like of float
         Approximate lst (radians) when the source sets, shape (Ncomponents,).
         Default is None, meaning the source never sets.
@@ -258,7 +258,7 @@ class SkyModel(UVBase):
             "rise_lst",
             description=(
                 "Approximate lst (radians) when the source rises. "
-                "Set by coarse horizon cut in simsetup. "
+                "Set by coarse horizon cut in `source_cuts`. "
                 "Default is nan, meaning the source never rises."
             ),
             form=("Ncomponents",),
@@ -270,7 +270,7 @@ class SkyModel(UVBase):
             "set_lst",
             description=(
                 "Approximate lst (radians) when the source sets. "
-                "Set by coarse horizon cut in simsetup. "
+                "Set by coarse horizon cut in `source_cuts`. "
                 "Default is nan, meaning the source never sets."
             ),
             form=("Ncomponents",),
@@ -355,8 +355,9 @@ class SkyModel(UVBase):
         if freq_array is not None:
             if not isinstance(freq_array, (Quantity,)):
                 warnings.warn(
-                    "freq_array must be an astropy Quantity with units that "
-                    "are convertable to Hz.",
+                    "In the future, the freq_array will be required to be an "
+                    "astropy Quantity with units that are convertable to Hz. "
+                    "Currently, floats are assumed to be in Hz.",
                     category=DeprecationWarning,
                 )
                 freq_array = freq_array * units.Hz
@@ -368,8 +369,9 @@ class SkyModel(UVBase):
         if reference_frequency is not None:
             if not isinstance(reference_frequency, (Quantity,)):
                 warnings.warn(
-                    "reference_frequency must be an astropy Quantity with units that "
-                    "are convertable to Hz.",
+                    "In the future, the reference_frequency will be required to be an "
+                    "astropy Quantity with units that are convertable to Hz. "
+                    "Currently, floats are assumed to be in Hz.",
                     category=DeprecationWarning,
                 )
                 reference_frequency = reference_frequency * units.Hz
@@ -1002,7 +1004,7 @@ def array_to_skymodel(catalog_table):
             freq_array = Quantity(
                 np.atleast_1d(catalog_table["subband_frequency"]), "hertz"
             )
-        # freq_array gets copied for every component, so it's zeroth axis is
+        # freq_array gets copied for every component, so its zeroth axis is
         # length Ncomponents. Just take the first one.
         freq_array = freq_array[0, :]
         if freq_array.size > 1:
@@ -1128,7 +1130,7 @@ def source_cuts(
                 freq_array = Quantity(
                     np.atleast_1d(catalog_table["subband_frequency"]), "hertz"
                 )
-            # freq_array gets copied for every component, so it's zeroth axis is
+            # freq_array gets copied for every component, so its zeroth axis is
             # length Ncomponents. Just take the first one.
             freq_array = freq_array[0, :]
             if freq_range is not None:
@@ -1527,7 +1529,7 @@ def read_text_catalog(catalog_csv, source_select_kwds=None, return_table=False):
     if "frequency" in header_lower:
         if len(flux_fields) != 1:
             raise ValueError(
-                "If frequency column is present, only one flux columns allowed."
+                "If frequency column is present, only one flux column allowed."
             )
         freq_array = None
         expected_cols.extend([flux_fields_lower[0], "frequency"])
@@ -1754,7 +1756,7 @@ def write_catalog_to_file(filename, skymodel):
     """
     Write out a catalog to a text file.
 
-    Readable with :meth:`simsetup.read_text_catalog()`.
+    Readable with :meth:`read_text_catalog()`.
 
     Parameters
     ----------
