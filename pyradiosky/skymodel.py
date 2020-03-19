@@ -4,7 +4,6 @@
 """Define SkyModel class and helper functions."""
 
 import warnings
-import copy
 
 import numpy as np
 from numpy.lib import recfunctions
@@ -1518,37 +1517,26 @@ def read_text_catalog(catalog_csv, source_select_kwds=None, return_table=False):
     """
     with open(catalog_csv, "r") as cfile:
         header = cfile.readline()
-        first_data_line = cfile.readline()
     header = [
         h.strip() for h in header.split() if not h[0] == "["
     ]  # Ignore units in header
 
-    data_elems = first_data_line.split()
-    id_len = len(data_elems[0])
-
     flux_fields = [colname for colname in header if colname.lower().startswith("flux")]
+    flux_fields_lower = [colname.lower() for colname in flux_fields]
 
     header_lower = [colname.lower() for colname in header]
 
     expected_cols = ["source_id", "ra_j2000", "dec_j2000"]
-    fieldnames = copy.copy(expected_cols)
-    fieldtypes = ["U" + str(id_len), "f8", "f8"]
-    fieldshapes = [()] * 3
     if "frequency" in header_lower:
         if len(flux_fields) != 1:
             raise ValueError(
                 "If frequency column is present, only one flux columns allowed."
             )
         freq_array = None
-        expected_cols.extend([flux_fields[0], "frequency"])
-        fieldnames.extend(["flux_density_I", "reference_frequency"])
-        fieldtypes.extend(["f8", "f8"])
-        fieldshapes.extend([()] * 2)
+        expected_cols.extend([flux_fields_lower[0], "frequency"])
         if "spectral_index" in header_lower:
             spectral_type = "spectral_index"
-            fieldnames.append("spectral_index")
-            fieldtypes.append("f8")
-            fieldshapes.append(())
+            expected_cols.append("spectral_index")
             freq_array = None
         else:
             spectral_type = "flat"
@@ -1572,10 +1560,7 @@ def read_text_catalog(catalog_csv, source_select_kwds=None, return_table=False):
             else:
                 spectral_type = "full"
             # This has a freq_array
-            expected_cols.extend(flux_fields)
-            fieldnames.append("flux_density_I")
-            fieldtypes.append("f8")
-            fieldshapes.append((len(frequencies)))
+            expected_cols.extend(flux_fields_lower)
             freq_array = np.array(frequencies) * units.Hz
         else:
             # This is a flat spectrum (no freq info)
@@ -1583,27 +1568,35 @@ def read_text_catalog(catalog_csv, source_select_kwds=None, return_table=False):
             spectral_type = "flat"
             freq_array = None
             expected_cols.append("flux")
-            fieldnames.append("flux_density_I")
-            fieldtypes.append("f8")
-            fieldshapes.append(())
 
-    for col in expected_cols:
-        if col not in header_lower and col not in header:
-            raise ValueError(f"Expected column {col} is not present.")
+    if expected_cols != header_lower:
+        raise ValueError(
+            "Header does not match expectations. Expected columns"
+            f"are: {expected_cols}, header columns were: {header_lower}"
+        )
 
-    dt = np.dtype(list(zip(fieldnames, fieldtypes, fieldshapes)))
-
-    catalog_table = np.genfromtxt(catalog_csv, autostrip=True, skip_header=1, dtype=dt)
+    catalog_table = np.genfromtxt(
+        catalog_csv, autostrip=True, skip_header=1, dtype=None, encoding="utf-8"
+    )
 
     catalog_table = np.atleast_1d(catalog_table)
 
+    col_names = catalog_table.dtype.names
+
+    names = catalog_table[col_names[0]].astype("str")
+    ras = Longitude(catalog_table[col_names[1]], units.deg)
+    decs = Latitude(catalog_table[col_names[2]], units.deg)
+
     stokes = np.zeros((4, n_freqs, len(catalog_table)), dtype=np.float)
-    stokes[0, :, :] = catalog_table["flux_density_I"].T
+    for ind in np.arange(n_freqs):
+        stokes[0, ind, :] = catalog_table[col_names[ind + 3]]
 
     if "frequency" in header_lower and freq_array is None:
-        reference_frequency = catalog_table["reference_frequency"] * units.Hz
+        freq_ind = np.where(np.array(header_lower) == "frequency")[0][0]
+        reference_frequency = catalog_table[col_names[freq_ind]] * units.Hz
         if "spectral_index" in header_lower:
-            spectral_index = catalog_table["spectral_index"]
+            si_ind = np.where(np.array(header_lower) == "spectral_index")[0][0]
+            spectral_index = catalog_table[col_names[si_ind]]
         else:
             spectral_index = None
     else:
@@ -1611,9 +1604,9 @@ def read_text_catalog(catalog_csv, source_select_kwds=None, return_table=False):
         spectral_index = None
 
     skymodel_obj = SkyModel(
-        catalog_table["source_id"].astype("str"),
-        Longitude(catalog_table["ra_j2000"], units.deg),
-        Latitude(catalog_table["dec_j2000"], units.deg),
+        names,
+        ras,
+        decs,
         stokes,
         spectral_type,
         freq_array=freq_array,
@@ -1771,7 +1764,6 @@ def write_catalog_to_file(filename, skymodel):
         The sky model to write to file.
     """
     header = "SOURCE_ID\tRA_J2000 [deg]\tDec_J2000 [deg]"
-
     format_str = "{}\t{:0.8f}\t{:0.8f}"
     if skymodel.reference_frequency is not None:
         header += "\tFlux [Jy]\tFrequency [Hz]"

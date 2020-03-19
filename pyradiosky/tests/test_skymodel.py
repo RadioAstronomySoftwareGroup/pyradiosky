@@ -1223,6 +1223,14 @@ def test_text_catalog_loop(spec_type):
         assert sky == sky2
 
 
+def test_pyuvsim_mock_catalog_read():
+    mock_cat_file = os.path.join(SKY_DATA_PATH, "mock_hera_text_2458098.27471.txt")
+
+    mock_sky = skymodel.read_text_catalog(mock_cat_file)
+    expected_names = ["src" + str(val) for val in np.arange(mock_sky.Ncomponents)]
+    assert mock_sky.name.tolist() == expected_names
+
+
 class TestMoon:
     """
     Series of tests for Moon-based observers
