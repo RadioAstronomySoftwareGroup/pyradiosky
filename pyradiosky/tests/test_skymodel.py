@@ -755,6 +755,23 @@ def test_array_to_skymodel_loop(spec_type):
     sky = skymodel.read_gleam_catalog(GLEAM_vot, spectral_type=spectral_type)
     if spec_type == "full":
         sky.spectral_type = "full"
+
+    # This should be removed after pyuvdata PR #790 is merged.
+    # GLEAM has NaNs for the spectral_index  of some sources
+    # Currently, arrays with NaNs are never equal even if they are equal where
+    # they are not nan and are nan in the same locations.
+    # So remove those components for the round trip equality test.
+    if spectral_type == "spectral_index":
+        wh_not_nan = np.squeeze(np.argwhere(~np.isnan(sky.spectral_index)))
+        sky.Ncomponents = wh_not_nan.size
+        sky.ra = sky.ra[wh_not_nan]
+        sky.dec = sky.dec[wh_not_nan]
+        sky.name = sky.name[wh_not_nan]
+        sky.reference_frequency = sky.reference_frequency[wh_not_nan]
+        sky.spectral_index = sky.spectral_index[wh_not_nan]
+        sky.stokes = sky.stokes[:, :, wh_not_nan]
+        sky.coherency_radec = skyutils.stokes_to_coherency(sky.stokes)
+
     arr = skymodel.skymodel_to_array(sky)
     sky2 = skymodel.array_to_skymodel(arr)
 
@@ -1171,6 +1188,22 @@ def test_text_catalog_loop(spec_type):
     sky = skymodel.read_gleam_catalog(GLEAM_vot, spectral_type=spectral_type)
     if spec_type == "full":
         sky.spectral_type = "full"
+
+    # This should be removed after pyuvdata PR #790 is merged.
+    # GLEAM has NaNs for the spectral_index  of some sources
+    # Currently, arrays with NaNs are never equal even if they are equal where
+    # they are not nan and are nan in the same locations.
+    # So remove those components for the round trip equality test.
+    if spectral_type == "spectral_index":
+        wh_not_nan = np.squeeze(np.argwhere(~np.isnan(sky.spectral_index)))
+        sky.Ncomponents = wh_not_nan.size
+        sky.ra = sky.ra[wh_not_nan]
+        sky.dec = sky.dec[wh_not_nan]
+        sky.name = sky.name[wh_not_nan]
+        sky.reference_frequency = sky.reference_frequency[wh_not_nan]
+        sky.spectral_index = sky.spectral_index[wh_not_nan]
+        sky.stokes = sky.stokes[:, :, wh_not_nan]
+        sky.coherency_radec = skyutils.stokes_to_coherency(sky.stokes)
 
     fname = os.path.join(SKY_DATA_PATH, "temp_cat.txt")
     skymodel.write_catalog_to_file(fname, sky)
