@@ -1558,7 +1558,10 @@ def read_text_catalog(catalog_csv, source_select_kwds=None, return_table=False):
             if "subband" in flux_fields[0]:
                 spectral_type = "subband"
             else:
-                spectral_type = "full"
+                if len(frequencies) > 1:
+                    spectral_type = "full"
+                else:
+                    spectral_type = "flat"
             # This has a freq_array
             expected_cols.extend(flux_fields_lower)
             freq_array = np.array(frequencies) * units.Hz

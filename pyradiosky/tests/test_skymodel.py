@@ -3,6 +3,7 @@
 # Licensed under the 3-clause BSD License
 
 import os
+import fileinput
 
 import pytest
 import numpy as np
@@ -15,6 +16,7 @@ from astropy.coordinates import (
     Longitude,
     Latitude,
 )
+from astropy.io import votable
 from astropy.time import Time, TimeDelta
 import scipy.io
 
@@ -778,10 +780,16 @@ def test_array_to_skymodel_loop(spec_type):
     assert sky == sky2
 
     if spec_type == "flat":
-        # again with flat & freq_array
-        sky = skymodel.read_gleam_catalog(GLEAM_vot)
-        sky.freq_array = np.atleast_1d(np.unique(sky.reference_frequency))
+        # again with no reference_frequency field
+        reference_frequency = sky.reference_frequency
         sky.reference_frequency = None
+        arr = skymodel.skymodel_to_array(sky)
+        sky2 = skymodel.array_to_skymodel(arr)
+
+        assert sky == sky2
+
+        # again with flat & freq_array
+        sky.freq_array = np.atleast_1d(np.unique(reference_frequency))
         arr = skymodel.skymodel_to_array(sky)
         sky2 = skymodel.array_to_skymodel(arr)
 
@@ -1061,6 +1069,11 @@ def test_read_gleam(spec_type):
         )
 
 
+def test_read_gleam_errors():
+    with pytest.raises(ValueError, match="spectral_type full is not an allowed type"):
+        skymodel.read_gleam_catalog(GLEAM_vot, spectral_type="full")
+
+
 def test_read_deprecated_votable():
     votable_file = os.path.join(SKY_DATA_PATH, "single_source.vot")
 
@@ -1074,6 +1087,18 @@ def test_read_deprecated_votable():
         skymodel_obj = skymodel.read_votable_catalog(votable_file)
 
     assert skymodel_obj.Ncomponents == 1
+
+    parsed_vo = votable.parse(votable_file)
+
+    tables = list(parsed_vo.iter_tables())
+    tables[1]._name = "VIII/100/gleamegc"
+    fname = os.path.join(SKY_DATA_PATH, "test_cat.vot")
+    parsed_vo.to_xml(fname)
+
+    skymodel_obj2 = skymodel.read_votable_catalog(fname)
+    os.remove(fname)
+
+    assert skymodel_obj == skymodel_obj2
 
     with pytest.raises(ValueError, match=("More than one matching table.")):
         skymodel.read_votable_catalog(votable_file, id_column="de")
@@ -1208,19 +1233,63 @@ def test_text_catalog_loop(spec_type):
     fname = os.path.join(SKY_DATA_PATH, "temp_cat.txt")
     skymodel.write_catalog_to_file(fname, sky)
     sky2 = skymodel.read_text_catalog(fname)
+    sky_arr2 = skymodel.read_text_catalog(fname, return_table=True)
+    sky3 = skymodel.array_to_skymodel(sky_arr2)
     os.remove(fname)
 
     assert sky == sky2
+    assert sky == sky3
 
     if spec_type == "flat":
-        # again with flat & freq_array
-        sky = skymodel.read_gleam_catalog(GLEAM_vot)
-        sky.freq_array = np.atleast_1d(np.unique(sky.reference_frequency))
+        # again with no reference_frequency field
+        reference_frequency = sky.reference_frequency
         sky.reference_frequency = None
         arr = skymodel.skymodel_to_array(sky)
         sky2 = skymodel.array_to_skymodel(arr)
 
         assert sky == sky2
+
+        # again with flat & freq_array
+        sky.freq_array = np.atleast_1d(np.unique(reference_frequency))
+        arr = skymodel.skymodel_to_array(sky)
+        sky2 = skymodel.array_to_skymodel(arr)
+
+        assert sky == sky2
+
+
+@pytest.mark.parametrize("freq_mult", [1e-6, 1e-3, 1e3])
+def test_text_catalog_loop_other_freqs(freq_mult):
+    sky = skymodel.read_gleam_catalog(GLEAM_vot)
+    sky.freq_array = np.atleast_1d(np.unique(sky.reference_frequency) * freq_mult)
+    sky.reference_frequency = None
+
+    fname = os.path.join(SKY_DATA_PATH, "temp_cat.txt")
+    skymodel.write_catalog_to_file(fname, sky)
+    sky2 = skymodel.read_text_catalog(fname)
+    print(sky.spectral_type)
+    print(sky2.spectral_type)
+    os.remove(fname)
+
+    assert sky == sky2
+
+
+@pytest.mark.parametrize("spec_type", ["flat", "subband"])
+def test_read_text_source_cuts(spec_type):
+
+    sky = skymodel.read_gleam_catalog(GLEAM_vot, spectral_type=spec_type)
+    fname = os.path.join(SKY_DATA_PATH, "temp_cat.txt")
+    skymodel.write_catalog_to_file(fname, sky)
+
+    source_select_kwds = {"min_flux": 0.5}
+    cut_catalog = skymodel.read_text_catalog(
+        fname, source_select_kwds=source_select_kwds, return_table=True,
+    )
+
+    assert len(cut_catalog) < sky.Ncomponents
+
+    cut_obj = skymodel.read_text_catalog(fname, source_select_kwds=source_select_kwds)
+
+    assert len(cut_catalog) == cut_obj.Ncomponents
 
 
 def test_pyuvsim_mock_catalog_read():
@@ -1229,6 +1298,46 @@ def test_pyuvsim_mock_catalog_read():
     mock_sky = skymodel.read_text_catalog(mock_cat_file)
     expected_names = ["src" + str(val) for val in np.arange(mock_sky.Ncomponents)]
     assert mock_sky.name.tolist() == expected_names
+
+
+def test_read_text_errors():
+    sky = skymodel.read_gleam_catalog(GLEAM_vot, spectral_type="subband")
+
+    fname = os.path.join(SKY_DATA_PATH, "temp_cat.txt")
+    skymodel.write_catalog_to_file(fname, sky)
+    with fileinput.input(files=fname, inplace=True) as infile:
+        for line in infile:
+            line = line.replace("Flux_subband_76_MHz [Jy]", "Frequency [Hz]")
+            print(line, end="")
+
+    with pytest.raises(
+        ValueError,
+        match="If frequency column is present, only one flux columns allowed.",
+    ):
+        skymodel.read_text_catalog(fname)
+
+    skymodel.write_catalog_to_file(fname, sky)
+    with fileinput.input(files=fname, inplace=True) as infile:
+        for line in infile:
+            line = line.replace("Flux_subband_76_MHz [Jy]", "Flux [Jy]")
+            print(line, end="")
+
+    with pytest.raises(
+        ValueError,
+        match="Multiple flux fields, but they do not all contain a frequency.",
+    ):
+        skymodel.read_text_catalog(fname)
+
+    skymodel.write_catalog_to_file(fname, sky)
+    with fileinput.input(files=fname, inplace=True) as infile:
+        for line in infile:
+            line = line.replace("SOURCE_ID", "NAME")
+            print(line, end="")
+
+    with pytest.raises(ValueError, match="Header does not match expectations."):
+        skymodel.read_text_catalog(fname)
+
+    os.remove(fname)
 
 
 class TestMoon:
