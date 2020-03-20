@@ -223,7 +223,8 @@ def test_skymodel_deprecated():
     assert source_new == source_old
 
     with pytest.warns(
-        DeprecationWarning, match="reference_frequency must be an astropy Quantity"
+        DeprecationWarning,
+        match="In the future, the reference_frequency will be required to be an astropy Quantity",
     ):
         source_old = skymodel.SkyModel(
             "Test",
@@ -305,7 +306,8 @@ def test_skymodel_deprecated():
     assert source_new == source_old
 
     with pytest.warns(
-        DeprecationWarning, match="freq_array must be an astropy Quantity"
+        DeprecationWarning,
+        match="In the future, the freq_array will be required to be an astropy Quantity",
     ):
         source_old = skymodel.SkyModel(
             "Test",
@@ -1275,6 +1277,7 @@ def test_read_text_source_cuts(spec_type):
     assert len(cut_catalog) < sky.Ncomponents
 
     cut_obj = skymodel.read_text_catalog(fname, source_select_kwds=source_select_kwds)
+    os.remove(fname)
 
     assert len(cut_catalog) == cut_obj.Ncomponents
 
@@ -1299,7 +1302,7 @@ def test_read_text_errors():
 
     with pytest.raises(
         ValueError,
-        match="If frequency column is present, only one flux columns allowed.",
+        match="If frequency column is present, only one flux column allowed.",
     ):
         skymodel.read_text_catalog(fname)
 
