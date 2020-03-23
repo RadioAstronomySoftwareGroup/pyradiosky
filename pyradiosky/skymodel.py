@@ -107,12 +107,6 @@ class SkyModel(UVBase):
     spectral_index : array_like of float
         Spectral index of each source, shape (Ncomponents).
         None if spectral_type is not 'spectral_index'.
-    rise_lst : array_like of float
-        Approximate lst (radians) when the source rises, shape (Ncomponents,). Set by
-        coarse horizon cut in `source_cuts`. Default is nan, meaning the source never rises.
-    set_lst : array_like of float
-        Approximate lst (radians) when the source sets, shape (Ncomponents,).
-        Default is None, meaning the source never sets.
     pos_tol : float
         position tolerance in degrees, defaults to minimum float in numpy
         position tolerance in degrees
@@ -136,8 +130,6 @@ class SkyModel(UVBase):
         freq_array=None,
         reference_frequency=None,
         spectral_index=None,
-        rise_lst=None,
-        set_lst=None,
         pos_tol=np.finfo(float).eps,
         extended_model_group=None,
         beam_amp=None,
@@ -254,30 +246,6 @@ class SkyModel(UVBase):
             required=False,
         )
 
-        self._rise_lst = UVParameter(
-            "rise_lst",
-            description=(
-                "Approximate lst (radians) when the source rises. "
-                "Set by coarse horizon cut in `source_cuts`. "
-                "Default is nan, meaning the source never rises."
-            ),
-            form=("Ncomponents",),
-            expected_type=float,
-            required=False,
-        )
-
-        self._set_lst = UVParameter(
-            "set_lst",
-            description=(
-                "Approximate lst (radians) when the source sets. "
-                "Set by coarse horizon cut in `source_cuts`. "
-                "Default is nan, meaning the source never sets."
-            ),
-            form=("Ncomponents",),
-            expected_type=float,
-            required=False,
-        )
-
         desc = "Time for local position calculations."
         self._time = UVParameter(
             "time", description=desc, expected_type=Time, required=False
@@ -391,10 +359,10 @@ class SkyModel(UVBase):
     @property
     def has_rise_set_lsts(self):
         """Property that determines whether this object has rise and set LSTs set."""
-        if not hasattr(self, "rise_lst") and not hasattr(self, "set_lst"):
+        if not hasattr(self, "_rise_lst") and not hasattr(self, "_set_lst"):
             return False
 
-        has_rise_set_lsts = (self.rise_lst is not None) and (self.set_lst is not None)
+        has_rise_set_lsts = (self._rise_lst is not None) and (self._set_lst is not None)
 
         return has_rise_set_lsts
 
@@ -1034,7 +1002,7 @@ def array_to_skymodel(catalog_table):
     # pad non-I flux values with zeros
     stokes = np.pad(flux_I[np.newaxis, :, :], ((0, 3), (0, 0), (0, 0)))
 
-    sourcelist = SkyModel(
+    skymodel = SkyModel(
         ids,
         ra,
         dec,
@@ -1043,11 +1011,14 @@ def array_to_skymodel(catalog_table):
         freq_array=freq_array,
         reference_frequency=reference_frequency,
         spectral_index=spectral_index,
-        rise_lst=rise_lst,
-        set_lst=set_lst,
     )
 
-    return sourcelist
+    if rise_lst is not None:
+        skymodel._rise_lst = rise_lst
+    if set_lst is not None:
+        skymodel._set_lst = set_lst
+
+    return skymodel
 
 
 def source_cuts(
