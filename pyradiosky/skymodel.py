@@ -19,7 +19,8 @@ from pyuvdata.parameter import UVParameter
 
 try:
     from pyuvdata.uvbeam.cst_beam import CSTBeam
-except ImportError:
+except ImportError:  # pragma: no cover
+    # backwards compatility for older pyuvdata versions
     from pyuvdata.cst_beam import CSTBeam
 
 from . import utils as skyutils
@@ -34,6 +35,7 @@ __all__ = [
     "skymodel_to_array",
     "array_to_skymodel",
     "source_cuts",
+    "read_gleam_catalog",
     "read_votable_catalog",
     "read_text_catalog",
     "read_idl_catalog",
@@ -355,16 +357,6 @@ class SkyModel(UVBase):
         self.coherency_radec = skyutils.stokes_to_coherency(self.stokes)
 
         self.check()
-
-    @property
-    def has_rise_set_lsts(self):
-        """Property that determines whether this object has rise and set LSTs set."""
-        if not hasattr(self, "_rise_lst") and not hasattr(self, "_set_lst"):
-            return False
-
-        has_rise_set_lsts = (self._rise_lst is not None) and (self._set_lst is not None)
-
-        return has_rise_set_lsts
 
     def set_spectral_type_params(self, spectral_type):
         """Set parameters depending on spectral_type."""
