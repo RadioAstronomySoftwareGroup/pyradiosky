@@ -864,21 +864,25 @@ def skymodel_to_array(sky):
     Returns
     -------
     catalog_table : recarray
-        recarray to turn into a SkyModel object.
+        recarray equivalent to SkyModel data.
 
     """
     sky.check()
     max_name_len = np.max([len(name) for name in sky.name])
     fieldtypes = ["U" + str(max_name_len), "f8", "f8", "f8"]
-    fieldnames = ["source_id", "ra_j2000", "dec_j2000", "flux_density_I"]
+    fieldnames = ["source_id", "ra_j2000", "dec_j2000", "flux_density"]
     fieldshapes = [()] * 3
+
+    n_stokes = 4
+    # TODO -- Only extend the flux axis with polarization if there are multiple pols.
+
     if sky.freq_array is not None:
         if sky.spectral_type == "subband":
             fieldnames.append("subband_frequency")
         else:
             fieldnames.append("frequency")
         fieldtypes.append("f8")
-        fieldshapes.extend([(sky.Nfreqs,)] * 2)
+        fieldshapes.extend([(sky.Nfreqs, n_stokes), (sky.Nfreqs,)])
     elif sky.reference_frequency is not None:
         # add frequency field (a copy of reference_frequency) for backwards
         # compatibility.
@@ -920,11 +924,11 @@ def skymodel_to_array(sky):
             arr["subband_frequency"] = sky.freq_array
         else:
             arr["frequency"] = sky.freq_array
-        arr["flux_density_I"] = sky.stokes[0, :, :].T
+        arr["flux_density"] = sky.stokes.T
     elif sky.reference_frequency is not None:
         arr["reference_frequency"] = sky.reference_frequency
         arr["frequency"] = sky.reference_frequency
-        arr["flux_density_I"] = np.squeeze(sky.stokes[0, :, :])
+        arr["flux_density"] = np.squeeze(sky.stokes.T)
         if sky.spectral_index is not None:
             arr["spectral_index"] = sky.spectral_index
     else:
@@ -956,7 +960,7 @@ def array_to_skymodel(catalog_table):
     ra = Longitude(catalog_table["ra_j2000"], units.deg)
     dec = Latitude(catalog_table["dec_j2000"], units.deg)
     ids = np.asarray(catalog_table["source_id"]).astype(str)
-    flux_I = np.atleast_1d(catalog_table["flux_density_I"])
+    stokes = np.atleast_1d(catalog_table["flux_density"])
 
     rise_lst = None
     set_lst = None
@@ -1003,13 +1007,13 @@ def array_to_skymodel(catalog_table):
         set_lst = catalog_table["set_lst"]
 
     if freq_array is not None:
-        flux_I = flux_I.T
+        stokes = stokes.T
 
-    if flux_I.ndim == 1:
-        flux_I = flux_I[np.newaxis, :]
+    if stokes.ndim == 1:
+        stokes = stokes[np.newaxis, :]
 
     # pad non-I flux values with zeros
-    stokes = np.pad(flux_I[np.newaxis, :, :], ((0, 3), (0, 0), (0, 0)))
+    #    stokes = np.pad(flux_I[np.newaxis, :, :], ((0, 3), (0, 0), (0, 0)))
 
     skymodel = SkyModel(
         ids,
