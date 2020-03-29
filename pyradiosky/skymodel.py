@@ -284,11 +284,12 @@ class SkyModel(UVBase):
         )
 
         desc = (
-            "Boolean indicator of whether this source is below the horizon."
+            "Boolean indicator of whether this source is below the horizon"
+            "at the current time."
             "True indicates the source is below the horizon."
         )
-        self._horizon_mask = UVParameter(
-            "horizon_mask",
+        self._below_horizon = UVParameter(
+            "below_horizon",
             description=desc,
             form=("Ncomponents",),
             expected_type=bool,
@@ -355,6 +356,9 @@ class SkyModel(UVBase):
         self.stokes = np.asarray(stokes, dtype=np.float)
         if self.Ncomponents == 1:
             self.stokes = self.stokes.reshape(4, self.Nfreqs, 1)
+
+        self._polarized = np.where(np.sum(self.stokes[1:, :, :], axis=0) != 0.0)[0]
+        self._n_polarized = self._polarized.size
 
         self.coherency_radec = skyutils.stokes_to_coherency(self.stokes)
 
@@ -499,9 +503,15 @@ class SkyModel(UVBase):
 
         return R_really_orthogonal
 
-    def _calc_rotation_matrix(self):
+    def _calc_rotation_matrix(self, inds=None):
         """
         Calculate the true rotation matrix from RA/Dec to AltAz for each component.
+
+        Parameters
+        ----------
+        inds: array_like, optional
+            Index array to select components.
+            Defaults to all components.
 
         Returns
         -------
@@ -509,23 +519,27 @@ class SkyModel(UVBase):
             Rotation matrix that defines the mapping (RA,Dec) <--> (Alt,Az),
             shape (3, 3, Ncomponents).
         """
+        if inds is None:
+            inds = range(self.Ncomponents)
+        n_inds = len(inds)
+
         # Find mathematical points and vectors for RA/Dec
-        theta_radec = np.pi / 2.0 - self.dec.rad
-        phi_radec = self.ra.rad
+        theta_radec = np.pi / 2.0 - self.dec.rad[inds]
+        phi_radec = self.ra.rad[inds]
         radec_vec = sct.r_hat(theta_radec, phi_radec)
-        assert radec_vec.shape == (3, self.Ncomponents)
+        assert radec_vec.shape == (3, n_inds)
 
         # Find mathematical points and vectors for Alt/Az
-        theta_altaz = np.pi / 2.0 - self.alt_az[0, :]
-        phi_altaz = self.alt_az[1, :]
+        theta_altaz = np.pi / 2.0 - self.alt_az[0, inds]
+        phi_altaz = self.alt_az[1, inds]
         altaz_vec = sct.r_hat(theta_altaz, phi_altaz)
-        assert altaz_vec.shape == (3, self.Ncomponents)
+        assert altaz_vec.shape == (3, n_inds)
 
         R_avg = self._calc_average_rotation_matrix()
 
         R_exact = np.zeros((3, 3, self.Ncomponents), dtype=np.float)
 
-        for src_i in range(self.Ncomponents):
+        for src_i in range(n_inds):
             intermediate_vec = np.matmul(R_avg, radec_vec[:, src_i])
 
             R_perturb = sct.vecs2rot(r1=intermediate_vec, r2=altaz_vec[:, src_i])
@@ -534,9 +548,15 @@ class SkyModel(UVBase):
 
         return R_exact
 
-    def _calc_coherency_rotation(self):
+    def _calc_coherency_rotation(self, inds=None):
         """
         Calculate the rotation matrix to apply to the RA/Dec coherency to get it into alt/az.
+
+        Parameters
+        ----------
+        inds: array_like, optional
+            Index array to select components.
+            Defaults to all components.
 
         Returns
         -------
@@ -544,18 +564,22 @@ class SkyModel(UVBase):
             Rotation matrix that takes the coherency from (RA,Dec) --> (Alt,Az),
             shape (2, 2, Ncomponents).
         """
-        basis_rotation_matrix = self._calc_rotation_matrix()
+        if inds is None:
+            inds = range(self.Ncomponents)
+        n_inds = len(inds)
+
+        basis_rotation_matrix = self._calc_rotation_matrix(inds)
 
         # Find mathematical points and vectors for RA/Dec
-        theta_radec = np.pi / 2.0 - self.dec.rad
-        phi_radec = self.ra.rad
+        theta_radec = np.pi / 2.0 - self.dec.rad[inds]
+        phi_radec = self.ra.rad[inds]
 
         # Find mathematical points and vectors for Alt/Az
-        theta_altaz = np.pi / 2.0 - self.alt_az[0, :]
-        phi_altaz = self.alt_az[1, :]
+        theta_altaz = np.pi / 2.0 - self.alt_az[0, inds]
+        phi_altaz = self.alt_az[1, inds]
 
-        coherency_rot_matrix = np.zeros((2, 2, self.Ncomponents), dtype=np.float)
-        for src_i in range(self.Ncomponents):
+        coherency_rot_matrix = np.zeros((2, 2, n_inds), dtype=np.float)
+        for src_i in range(n_inds):
             coherency_rot_matrix[
                 :, :, src_i
             ] = sct.spherical_basis_vector_rotation_matrix(
@@ -605,31 +629,26 @@ class SkyModel(UVBase):
                 errm + "value was: {al}".format(al=str(self.telescope_location))
             )
 
-        Ionly_mask = np.sum(self.stokes[1:, :, :], axis=0) == 0.0
-        NstokesI = np.sum(Ionly_mask)  # Number of unpolarized sources
+        # Select sources within the horizon only.
+        coherency_local = self.coherency_radec[..., ~self.below_horizon]
 
         # For unpolarized sources, there's no need to rotate the coherency matrix.
-        coherency_local = self.coherency_radec.copy()
-
-        if NstokesI < self.Ncomponents:
+        if self._n_polarized > 0:
             # If there are any polarized sources, do rotation.
-            rotation_matrix = self._calc_coherency_rotation()
 
-            polarized_sources = np.where(~Ionly_mask)[0]
+            pol_over_hor = np.where(~self.below_horizon[self._polarized])[0]
 
-            # shape (2, 2, Ncomponents)
-            rotation_matrix = rotation_matrix[..., polarized_sources]
+            if len(pol_over_hor) > 0:
 
-            rotation_matrix_T = np.swapaxes(rotation_matrix, 0, 1)
-            coherency_local[:, :, :, polarized_sources] = np.einsum(
-                "aby,bcxy,cdy->adxy",
-                rotation_matrix_T,
-                self.coherency_radec[:, :, :, polarized_sources],
-                rotation_matrix,
-            )
+                rotation_matrix = self._calc_coherency_rotation(pol_over_hor)
 
-        # Zero coherency on sources below horizon.
-        coherency_local[:, :, :, self.horizon_mask] *= 0.0
+                rotation_matrix_T = np.swapaxes(rotation_matrix, 0, 1)
+                coherency_local[:, :, :, pol_over_hor] = np.einsum(
+                    "aby,bcxy,cdy->adxy",
+                    rotation_matrix_T,
+                    self.coherency_radec[:, :, :, pol_over_hor],
+                    rotation_matrix,
+                )
 
         return coherency_local
 
@@ -698,7 +717,7 @@ class SkyModel(UVBase):
         self.pos_lmn[2, :] = pos_n
 
         # Horizon mask:
-        self.horizon_mask = self.alt_az[0, :] < 0.0
+        self.below_horizon = self.alt_az[0, :] < 0.0
 
 
 def read_healpix_hdf5(hdf5_filename):
