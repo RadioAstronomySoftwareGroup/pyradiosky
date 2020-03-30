@@ -284,12 +284,12 @@ class SkyModel(UVBase):
         )
 
         desc = (
-            "Boolean indicator of whether this source is below the horizon"
+            "Boolean indicator of whether this source is above the horizon"
             "at the current time."
-            "True indicates the source is below the horizon."
+            "True indicates the source is above the horizon."
         )
-        self._below_horizon = UVParameter(
-            "below_horizon",
+        self._above_horizon = UVParameter(
+            "above_horizon",
             description=desc,
             form=("Ncomponents",),
             expected_type=bool,
@@ -613,12 +613,12 @@ class SkyModel(UVBase):
         array of float
             local coherency in alt/az basis, shape (2, 2, Nfreqs, Ncomponents)
         """
-        if self.below_horizon is None:
+        if self.above_horizon is None:
             warnings.warn(
-                "Horizon cutoff undefined. Assuming all source components are"
-                " above the horizon."
+                "Horizon cutoff undefined. Assuming all source components "
+                "are above the horizon."
             )
-            self.below_horizon = np.zeros(self.Ncomponents).astype(bool)
+            self.above_horizon = np.ones(self.Ncomponents).astype(bool)
 
         if deprecated_location is not None:
             warnings.warn(
@@ -639,13 +639,13 @@ class SkyModel(UVBase):
             )
 
         # Select sources within the horizon only.
-        coherency_local = self.coherency_radec[..., ~self.below_horizon]
+        coherency_local = self.coherency_radec[..., self.above_horizon]
 
         # For unpolarized sources, there's no need to rotate the coherency matrix.
         if self._n_polarized > 0:
             # If there are any polarized sources, do rotation.
 
-            pol_over_hor = np.where(~self.below_horizon[self._polarized])[0]
+            pol_over_hor = np.where(self.above_horizon[self._polarized])[0]
 
             if len(pol_over_hor) > 0:
 
@@ -726,7 +726,7 @@ class SkyModel(UVBase):
         self.pos_lmn[2, :] = pos_n
 
         # Horizon mask:
-        self.below_horizon = self.alt_az[0, :] < 0.0
+        self.above_horizon = self.alt_az[0, :] > 0.0
 
 
 def read_healpix_hdf5(hdf5_filename):
