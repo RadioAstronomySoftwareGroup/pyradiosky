@@ -594,7 +594,9 @@ class SkyModel(UVBase):
 
     def coherency_calc(self, deprecated_location=None):
         """
-        Calculate the local coherency in alt/az basis for this source at a time & location.
+        Calculate the local coherency in alt/az basis.
+
+        SkyModel.update_positions() must be run prior to this method.
 
         The coherency is a 2x2 matrix giving electric field correlation in Jy.
         It's specified on the object as a coherency in the ra/dec basis,
@@ -611,6 +613,13 @@ class SkyModel(UVBase):
         array of float
             local coherency in alt/az basis, shape (2, 2, Nfreqs, Ncomponents)
         """
+        if self.below_horizon is None:
+            warnings.warn(
+                "Horizon cutoff undefined. Assuming all source components are"
+                " above the horizon."
+            )
+            self.below_horizon = np.zeros(self.Ncomponents).astype(bool)
+
         if deprecated_location is not None:
             warnings.warn(
                 "Passing telescope_location to SkyModel.coherency_calc is "
@@ -893,7 +902,6 @@ def skymodel_to_array(sky):
     fieldshapes = [()] * 3
 
     n_stokes = 4
-    # TODO -- Only extend the flux axis with polarization if there are multiple pols.
 
     if sky.freq_array is not None:
         if sky.spectral_type == "subband":
