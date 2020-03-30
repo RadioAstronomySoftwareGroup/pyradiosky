@@ -898,10 +898,10 @@ def test_flux_cuts(spec_type, init_kwargs, cut_kwargs):
     if "freq_range" in cut_kwargs and np.min(
         cut_kwargs["freq_range"] > np.min(init_kwargs["freq_array"])
     ):
-        assert np.all(cut_sourcelist["flux_density_I"] < maxI_cut)
+        assert np.all(cut_sourcelist["flux_density"][..., 0] < maxI_cut)
     else:
-        assert np.all(cut_sourcelist["flux_density_I"] > minI_cut)
-        assert np.all(cut_sourcelist["flux_density_I"] < maxI_cut)
+        assert np.all(cut_sourcelist["flux_density"][..., 0] > minI_cut)
+        assert np.all(cut_sourcelist["flux_density"][..., 0] < maxI_cut)
 
 
 @pytest.mark.parametrize(
@@ -1224,7 +1224,7 @@ def test_point_catalog_reader():
     header = [h.strip() for h in header.split()]
     dt = np.format_parser(
         ["U10", "f8", "f8", "f8", "f8"],
-        ["source_id", "ra_j2000", "dec_j2000", "flux_density_I", "frequency"],
+        ["source_id", "ra_j2000", "dec_j2000", "flux_density", "frequency"],
         header,
     )
 
@@ -1235,7 +1235,7 @@ def test_point_catalog_reader():
     assert sorted(srcs.name) == sorted(catalog_table["source_id"])
     assert srcs.ra.deg in catalog_table["ra_j2000"]
     assert srcs.dec.deg in catalog_table["dec_j2000"]
-    assert srcs.stokes[0] in catalog_table["flux_density_I"]
+    assert srcs.stokes in catalog_table["flux_density"]
 
     # Check cuts
     source_select_kwds = {"min_flux": 1.0}

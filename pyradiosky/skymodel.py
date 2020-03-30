@@ -901,7 +901,7 @@ def skymodel_to_array(sky):
         else:
             fieldnames.append("frequency")
         fieldtypes.append("f8")
-        fieldshapes.extend([(sky.Nfreqs, n_stokes), (sky.Nfreqs,)])
+        fieldshapes.extend([(sky.Nfreqs, n_stokes,), (sky.Nfreqs,)])
     elif sky.reference_frequency is not None:
         # add frequency field (a copy of reference_frequency) for backwards
         # compatibility.
@@ -913,14 +913,14 @@ def skymodel_to_array(sky):
         )
         fieldnames.extend(["frequency", "reference_frequency"])
         fieldtypes.extend(["f8"] * 2)
-        fieldshapes.extend([()] * 3)
+        fieldshapes.extend([(n_stokes,)] + [()] * 3)
         if sky.spectral_index is not None:
             fieldnames.append("spectral_index")
             fieldtypes.append("f8")
             fieldshapes.append(())
     else:
         # flat spectrum, no freq info
-        fieldshapes.append(())
+        fieldshapes.append((n_stokes,))
 
     if hasattr(sky, "_rise_lst"):
         fieldnames.append("rise_lst")
@@ -952,7 +952,7 @@ def skymodel_to_array(sky):
             arr["spectral_index"] = sky.spectral_index
     else:
         # flat spectral type, no freq info
-        arr["flux_density_I"] = np.squeeze(sky.stokes[0, :, :])
+        arr["flux_density"] = np.squeeze(sky.stokes.T)
 
     if hasattr(sky, "_rise_lst"):
         arr["rise_lst"] = sky._rise_lst
@@ -979,7 +979,7 @@ def array_to_skymodel(catalog_table):
     ra = Longitude(catalog_table["ra_j2000"], units.deg)
     dec = Latitude(catalog_table["dec_j2000"], units.deg)
     ids = np.asarray(catalog_table["source_id"]).astype(str)
-    stokes = np.atleast_1d(catalog_table["flux_density"])
+    stokes = np.atleast_1d(catalog_table["flux_density"]).T
 
     rise_lst = None
     set_lst = None
@@ -1025,14 +1025,8 @@ def array_to_skymodel(catalog_table):
         rise_lst = catalog_table["rise_lst"]
         set_lst = catalog_table["set_lst"]
 
-    if freq_array is not None:
-        stokes = stokes.T
-
-    if stokes.ndim == 1:
-        stokes = stokes[np.newaxis, :]
-
-    # pad non-I flux values with zeros
-    #    stokes = np.pad(flux_I[np.newaxis, :, :], ((0, 3), (0, 0), (0, 0)))
+    if stokes.ndim == 2:
+        stokes = stokes[:, np.newaxis, :]  # Add frequency axis if there isn't one.
 
     skymodel = SkyModel(
         ids,
@@ -1068,7 +1062,7 @@ def source_cuts(
     ----------
     catalog_table : recarray
         recarray of source catalog information. Must have the columns:
-        'source_id', 'ra_j2000', 'dec_j2000', 'flux_density_I'
+        'source_id', 'ra_j2000', 'dec_j2000', 'flux_density'
         may also have the colums:
         'frequency' or 'reference_frequency'
     latitude_deg : float
@@ -1118,11 +1112,11 @@ def source_cuts(
                 # flat spectral type
                 if min_flux:
                     catalog_table = catalog_table[
-                        catalog_table["flux_density_I"] > min_flux
+                        catalog_table["flux_density"][..., 0] > min_flux
                     ]
                 if max_flux:
                     catalog_table = catalog_table[
-                        catalog_table["flux_density_I"] < max_flux
+                        catalog_table["flux_density"][..., 0] < max_flux
                     ]
         elif "frequency" in fieldnames or "subband_frequency" in fieldnames:
             if "frequency" in fieldnames:
@@ -1145,7 +1139,7 @@ def source_cuts(
                     raise ValueError("No frequencies in freq_range.")
             else:
                 freqs_inds_use = np.arange(freq_array.size)
-            flux_data = np.atleast_1d(catalog_table["flux_density_I"])
+            flux_data = np.atleast_1d(catalog_table["flux_density"][..., 0])
             if flux_data.ndim > 1:
                 flux_data = flux_data[:, freqs_inds_use]
             if min_flux:
@@ -1160,11 +1154,11 @@ def source_cuts(
             # flat spectral type
             if min_flux:
                 catalog_table = catalog_table[
-                    catalog_table["flux_density_I"] > min_flux
+                    catalog_table["flux_density"][..., 0] > min_flux
                 ]
             if max_flux:
                 catalog_table = catalog_table[
-                    catalog_table["flux_density_I"] < max_flux
+                    catalog_table["flux_density"][..., 0] < max_flux
                 ]
 
     ra = Longitude(catalog_table["ra_j2000"], units.deg)
@@ -1807,17 +1801,21 @@ def write_catalog_to_file(filename, skymodel):
         for src in arr:
             if skymodel.reference_frequency is not None:
                 if skymodel.spectral_index is not None:
-                    srcid, ra, dec, flux_i, rfreq, freq, spec_index = src
+                    srcid, ra, dec, flux, rfreq, freq, spec_index = src
+                    flux_i = flux[0]
                     fo.write(
                         format_str.format(srcid, ra, dec, flux_i, freq, spec_index)
                     )
                 else:
-                    srcid, ra, dec, flux_i, rfreq, freq = src
+                    srcid, ra, dec, flux, rfreq, freq = src
+                    flux_i = flux[0]
                     fo.write(format_str.format(srcid, ra, dec, flux_i, rfreq))
             elif skymodel.freq_array is not None:
-                srcid, ra, dec, flux_i, freq = src
+                srcid, ra, dec, flux, freq = src
+                flux_i = flux[..., 0]
                 fo.write(format_str.format(srcid, ra, dec, *flux_i))
             else:
                 # flat spectral response, no freq info
-                srcid, ra, dec, flux_i = src
+                srcid, ra, dec, flux = src
+                flux_i = flux[0]
                 fo.write(format_str.format(srcid, ra, dec, flux_i))
