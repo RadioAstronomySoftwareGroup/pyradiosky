@@ -377,8 +377,9 @@ def test_coherency_calc_errors():
 
     source = skymodel.SkyModel("test", coord.ra, coord.dec, stokes_radec, "flat")
 
-    with pytest.raises(ValueError, match="telescope_location must be an"):
-        source.coherency_calc().squeeze()
+    with pytest.warns(UserWarning, match="Horizon cutoff undefined"):
+        with pytest.raises(ValueError, match="telescope_location must be an"):
+            source.coherency_calc().squeeze()
 
 
 def test_calc_basis_rotation_matrix():
