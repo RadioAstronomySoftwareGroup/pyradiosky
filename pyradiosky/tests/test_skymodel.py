@@ -7,6 +7,7 @@ import fileinput
 
 import pytest
 import numpy as np
+import warnings
 from astropy import units
 from astropy.coordinates import (
     SkyCoord,
@@ -944,47 +945,80 @@ def test_source_cut_error(
         )
 
 
-def test_circumpolar_nonrising():
+def test_circumpolar_nonrising(time_location):
     # Check that the source_cut function correctly identifies sources that are circumpolar or
     # won't rise.
-    # Working with an observatory at the HERA latitude
+    # Working with an observatory at the HERA latitude.
 
-    lat = -31.0
-    lon = 0.0
+    time, location = time_location
 
     Ntimes = 100
-    Nsrcs = 50
+    Nras = 20
+    Ndecs = 20
+    Nsrcs = Nras * Ndecs
 
-    j2000 = 2451545.0
-    times = Time(
-        np.linspace(j2000 - 0.5, j2000 + 0.5, Ntimes), format="jd", scale="utc"
+    times = time + TimeDelta(np.linspace(0, 1.0, Ntimes), format="jd")
+    lon = location.lon.deg
+    ra = np.linspace(lon - 90, lon + 90, Nras)
+    dec = np.linspace(-90, 90, Ndecs)
+
+    ra, dec = map(np.ndarray.flatten, np.meshgrid(ra, dec))
+    ra = Longitude(ra, units.deg)
+    dec = Latitude(dec, units.deg)
+
+    names = ["src{}".format(i) for i in range(Nsrcs)]
+    stokes = np.zeros((4, 1, Nsrcs))
+    stokes[0, ...] = 1.0
+
+    sky = skymodel.SkyModel(names, ra, dec, stokes, "flat")
+
+    src_arr = skymodel.skymodel_to_array(sky)
+    src_arr = skymodel.source_cuts(src_arr, latitude_deg=location.lat.deg)
+
+    # Boolean array identifying nonrising sources that were removed by source_cuts
+    nonrising = np.array(
+        [sky.name[ind] not in src_arr["source_id"] for ind in range(Nsrcs)]
     )
+    is_below_horizon = np.zeros(Nsrcs).astype(bool)
+    is_below_horizon[nonrising] = True
 
-    ra = np.zeros(Nsrcs)
-    dec = np.linspace(-90, 90, Nsrcs)
+    alts, azs = [], []
+    for ti in range(Ntimes):
+        sky.update_positions(times[ti], location)
+        alts.append(sky.alt_az[0])
+        azs.append(sky.alt_az[1])
 
-    ra = Angle(ra, units.deg)
-    dec = Angle(dec, units.deg)
+        # Check that sources below the horizon by coarse cut are
+        # indeed below the horizon.
+        lst = times[ti].sidereal_time("mean").rad
+        dt0 = lst - src_arr["rise_lst"]
+        dt1 = src_arr["set_lst"] - src_arr["rise_lst"]
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore", message="invalid value encountered", category=RuntimeWarning
+            )
 
-    coord = SkyCoord(ra=ra, dec=dec, frame="icrs")
-    alts = []
-    azs = []
+            dt0[dt0 < 0] += 2 * np.pi
+            dt1[dt1 < 0] += 2 * np.pi
 
-    loc = EarthLocation.from_geodetic(lat=lat, lon=lon)
-    for i in range(Ntimes):
-        altaz = coord.transform_to(AltAz(obstime=times[i], location=loc))
-        alts.append(altaz.alt.deg)
-        azs.append(altaz.az.deg)
-    alts = np.array(alts)
+            is_below_horizon[~nonrising] = dt0 > dt1
+            assert np.all(sky.alt_az[0][is_below_horizon] < 0.0)
 
-    nonrising = np.where(np.all(alts < 0, axis=0))[0]
-    circumpolar = np.where(np.all(alts > 0, axis=0))[0]
+    alts = np.degrees(alts)
 
-    tans = np.tan(np.radians(lat)) * np.tan(dec.rad)
-    nonrising_check = np.where(tans < -1)
-    circumpolar_check = np.where(tans > 1)
-    assert np.all(circumpolar_check == circumpolar)
-    assert np.all(nonrising_check == nonrising)
+    # Check that the circumpolar and nonrising sources match expectation
+    # from the tan(lat) * tan(dec) values.
+    nonrising_test = np.where(np.all(alts < 0, axis=0))[0]
+    circumpolar_test = np.where(np.all(alts > 0, axis=0))[0]
+
+    tans = np.tan(location.lat.rad) * np.tan(dec.rad)
+    nonrising_calc = np.where(tans < -1)
+    circumpolar_calc = np.where(tans > 1)
+    assert np.all(circumpolar_calc == circumpolar_test)
+    assert np.all(nonrising_calc == nonrising_test)
+
+    # Confirm that the source cuts excluded the non-rising sources.
+    assert np.all(np.where(nonrising)[0] == nonrising_test)
 
 
 @pytest.mark.parametrize(
