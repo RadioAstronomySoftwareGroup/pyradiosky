@@ -1020,6 +1020,22 @@ def test_circumpolar_nonrising(time_location):
     # Confirm that the source cuts excluded the non-rising sources.
     assert np.all(np.where(nonrising)[0] == nonrising_test)
 
+    # check that rise_lst and set_lst get added to object when converted
+    new_sky = skymodel.array_to_skymodel(src_arr)
+    assert hasattr(new_sky, "_rise_lst")
+    assert hasattr(new_sky, "_set_lst")
+
+    # and that it's round tripped
+    src_arr2 = skymodel.skymodel_to_array(new_sky)
+    assert src_arr.dtype == src_arr2.dtype
+    assert len(src_arr) == len(src_arr2)
+
+    for name in src_arr.dtype.names:
+        if isinstance(src_arr[name][0], (str,)):
+            assert np.array_equal(src_arr[name], src_arr2[name])
+        else:
+            assert np.allclose(src_arr[name], src_arr2[name], equal_nan=True)
+
 
 @pytest.mark.parametrize(
     "name_to_match, name_list, kwargs, result",

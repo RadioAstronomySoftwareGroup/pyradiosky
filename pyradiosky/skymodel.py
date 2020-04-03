@@ -897,6 +897,16 @@ def skymodel_to_array(sky):
         # flat spectrum, no freq info
         fieldshapes.append(())
 
+    if hasattr(sky, "_rise_lst"):
+        fieldnames.append("rise_lst")
+        fieldtypes.append("f8")
+        fieldshapes.append(())
+
+    if hasattr(sky, "_set_lst"):
+        fieldnames.append("set_lst")
+        fieldtypes.append("f8")
+        fieldshapes.append(())
+
     dt = np.dtype(list(zip(fieldnames, fieldtypes, fieldshapes)))
 
     arr = np.empty(sky.Ncomponents, dtype=dt)
@@ -918,6 +928,11 @@ def skymodel_to_array(sky):
     else:
         # flat spectral type, no freq info
         arr["flux_density_I"] = np.squeeze(sky.stokes[0, :, :])
+
+    if hasattr(sky, "_rise_lst"):
+        arr["rise_lst"] = sky._rise_lst
+    if hasattr(sky, "_set_lst"):
+        arr["set_lst"] = sky._set_lst
 
     return arr
 
