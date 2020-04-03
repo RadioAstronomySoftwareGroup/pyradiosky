@@ -7,18 +7,9 @@ import sys
 
 from setuptools import setup
 
+# add pyradiosky to our path in order to use the branch_scheme function
 sys.path.append("pyradiosky")
-# import version  # noqa
-
-
-# data = [version.git_origin, version.git_hash, version.git_description, version.git_branch]
-# with open(os.path.join('pyradiosky', 'GIT_INFO'), 'w') as outfile:
-#     json.dump(data, outfile)
-class MockVersion:
-    version = 0.0
-
-
-version = MockVersion()
+from branch_scheme import branch_scheme  # noqa
 
 with io.open("README.md", "r", encoding="utf-8") as readme_file:
     readme = readme_file.read()
@@ -34,10 +25,16 @@ setup_args = {
     "package_dir": {"pyradiosky": "pyradiosky"},
     "packages": ["pyradiosky", "pyradiosky.tests"],
     "scripts": glob.glob("scripts/*"),
-    "version": version.version,
+    "use_scm_version": {"local_scheme": branch_scheme},
     "include_package_data": True,
-    "install_requires": ["numpy>=1.15", "scipy", "astropy>=4.0", "h5py", "pyuvdata"],
-    "tests_require": ["pytest"],
+    "install_requires": [
+        "numpy>=1.15",
+        "scipy",
+        "astropy>=4.0",
+        "h5py",
+        "pyuvdata",
+        "setuptools_scm",
+    ],
     "extras_require": {
         "healpix": ["astropy-healpix"],
         "dev": ["pytest", "pre-commit", "astropy-healpix"],
