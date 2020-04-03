@@ -260,6 +260,8 @@ class SkyModel(UVBase):
             expected_type=EarthLocation,
             required=False,
         )
+        if hasmoon:
+            self._telescope_location.expected_type = (EarthLocation, MoonLocation)
 
         desc = "Altitude and Azimuth of components in local coordinates."
         self._alt_az = UVParameter(

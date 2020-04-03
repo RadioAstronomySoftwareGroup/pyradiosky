@@ -68,6 +68,37 @@ def zenith_skymodel(zenith_skycoord):
 
 
 @pytest.fixture
+def moonsky():
+    pytest.importorskip("lunarsky")
+
+    from lunarsky import MoonLocation, SkyCoord as SkyC
+
+    # Tranquility base
+    array_location = MoonLocation(lat="00d41m15s", lon="23d26m00s", height=0.0)
+
+    time = Time.now()
+    zen_coord = SkyC(
+        alt=Angle(90, unit=units.deg),
+        az=Angle(0, unit=units.deg),
+        obstime=time,
+        frame="lunartopo",
+        location=array_location,
+    )
+
+    icrs_coord = zen_coord.transform_to("icrs")
+
+    ra = icrs_coord.ra
+    dec = icrs_coord.dec
+    names = "zen_source"
+    stokes = [1.0, 0, 0, 0]
+    zenith_source = skymodel.SkyModel(names, ra, dec, stokes, "flat")
+
+    zenith_source.update_positions(time, array_location)
+
+    yield zenith_source
+
+
+@pytest.fixture
 def healpix_data():
     pytest.importorskip("astropy_healpix")
     import astropy_healpix
@@ -1380,60 +1411,34 @@ def test_read_text_errors():
     os.remove(fname)
 
 
-class TestMoon:
-    """
-    Series of tests for Moon-based observers
-    """
+def test_zenith_on_moon(moonsky):
+    """Source at zenith from the Moon."""
 
-    def setup(self):
-        pytest.importorskip("lunarsky")
+    zenith_source = moonsky
+    zenith_source.check()
 
-        from lunarsky import MoonLocation, SkyCoord as SkyC
+    zenith_source_lmn = zenith_source.pos_lmn.squeeze()
+    assert np.allclose(zenith_source_lmn, np.array([0, 0, 1]))
 
-        # Tranquility base
-        self.array_location = MoonLocation(lat="00d41m15s", lon="23d26m00s", height=0.0)
 
-        self.time = Time.now()
-        self.zen_coord = SkyC(
-            alt=Angle(90, unit=units.deg),
-            az=Angle(0, unit=units.deg),
-            obstime=self.time,
-            frame="lunartopo",
-            location=self.array_location,
-        )
+def test_source_motion(moonsky):
+    """ Check that period is about 28 days."""
 
-        icrs_coord = self.zen_coord.transform_to("icrs")
+    zenith_source = moonsky
 
-        ra = icrs_coord.ra
-        dec = icrs_coord.dec
-        names = "zen_source"
-        stokes = [1.0, 0, 0, 0]
-        self.zenith_source = skymodel.SkyModel(names, ra, dec, stokes, "flat")
+    Ntimes = 500
+    ets = np.linspace(0, 4 * 28 * 24 * 3600, Ntimes)
+    times = zenith_source.time + TimeDelta(ets, format="sec")
 
-        self.zenith_source.update_positions(self.time, self.array_location)
+    lmns = np.zeros((Ntimes, 3))
+    for ti in range(Ntimes):
+        zenith_source.update_positions(times[ti], zenith_source.telescope_location)
+        lmns[ti] = zenith_source.pos_lmn.squeeze()
+    _els = np.fft.fft(lmns[:, 0])
+    dt = np.diff(ets)[0]
+    _freqs = np.fft.fftfreq(Ntimes, d=dt)
 
-    def test_zenith_on_moon(self):
-        """Source at zenith from the Moon."""
+    f_28d = 1 / (28 * 24 * 3600.0)
 
-        zenith_source_lmn = self.zenith_source.pos_lmn.squeeze()
-        assert np.allclose(zenith_source_lmn, np.array([0, 0, 1]))
-
-    def test_source_motion(self):
-        """ Check that period is about 28 days."""
-
-        Ntimes = 500
-        ets = np.linspace(0, 4 * 28 * 24 * 3600, Ntimes)
-        times = self.time + TimeDelta(ets, format="sec")
-
-        lmns = np.zeros((Ntimes, 3))
-        for ti in range(Ntimes):
-            self.zenith_source.update_positions(times[ti], self.array_location)
-            lmns[ti] = self.zenith_source.pos_lmn.squeeze()
-        _els = np.fft.fft(lmns[:, 0])
-        dt = np.diff(ets)[0]
-        _freqs = np.fft.fftfreq(Ntimes, d=dt)
-
-        f_28d = 1 / (28 * 24 * 3600.0)
-
-        maxf = _freqs[np.argmax(np.abs(_els[_freqs > 0]) ** 2)]
-        assert np.isclose(maxf, f_28d, atol=2 / ets[-1])
+    maxf = _freqs[np.argmax(np.abs(_els[_freqs > 0]) ** 2)]
+    assert np.isclose(maxf, f_28d, atol=2 / ets[-1])
