@@ -357,7 +357,7 @@ class SkyModel(UVBase):
         if self.Ncomponents == 1:
             self.stokes = self.stokes.reshape(4, self.Nfreqs, 1)
 
-        self._polarized = np.where(np.sum(self.stokes[1:, :, :], axis=0) != 0.0)[0]
+        self._polarized = np.where(np.sum(self.stokes[1:, :, :], axis=0) != 0.0)[1]
         self._n_polarized = self._polarized.size
 
         self.coherency_radec = skyutils.stokes_to_coherency(self.stokes)
@@ -645,17 +645,25 @@ class SkyModel(UVBase):
         if self._n_polarized > 0:
             # If there are any polarized sources, do rotation.
 
-            pol_over_hor = np.where(self.above_horizon[self._polarized])[0]
+            # Indices of source components, downselected to those above the horizon,
+            # that are also polarized.
+            pol_over_hor = np.in1d(
+                np.arange(self.Ncomponents)[self.above_horizon], self._polarized
+            )
+
+            # Indices of polarized sources on the full Ncomponents array, only
+            # if they're above the horizon.
+            full_inds = [pi for pi in self._polarized if self.above_horizon[pi]]
 
             if len(pol_over_hor) > 0:
 
-                rotation_matrix = self._calc_coherency_rotation(pol_over_hor)
+                rotation_matrix = self._calc_coherency_rotation(full_inds)
 
                 rotation_matrix_T = np.swapaxes(rotation_matrix, 0, 1)
                 coherency_local[:, :, :, pol_over_hor] = np.einsum(
                     "aby,bcxy,cdy->adxy",
                     rotation_matrix_T,
-                    self.coherency_radec[:, :, :, pol_over_hor],
+                    self.coherency_radec[:, :, :, full_inds],
                     rotation_matrix,
                 )
 
