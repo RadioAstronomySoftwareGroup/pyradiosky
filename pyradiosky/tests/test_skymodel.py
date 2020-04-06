@@ -433,6 +433,50 @@ def test_calc_vector_rotation():
     assert np.isclose(np.linalg.det(coherency_rotation), 1)
 
 
+def test_pol_rotator():
+    """
+    Test that when above_horizon is unset, the coherency rotation is done for
+    all polarized sources.
+    """
+    time = Time("2018-01-01 00:00")
+    telescope_location = EarthLocation(
+        lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0
+    )
+
+    Nsrcs = 50
+    ras = Longitude(np.linspace(0, 24, Nsrcs) * units.hr)
+    decs = Latitude(np.linspace(-90, 90, Nsrcs) * units.deg)
+    names = np.arange(Nsrcs).astype("str")
+    fluxes = np.array([[[5.5, 0.7, 0.3, 0.0]]] * Nsrcs).T
+
+    # Make the last source non-polarized
+    fluxes[..., -1] = [[1.0], [0], [0], [0]]
+
+    source = skymodel.SkyModel(names, ras, decs, fluxes, "flat")
+
+    assert source._n_polarized == Nsrcs - 1
+
+    source.update_positions(time, telescope_location)
+
+    # Check the default of inds for _calc_rotation_matrix()
+    rots1 = source._calc_rotation_matrix()
+    inds = np.array([25, 45, 16])
+    rots2 = source._calc_rotation_matrix(inds)
+    assert np.allclose(rots1[..., inds], rots2)
+
+    # Unset the horizon mask and confirm that all rotation matrices are calculated.
+    source.above_horizon = None
+
+    with pytest.warns(UserWarning, match="Horizon cutoff undefined"):
+        local_coherency = source.coherency_calc()
+
+    # Check that all polarized sources are rotated.
+    assert not np.all(
+        np.isclose(local_coherency[..., :-1], source.coherency_radec[..., :-1])
+    )
+    assert np.allclose(local_coherency[..., -1], source.coherency_radec[..., -1])
+
+
 def analytic_beam_jones(za, az, sigma=0.3):
     """
     Analytic beam with sensible polarization response.
