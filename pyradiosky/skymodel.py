@@ -521,6 +521,7 @@ class SkyModel(UVBase):
         """
         if inds is None:
             inds = range(self.Ncomponents)
+
         n_inds = len(inds)
 
         # Find mathematical points and vectors for RA/Dec
@@ -537,7 +538,7 @@ class SkyModel(UVBase):
 
         R_avg = self._calc_average_rotation_matrix()
 
-        R_exact = np.zeros((3, 3, self.Ncomponents), dtype=np.float)
+        R_exact = np.zeros((3, 3, n_inds), dtype=np.float)
 
         for src_i in range(n_inds):
             intermediate_vec = np.matmul(R_avg, radec_vec[:, src_i])
@@ -618,7 +619,9 @@ class SkyModel(UVBase):
                 "Horizon cutoff undefined. Assuming all source components "
                 "are above the horizon."
             )
-            self.above_horizon = np.ones(self.Ncomponents).astype(bool)
+            above_horizon = np.ones(self.Ncomponents).astype(bool)
+        else:
+            above_horizon = self.above_horizon
 
         if deprecated_location is not None:
             warnings.warn(
@@ -639,7 +642,7 @@ class SkyModel(UVBase):
             )
 
         # Select sources within the horizon only.
-        coherency_local = self.coherency_radec[..., self.above_horizon]
+        coherency_local = self.coherency_radec[..., above_horizon]
 
         # For unpolarized sources, there's no need to rotate the coherency matrix.
         if self._n_polarized > 0:
@@ -648,12 +651,12 @@ class SkyModel(UVBase):
             # Indices of source components, downselected to those above the horizon,
             # that are also polarized.
             pol_over_hor = np.in1d(
-                np.arange(self.Ncomponents)[self.above_horizon], self._polarized
+                np.arange(self.Ncomponents)[above_horizon], self._polarized
             )
 
             # Indices of polarized sources on the full Ncomponents array, only
             # if they're above the horizon.
-            full_inds = [pi for pi in self._polarized if self.above_horizon[pi]]
+            full_inds = [pi for pi in self._polarized if above_horizon[pi]]
 
             if len(pol_over_hor) > 0:
 
@@ -929,7 +932,7 @@ def skymodel_to_array(sky):
         )
         fieldnames.extend(["frequency", "reference_frequency"])
         fieldtypes.extend(["f8"] * 2)
-        fieldshapes.extend([(n_stokes,)] + [()] * 3)
+        fieldshapes.extend([(n_stokes,)] + [()] * 2)
         if sky.spectral_index is not None:
             fieldnames.append("spectral_index")
             fieldtypes.append("f8")
