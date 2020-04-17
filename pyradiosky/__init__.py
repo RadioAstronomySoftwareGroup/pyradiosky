@@ -28,6 +28,7 @@ from .skymodel import (
     array_to_skymodel,
     source_cuts,
     read_votable_catalog,
+    read_gleam_catalog,
     read_text_catalog,
     read_idl_catalog,
     write_catalog_to_file,
