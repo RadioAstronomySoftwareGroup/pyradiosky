@@ -127,7 +127,7 @@ def rotate_points_3d(rot_matrix, theta, phi):
 
     # Should write a function to do this as well, i.e., pull back angles from
     # a vector
-    if np.isclose(p_hat[2], 1.0, rtol=0., atol=1e-12):
+    if np.isclose(p_hat[2], 1.0, rtol=0.0, atol=1e-12):
         p_hat[2] = 1.0
     beta = np.arccos(p_hat[2])
     alpha = np.arctan2(p_hat[1], p_hat[0])
