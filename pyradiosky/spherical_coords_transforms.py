@@ -122,13 +122,16 @@ def rotate_points_3d(rot_matrix, theta, phi):
     q_hat_3 = np.cos(theta)
     q_hat = np.stack((q_hat_1, q_hat_2, q_hat_3))
 
-    p_hat = np.einsum("ab...,b...->a...", rot_matrix, q_hat)
     # Should test for shape of p_hat
+    p_hat = np.einsum("ab...,b...->a...", rot_matrix, q_hat)
 
     # Should write a function to do this as well, i.e., pull back angles from
     # a vector
+    if np.isclose(p_hat[2], 1.0, rtol=0., atol=1e-12):
+        p_hat[2] = 1.0
     beta = np.arccos(p_hat[2])
     alpha = np.arctan2(p_hat[1], p_hat[0])
+
     if alpha < 0:
         alpha += 2.0 * np.pi
 
