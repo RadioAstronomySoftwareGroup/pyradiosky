@@ -20,7 +20,6 @@ def test_hat_errors(func_name):
     assert str(cm.value).startswith("theta and phi must have the same shape")
 
 
-@pytest.mark.skip()
 def test_rotate_points_3d():
     array_location = EarthLocation(lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0)
     time0 = Time("2018-03-01 18:00:00", scale="utc", location=array_location)
