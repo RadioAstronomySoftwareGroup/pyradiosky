@@ -1,5 +1,6 @@
 # pyradiosky
 ![](https://github.com/RadioAstronomySoftwareGroup/pyradiosky/workflows/Tests/badge.svg?branch=master)
+[![codecov](https://codecov.io/gh/RadioAstronomySoftwareGroup/pyradiosky/branch/master/graph/badge.svg)](https://codecov.io/gh/RadioAstronomySoftwareGroup/pyradiosky)
 
 Python objects and interfaces for representing diffuse, extended and compact astrophysical radio sources.
 
