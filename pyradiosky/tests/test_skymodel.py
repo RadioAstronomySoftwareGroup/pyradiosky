@@ -926,6 +926,10 @@ def test_flux_cuts(spec_type, init_kwargs, cut_kwargs):
         stokes[0, 0, :] = np.linspace(minflux, maxflux / 2.0, Nsrcs)
         stokes[0, 1, :] = np.linspace(minflux * 2.0, maxflux, Nsrcs)
 
+    # Add a nonzero polarization.
+    Ucomp = maxflux + 1.3
+    stokes[2, :, :] = Ucomp  # Should not be affected by cuts.
+
     skymodel_obj = skymodel.SkyModel(ids, ras, decs, stokes, spec_type, **init_kwargs)
     catalog_table = skymodel.skymodel_to_array(skymodel_obj)
 
@@ -939,14 +943,14 @@ def test_flux_cuts(spec_type, init_kwargs, cut_kwargs):
         max_flux=maxI_cut,
         **cut_kwargs,
     )
-
     if "freq_range" in cut_kwargs and np.min(
         cut_kwargs["freq_range"] > np.min(init_kwargs["freq_array"])
     ):
-        assert np.all(cut_sourcelist["flux_density"][..., 0] < maxI_cut)
+        assert np.all(cut_sourcelist["I"] < maxI_cut)
     else:
-        assert np.all(cut_sourcelist["flux_density"][..., 0] > minI_cut)
-        assert np.all(cut_sourcelist["flux_density"][..., 0] < maxI_cut)
+        assert np.all(cut_sourcelist["I"] > minI_cut)
+        assert np.all(cut_sourcelist["I"] < maxI_cut)
+    assert np.all(cut_sourcelist["U"] == Ucomp)
 
 
 @pytest.mark.parametrize(
@@ -1010,6 +1014,13 @@ def test_source_cut_error(
 
     minI_cut = 1.0
     maxI_cut = 2.3
+
+    if spec_type == "spectral_index":  # Just run on the first iteration
+        newcat = catalog_table[[key for key in catalog_table.dtype.names if key != "I"]]
+        with pytest.raises(ValueError, match="No Stokes-I information"):
+            skymodel.source_cuts(
+                newcat, min_flux=minI_cut, max_flux=maxI_cut,
+            )
 
     with pytest.raises(error_category, match=error_message):
         skymodel.source_cuts(
