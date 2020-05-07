@@ -915,7 +915,8 @@ def skymodel_to_array(sky):
     max_name_len = np.max([len(name) for name in sky.name])
     fieldtypes = ["U" + str(max_name_len), "f8", "f8"]
     fieldnames = ["source_id", "ra_j2000", "dec_j2000"]
-    stokes_names = ["I", "Q", "U", "V"]
+    # Alias "flux_density_" for "I", etc.
+    stokes_names = [(f"flux_density_{k}", k) for k in ["I", "Q", "U", "V"]]
     fieldshapes = [()] * 3
 
     n_stokes = 0
@@ -971,7 +972,7 @@ def skymodel_to_array(sky):
 
     for ii in range(4):
         if stokes_keep[ii]:
-            arr[stokes_names[ii]] = sky.stokes[ii].T
+            arr[stokes_names[ii][0]] = sky.stokes[ii].T
 
     if sky.freq_array is not None:
         if sky.spectral_type == "subband":
@@ -987,6 +988,12 @@ def skymodel_to_array(sky):
         arr["rise_lst"] = sky._rise_lst
     if hasattr(sky, "_set_lst"):
         arr["set_lst"] = sky._set_lst
+
+    warnings.warn(
+        "recarray flux columns will no longer be labeled"
+        " `flux_density_I` etc. in the future. Use `I` instead.",
+        DeprecationWarning,
+    )
 
     return arr
 
