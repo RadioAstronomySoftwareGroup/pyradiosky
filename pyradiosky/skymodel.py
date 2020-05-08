@@ -72,6 +72,11 @@ except ImportError:
 #    Convert stokes and coherency to Astropy quantities.
 
 
+class TelescopeLocationParameter(UVParameter):
+    def __eq__(self, other):
+        return self.value == other.value
+
+
 def _get_matching_fields(
     name_to_match, name_list, exclude_start_pattern=None, brittle=True
 ):
@@ -328,7 +333,7 @@ class SkyModel(UVBase):
         )
 
         desc = "Telescope Location for local position calculations."
-        self._telescope_location = UVParameter(
+        self._telescope_location = TelescopeLocationParameter(
             "telescope_location",
             description=desc,
             expected_type=EarthLocation,
@@ -1387,10 +1392,11 @@ class SkyModel(UVBase):
             hpmap = fileobj["data"][0, ...]  # Remove Nskies axis.
             indices = fileobj["indices"][()]
             freqs = fileobj["freqs"][()]
+            history = fileobj["history"][()]
             try:
-                history = fileobj.attrs["history"]
-            except KeyError:
-                history = None
+                history = history.decode("utf8")
+            except (UnicodeDecodeError, AttributeError):
+                pass
             try:
                 nside = int(fileobj.attrs["nside"])
             except KeyError:
