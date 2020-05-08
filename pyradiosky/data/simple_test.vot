@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Produced with astropy.io.votable version 4.0.1.post1
+     http://www.astropy.org/ -->
+<VOTABLE version="1.4" xmlns="http://www.ivoa.net/xml/VOTable/v1.4" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.ivoa.net/xml/VOTable/v1.4">
+ <RESOURCE type="results">
+  <TABLE ID="VIII_1000_single" name="VIII/1000/single">
+   <FIELD ID="source_id" arraysize="*" datatype="char" name="source_id" ucd="meta.id;meta.main"/>
+   <FIELD ID="RAJ2000" datatype="double" name="RAJ2000" precision="8" ref="J2000" ucd="pos.eq.ra" unit="deg" width="12"/>
+   <FIELD ID="DEJ2000" datatype="double" name="DEJ2000" precision="8" ref="J2000" ucd="pos.eq.dec" unit="deg" width="12"/>
+   <FIELD ID="Si" datatype="double" name="Si" precision="6" ucd="phot.flux" unit="Jy" width="11"/>
+   <DATA>
+    <TABLEDATA>
+     <TR>
+      <TD>TEST</TD>
+      <TD>  0.00000000</TD>
+      <TD>-30.00000000</TD>
+      <TD>   1.000000</TD>
+     </TR>
+     <TR>
+      <TD>TEST2</TD>
+      <TD>  0.00000000</TD>
+      <TD>  0.00000000</TD>
+      <TD>   0.000000</TD>
+     </TR>
+    </TABLEDATA>
+   </DATA>
+  </TABLE>
+ </RESOURCE>
+</VOTABLE>
