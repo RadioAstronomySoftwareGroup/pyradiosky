@@ -905,23 +905,15 @@ def test_healpix_import_err():
         inds = hpmap
         freqs = np.zeros(1)
 
-        with pytest.warns(
-            DeprecationWarning,
-            match="This function is deprecated, use `SkyModel.read_healpix_hdf5` instead.",
-        ):
-            with pytest.raises(ImportError, match=errstr):
-                skymodel.healpix_to_sky(hpmap, inds, freqs)
+        with pytest.raises(ImportError, match=errstr):
+            skymodel.healpix_to_sky(hpmap, inds, freqs)
 
         skyobj = SkyModel()
         with pytest.raises(ImportError, match=errstr):
             skyobj.read_healpix_hdf5(os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5"))
 
-        with pytest.warns(
-            DeprecationWarning,
-            match="This function is deprecated, use `SkyModel.write_healpix_hdf5` instead.",
-        ):
-            with pytest.raises(ImportError, match=errstr):
-                skymodel.write_healpix_hdf5("filename.hdf5", hpmap, inds, freqs)
+        with pytest.raises(ImportError, match=errstr):
+            skymodel.write_healpix_hdf5("filename.hdf5", hpmap, inds, freqs)
 
 
 def test_healpix_positions(tmp_path):
@@ -1653,6 +1645,7 @@ def test_text_catalog_loop_other_freqs(tmp_path, freq_mult):
 
 
 def test_write_text_catalog_error(tmp_path):
+    pytest.importorskip("astropy_healpix")
     healpix_filename = os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
 
     fname = os.path.join(tmp_path, "temp_cat.txt")
