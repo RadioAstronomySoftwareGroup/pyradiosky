@@ -412,6 +412,9 @@ def test_update_position_errors(zenith_skymodel, time_location):
     with pytest.raises(ValueError, match=("time must be an astropy Time object.")):
         zenith_skymodel.update_positions("2018-03-01 00:00:00", array_location)
 
+    with pytest.raises(ValueError, match=("telescope_location must be a.")):
+        zenith_skymodel.update_positions(time, time)
+
 
 def test_coherency_calc_errors():
     """Test that correct errors are raised when providing invalid location object."""
