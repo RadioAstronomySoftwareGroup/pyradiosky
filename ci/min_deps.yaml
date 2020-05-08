@@ -9,5 +9,5 @@ dependencies:
   - scipy
   - coverage
   - pytest-cov
-  - pyuvdata
+  - pyuvdata>=2.0.1
   - setuptools_scm
