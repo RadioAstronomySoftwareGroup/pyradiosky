@@ -629,6 +629,73 @@ class SkyModel(UVBase):
 
         return equal
 
+    def update_positions(self, time, telescope_location):
+        """
+        Calculate the altitude/azimuth positions for source components.
+
+        From alt/az, calculate direction cosines (lmn)
+
+        Doesn't return anything but updates the following attributes in-place:
+        * ``pos_lmn``
+        * ``alt_az``
+        * ``time``
+
+        Parameters
+        ----------
+        time : astropy Time object
+            Time to update positions for.
+        telescope_location : astropy EarthLocation object
+            Telescope location to update positions for.
+        """
+        if not isinstance(time, Time):
+            raise ValueError(
+                "time must be an astropy Time object. value was: {t}".format(t=time)
+            )
+
+        if not isinstance(telescope_location, (EarthLocation, MoonLocation)):
+
+            errm = "telescope_location must be an astropy EarthLocation object"
+            if hasmoon:
+                errm += " or a lunarsky MoonLocation object "
+            errm += ". "
+            raise ValueError(
+                errm + "value was: {al}".format(al=str(telescope_location))
+            )
+
+        # Don't repeat calculations
+        if self.time == time and self.telescope_location == telescope_location:
+            return
+
+        self.time = time
+        self.telescope_location = telescope_location
+
+        skycoord_use = SkyCoord(self.ra, self.dec, frame="icrs")
+        if isinstance(self.telescope_location, MoonLocation):
+            source_altaz = skycoord_use.transform_to(
+                LunarTopo(obstime=self.time, location=self.telescope_location)
+            )
+        else:
+            source_altaz = skycoord_use.transform_to(
+                AltAz(obstime=self.time, location=self.telescope_location)
+            )
+
+        alt_az = np.array([source_altaz.alt.rad, source_altaz.az.rad])
+
+        self.alt_az = alt_az
+
+        pos_l = np.sin(alt_az[1, :]) * np.cos(alt_az[0, :])
+        pos_m = np.cos(alt_az[1, :]) * np.cos(alt_az[0, :])
+        pos_n = np.sin(alt_az[0, :])
+
+        if self.pos_lmn is None:
+            self.pos_lmn = np.zeros((3, self.Ncomponents), dtype=float)
+        self.pos_lmn[0, :] = pos_l
+        self.pos_lmn[1, :] = pos_m
+        self.pos_lmn[2, :] = pos_n
+
+        # Horizon mask:
+        self.above_horizon = self.alt_az[0, :] > 0.0
+
     def _calc_average_rotation_matrix(self):
         """
         Calculate the "average" rotation matrix from RA/Dec to AltAz.
@@ -839,73 +906,6 @@ class SkyModel(UVBase):
                 )
 
         return coherency_local
-
-    def update_positions(self, time, telescope_location):
-        """
-        Calculate the altitude/azimuth positions for source components.
-
-        From alt/az, calculate direction cosines (lmn)
-
-        Doesn't return anything but updates the following attributes in-place:
-        * ``pos_lmn``
-        * ``alt_az``
-        * ``time``
-
-        Parameters
-        ----------
-        time : astropy Time object
-            Time to update positions for.
-        telescope_location : astropy EarthLocation object
-            Telescope location to update positions for.
-        """
-        if not isinstance(time, Time):
-            raise ValueError(
-                "time must be an astropy Time object. value was: {t}".format(t=time)
-            )
-
-        if not isinstance(telescope_location, (EarthLocation, MoonLocation)):
-
-            errm = "telescope_location must be an astropy EarthLocation object"
-            if hasmoon:
-                errm += " or a lunarsky MoonLocation object "
-            errm += ". "
-            raise ValueError(
-                errm + "value was: {al}".format(al=str(telescope_location))
-            )
-
-        # Don't repeat calculations
-        if self.time == time and self.telescope_location == telescope_location:
-            return
-
-        self.time = time
-        self.telescope_location = telescope_location
-
-        skycoord_use = SkyCoord(self.ra, self.dec, frame="icrs")
-        if isinstance(self.telescope_location, MoonLocation):
-            source_altaz = skycoord_use.transform_to(
-                LunarTopo(obstime=self.time, location=self.telescope_location)
-            )
-        else:
-            source_altaz = skycoord_use.transform_to(
-                AltAz(obstime=self.time, location=self.telescope_location)
-            )
-
-        alt_az = np.array([source_altaz.alt.rad, source_altaz.az.rad])
-
-        self.alt_az = alt_az
-
-        pos_l = np.sin(alt_az[1, :]) * np.cos(alt_az[0, :])
-        pos_m = np.cos(alt_az[1, :]) * np.cos(alt_az[0, :])
-        pos_n = np.sin(alt_az[0, :])
-
-        if self.pos_lmn is None:
-            self.pos_lmn = np.zeros((3, self.Ncomponents), dtype=float)
-        self.pos_lmn[0, :] = pos_l
-        self.pos_lmn[1, :] = pos_m
-        self.pos_lmn[2, :] = pos_n
-
-        # Horizon mask:
-        self.above_horizon = self.alt_az[0, :] > 0.0
 
     def select(
         self,
