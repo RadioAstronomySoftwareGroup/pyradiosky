@@ -143,6 +143,17 @@ def test_set_spectral_params(zenith_skymodel):
         zenith_skymodel.set_spectral_type_params(zenith_skymodel.spectral_type)
 
 
+def test_init_error(zenith_skycoord):
+
+    with pytest.raises(ValueError, match="If initializing with values, all of"):
+        SkyModel(
+            ra=zenith_skycoord.ra,
+            dec=zenith_skycoord.dec,
+            stokes=[1.0, 0, 0, 0],
+            spectral_type="flat",
+        )
+
+
 def test_source_zenith_from_icrs(time_location):
     """Test single source position at zenith constructed using icrs."""
     time, array_location = time_location
@@ -882,6 +893,23 @@ def test_read_write_healpix_cut_sky(tmp_path, healpix_data):
     assert sky == sky2
 
 
+def test_read_write_healpix_nover_history(tmp_path, healpix_data):
+
+    healpix_filename = os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
+
+    test_filename = os.path.join(tmp_path, "tempfile.hdf5")
+
+    sky = SkyModel()
+    sky.read_healpix_hdf5(healpix_filename)
+    sky.history = None
+    sky.write_healpix_hdf5(test_filename)
+
+    sky2 = SkyModel()
+    sky2.read_healpix_hdf5(test_filename)
+
+    assert sky == sky2
+
+
 def test_write_healpix_error(tmp_path):
     skyobj = SkyModel()
     skyobj.read_gleam_catalog(GLEAM_vot)
@@ -907,6 +935,11 @@ def test_healpix_import_err():
 
         with pytest.raises(ImportError, match=errstr):
             skymodel.healpix_to_sky(hpmap, inds, freqs)
+
+        with pytest.raises(ImportError, match=errstr):
+            SkyModel(
+                nside=8, hpx_inds=[0], stokes=[1.0, 0.0, 0.0, 0.0], spectral_type="flat"
+            )
 
         skyobj = SkyModel()
         with pytest.raises(ImportError, match=errstr):
@@ -1034,6 +1067,24 @@ def test_param_flux_cuts():
     skyobj3 = skyobj.select(component_inds=components_to_keep, inplace=False)
 
     assert skyobj2 == skyobj3
+
+
+@pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index", "full"])
+def test_select(spec_type, time_location):
+    time, array_location = time_location
+
+    skyobj = SkyModel()
+    skyobj.read_gleam_catalog(GLEAM_vot)
+
+    skyobj.beam_amp = np.ones((4, skyobj.Nfreqs, skyobj.Ncomponents))
+    skyobj.extended_model_group = np.arange(skyobj.Ncomponents)
+    skyobj.update_positions(time, array_location)
+
+    skyobj2 = skyobj.select(component_inds=np.arange(10), inplace=False)
+
+    skyobj.select(component_inds=np.arange(10))
+
+    assert skyobj == skyobj2
 
 
 def test_select_none():
@@ -1372,10 +1423,13 @@ def test_read_gleam(spec_type):
 
     assert len(cut_catalog) < skyobj.Ncomponents
 
-    cut_obj = SkyModel()
-    cut_obj.read_gleam_catalog(
-        GLEAM_vot, spectral_type=spec_type, source_select_kwds=source_select_kwds
-    )
+    with pytest.warns(
+        DeprecationWarning,
+        match="This function is deprecated, use `SkyModel.read_gleam_catalog` instead.",
+    ):
+        cut_obj = skymodel.read_gleam_catalog(
+            GLEAM_vot, spectral_type=spec_type, source_select_kwds=source_select_kwds
+        )
 
     assert len(cut_catalog) == cut_obj.Ncomponents
 
@@ -1415,6 +1469,23 @@ def test_read_votable():
             flux_columns="Si",
             reference_frequency=None,
         )
+    assert skyobj == skyobj2
+
+    with pytest.warns(
+        DeprecationWarning,
+        match="This function is deprecated, use `SkyModel.read_votable_catalog` instead.",
+    ):
+        skyarr = skymodel.read_votable_catalog(
+            votable_file,
+            table_name="VIII/1000/single",
+            id_column="source_id",
+            ra_column="RAJ2000",
+            dec_column="DEJ2000",
+            flux_columns="Si",
+            reference_frequency=None,
+            return_table=True,
+        )
+    skyobj2.from_recarray(skyarr)
     assert skyobj == skyobj2
 
 
@@ -1502,6 +1573,21 @@ def test_idl_catalog_reader():
     assert skyobj == skyobj2
 
 
+def test_idl_catalog_reader_source_cuts():
+    catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
+
+    skyobj = SkyModel()
+    skyobj.read_idl_catalog(catfile, expand_extended=False)
+    skyobj.source_cuts(latitude_deg=30.0)
+
+    skyobj2 = SkyModel()
+    skyobj2.read_idl_catalog(
+        catfile, expand_extended=False, source_select_kwds={"latitude_deg": 30.0}
+    )
+
+    assert skyobj == skyobj2
+
+
 def test_idl_catalog_reader_extended_sources():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
     skyobj = SkyModel()
@@ -1544,10 +1630,19 @@ def test_point_catalog_reader():
         DeprecationWarning,
         match="This function is deprecated, use `SkyModel.read_text_catalog` instead.",
     ):
-        catalog = skymodel.read_text_catalog(
+        skyarr = skymodel.read_text_catalog(
             catfile, source_select_kwds=source_select_kwds, return_table=True
         )
-    assert len(catalog) == 2
+    assert len(skyarr) == 2
+
+    with pytest.warns(
+        DeprecationWarning,
+        match="This function is deprecated, use `SkyModel.read_text_catalog` instead.",
+    ):
+        skyobj2 = skymodel.read_text_catalog(
+            catfile, source_select_kwds=source_select_kwds
+        )
+    assert skyobj2.Ncomponents == 2
 
 
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
