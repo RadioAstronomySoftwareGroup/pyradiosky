@@ -63,7 +63,9 @@ def zenith_skymodel(zenith_skycoord):
 
     names = "zen_source"
     stokes = [1.0, 0, 0, 0]
-    zenith_source = SkyModel(names, ra, dec, stokes, "flat")
+    zenith_source = SkyModel(
+        name=names, ra=ra, dec=dec, stokes=stokes, spectral_type="flat"
+    )
 
     return zenith_source
 
@@ -92,7 +94,9 @@ def moonsky():
     dec = icrs_coord.dec
     names = "zen_source"
     stokes = [1.0, 0, 0, 0]
-    zenith_source = SkyModel(names, ra, dec, stokes, "flat")
+    zenith_source = SkyModel(
+        name=names, ra=ra, dec=dec, stokes=stokes, spectral_type="flat"
+    )
 
     zenith_source.update_positions(time, array_location)
 
@@ -130,6 +134,15 @@ def healpix_data():
     }
 
 
+def test_set_spectral_params(zenith_skymodel):
+
+    with pytest.warns(
+        DeprecationWarning,
+        match="This function is deprecated, use `_set_spectral_type_params` instead.",
+    ):
+        zenith_skymodel.set_spectral_type_params(zenith_skymodel.spectral_type)
+
+
 def test_source_zenith_from_icrs(time_location):
     """Test single source position at zenith constructed using icrs."""
     time, array_location = time_location
@@ -152,7 +165,9 @@ def test_source_zenith_from_icrs(time_location):
     ra = icrs_coord.ra
     dec = icrs_coord.dec
 
-    zenith_source = SkyModel("icrs_zen", ra, dec, [1.0, 0, 0, 0], "flat")
+    zenith_source = SkyModel(
+        name="icrs_zen", ra=ra, dec=dec, stokes=[1.0, 0, 0, 0], spectral_type="flat"
+    )
 
     zenith_source.update_positions(time, array_location)
     zenith_source_lmn = zenith_source.pos_lmn.squeeze()
@@ -182,7 +197,13 @@ def test_skymodel_init_errors(zenith_skycoord):
             "Should be: <class 'astropy.coordinates.angles.Longitude'>"
         ),
     ):
-        SkyModel("icrs_zen", ra.rad, dec, [1.0, 0, 0, 0], "flat")
+        SkyModel(
+            name="icrs_zen",
+            ra=ra.rad,
+            dec=dec,
+            stokes=[1.0, 0, 0, 0],
+            spectral_type="flat",
+        )
 
     with pytest.raises(
         ValueError,
@@ -191,7 +212,13 @@ def test_skymodel_init_errors(zenith_skycoord):
             "Should be: <class 'astropy.coordinates.angles.Latitude'>"
         ),
     ):
-        SkyModel("icrs_zen", ra, dec.rad, [1.0, 0, 0, 0], "flat")
+        SkyModel(
+            name="icrs_zen",
+            ra=ra,
+            dec=dec.rad,
+            stokes=[1.0, 0, 0, 0],
+            spectral_type="flat",
+        )
 
     with pytest.raises(
         ValueError,
@@ -200,11 +227,11 @@ def test_skymodel_init_errors(zenith_skycoord):
         ),
     ):
         SkyModel(
-            "icrs_zen",
-            ra,
-            dec,
-            [1.0, 0, 0, 0],
-            "flat",
+            name="icrs_zen",
+            ra=ra,
+            dec=dec,
+            stokes=[1.0, 0, 0, 0],
+            spectral_type="flat",
             reference_frequency=[1e8] * units.Hz,
             freq_array=[1e8] * units.Hz,
         )
@@ -213,7 +240,12 @@ def test_skymodel_init_errors(zenith_skycoord):
         ValueError, match=("freq_array must have a unit that can be converted to Hz.")
     ):
         SkyModel(
-            "icrs_zen", ra, dec, [1.0, 0, 0, 0], "flat", freq_array=[1e8] * units.m
+            name="icrs_zen",
+            ra=ra,
+            dec=dec,
+            stokes=[1.0, 0, 0, 0],
+            spectral_type="flat",
+            freq_array=[1e8] * units.m,
         )
 
     with pytest.raises(
@@ -221,11 +253,11 @@ def test_skymodel_init_errors(zenith_skycoord):
         match=("reference_frequency must have a unit that can be converted to Hz."),
     ):
         SkyModel(
-            "icrs_zen",
-            ra,
-            dec,
-            [1.0, 0, 0, 0],
-            "flat",
+            name="icrs_zen",
+            ra=ra,
+            dec=dec,
+            stokes=[1.0, 0, 0, 0],
+            spectral_type="flat",
             reference_frequency=[1e8] * units.m,
         )
 
@@ -233,11 +265,11 @@ def test_skymodel_init_errors(zenith_skycoord):
 def test_skymodel_deprecated():
     """Test that old init works with deprecation."""
     source_new = SkyModel(
-        "Test",
-        Longitude(12.0 * units.hr),
-        Latitude(-30.0 * units.deg),
-        [1.0, 0.0, 0.0, 0.0],
-        "flat",
+        name="Test",
+        ra=Longitude(12.0 * units.hr),
+        dec=Latitude(-30.0 * units.deg),
+        stokes=[1.0, 0.0, 0.0, 0.0],
+        spectral_type="flat",
         reference_frequency=np.array([1e8]) * units.Hz,
     )
 
@@ -260,21 +292,21 @@ def test_skymodel_deprecated():
         match="In the future, the reference_frequency will be required to be an astropy Quantity",
     ):
         source_old = SkyModel(
-            "Test",
-            Longitude(12.0 * units.hr),
-            Latitude(-30.0 * units.deg),
-            [1.0, 0.0, 0.0, 0.0],
-            "flat",
+            name="Test",
+            ra=Longitude(12.0 * units.hr),
+            dec=Latitude(-30.0 * units.deg),
+            stokes=[1.0, 0.0, 0.0, 0.0],
+            spectral_type="flat",
             reference_frequency=np.array([1e8]),
         )
     assert source_new == source_old
 
     source_old = SkyModel(
-        "Test",
-        Longitude(12.0 * units.hr),
-        Latitude(-30.0 * units.deg),
-        [1.0, 0.0, 0.0, 0.0],
-        "flat",
+        name="Test",
+        ra=Longitude(12.0 * units.hr),
+        dec=Latitude(-30.0 * units.deg),
+        stokes=[1.0, 0.0, 0.0, 0.0],
+        spectral_type="flat",
         reference_frequency=np.array([1.5e8]) * units.Hz,
     )
     with pytest.warns(
@@ -287,11 +319,11 @@ def test_skymodel_deprecated():
         assert source_new == source_old
 
     source_old = SkyModel(
-        "Test",
-        Longitude(12.0 * units.hr),
-        Latitude(-30.0 * units.deg + 2e-3 * units.arcsec),
-        [1.0, 0.0, 0.0, 0.0],
-        "flat",
+        name="Test",
+        ra=Longitude(12.0 * units.hr),
+        dec=Latitude(-30.0 * units.deg + 2e-3 * units.arcsec),
+        stokes=[1.0, 0.0, 0.0, 0.0],
+        spectral_type="flat",
         reference_frequency=np.array([1e8]) * units.Hz,
     )
     with pytest.warns(
@@ -301,11 +333,11 @@ def test_skymodel_deprecated():
         assert source_new == source_old
 
     source_old = SkyModel(
-        "Test",
-        Longitude(Longitude(12.0 * units.hr) + Longitude(2e-3 * units.arcsec)),
-        Latitude(-30.0 * units.deg),
-        [1.0, 0.0, 0.0, 0.0],
-        "flat",
+        name="Test",
+        ra=Longitude(Longitude(12.0 * units.hr) + Longitude(2e-3 * units.arcsec)),
+        dec=Latitude(-30.0 * units.deg),
+        stokes=[1.0, 0.0, 0.0, 0.0],
+        spectral_type="flat",
         reference_frequency=np.array([1e8]) * units.Hz,
     )
     with pytest.warns(
@@ -317,11 +349,11 @@ def test_skymodel_deprecated():
     stokes = np.zeros((4, 2, 1), dtype=np.float)
     stokes[0, :, :] = 1.0
     source_new = SkyModel(
-        "Test",
-        Longitude(12.0 * units.hr),
-        Latitude(-30.0 * units.deg),
-        stokes,
-        "subband",
+        name="Test",
+        ra=Longitude(12.0 * units.hr),
+        dec=Latitude(-30.0 * units.deg),
+        stokes=stokes,
+        spectral_type="subband",
         freq_array=np.array([1e8, 1.5e8]) * units.Hz,
     )
     with pytest.warns(
@@ -343,11 +375,11 @@ def test_skymodel_deprecated():
         match="In the future, the freq_array will be required to be an astropy Quantity",
     ):
         source_old = SkyModel(
-            "Test",
-            Longitude(12.0 * units.hr),
-            Latitude(-30.0 * units.deg),
-            stokes,
-            "subband",
+            name="Test",
+            ra=Longitude(12.0 * units.hr),
+            dec=Latitude(-30.0 * units.deg),
+            stokes=stokes,
+            spectral_type="subband",
             freq_array=np.array([1e8, 1.5e8]),
         )
     assert source_new == source_old
@@ -376,7 +408,13 @@ def test_coherency_calc_errors():
 
     stokes_radec = [1, -0.2, 0.3, 0.1]
 
-    source = SkyModel("test", coord.ra, coord.dec, stokes_radec, "flat")
+    source = SkyModel(
+        name="test",
+        ra=coord.ra,
+        dec=coord.dec,
+        stokes=stokes_radec,
+        spectral_type="flat",
+    )
 
     with pytest.warns(UserWarning, match="Horizon cutoff undefined"):
         with pytest.raises(ValueError, match="telescope_location must be an"):
@@ -395,11 +433,11 @@ def test_calc_basis_rotation_matrix():
     )
 
     source = SkyModel(
-        "Test",
-        Longitude(12.0 * units.hr),
-        Latitude(-30.0 * units.deg),
-        [1.0, 0.0, 0.0, 0.0],
-        "flat",
+        name="Test",
+        ra=Longitude(12.0 * units.hr),
+        dec=Latitude(-30.0 * units.deg),
+        stokes=[1.0, 0.0, 0.0, 0.0],
+        spectral_type="flat",
     )
     source.update_positions(time, telescope_location)
 
@@ -421,11 +459,11 @@ def test_calc_vector_rotation():
     )
 
     source = SkyModel(
-        "Test",
-        Longitude(12.0 * units.hr),
-        Latitude(-30.0 * units.deg),
-        [1.0, 0.0, 0.0, 0.0],
-        "flat",
+        name="Test",
+        ra=Longitude(12.0 * units.hr),
+        dec=Latitude(-30.0 * units.deg),
+        stokes=[1.0, 0.0, 0.0, 0.0],
+        spectral_type="flat",
     )
     source.update_positions(time, telescope_location)
 
@@ -453,7 +491,7 @@ def test_pol_rotator():
     # Make the last source non-polarized
     fluxes[..., -1] = [[1.0], [0], [0], [0]]
 
-    source = SkyModel(names, ras, decs, fluxes, "flat")
+    source = SkyModel(name=names, ra=ras, dec=decs, stokes=fluxes, spectral_type="flat")
 
     assert source._n_polarized == Nsrcs - 1
 
@@ -527,11 +565,11 @@ def test_polarized_source_visibilities():
     raoff = 0.0 * units.arcsec
 
     source = SkyModel(
-        "icrs_zen",
-        Longitude(zenith_icrs.ra + raoff),
-        Latitude(zenith_icrs.dec + decoff),
-        stokes_radec,
-        "flat",
+        name="icrs_zen",
+        ra=Longitude(zenith_icrs.ra + raoff),
+        dec=Latitude(zenith_icrs.dec + decoff),
+        stokes=stokes_radec,
+        spectral_type="flat",
     )
 
     coherency_matrix_local = np.zeros([2, 2, ntimes], dtype="complex128")
@@ -625,7 +663,13 @@ def test_polarized_source_smooth_visibilities():
 
     stokes_radec = [1, -0.2, 0.3, 0.1]
 
-    source = SkyModel("icrs_zen", zenith_icrs.ra, zenith_icrs.dec, stokes_radec, "flat")
+    source = SkyModel(
+        name="icrs_zen",
+        ra=zenith_icrs.ra,
+        dec=zenith_icrs.dec,
+        stokes=stokes_radec,
+        spectral_type="flat",
+    )
 
     coherency_matrix_local = np.zeros([2, 2, ntimes], dtype="complex128")
     alts = np.zeros(ntimes)
@@ -1057,15 +1101,22 @@ def test_flux_cuts(spec_type, init_kwargs, cut_kwargs):
     Ucomp = maxflux + 1.3
     stokes[2, :, :] = Ucomp  # Should not be affected by cuts.
 
-    skymodel_obj = SkyModel(ids, ras, decs, stokes, spec_type, **init_kwargs)
+    skyobj = SkyModel(
+        name=ids,
+        ra=ras,
+        dec=decs,
+        stokes=stokes,
+        spectral_type=spec_type,
+        **init_kwargs,
+    )
 
     minI_cut = 1.0
     maxI_cut = 2.3
-    skymodel_obj.source_cuts(
+    skyobj.source_cuts(
         latitude_deg=30.0, min_flux=minI_cut, max_flux=maxI_cut, **cut_kwargs,
     )
 
-    cut_sourcelist = skymodel_obj.to_recarray()
+    cut_sourcelist = skyobj.to_recarray()
 
     if "freq_range" in cut_kwargs and np.min(
         cut_kwargs["freq_range"] > np.min(init_kwargs["freq_array"])
@@ -1133,7 +1184,14 @@ def test_source_cut_error(
         stokes[0, 0, :] = np.linspace(minflux, maxflux / 2.0, Nsrcs)
         stokes[0, 1, :] = np.linspace(minflux * 2.0, maxflux, Nsrcs)
 
-    skyobj = SkyModel(ids, ras, decs, stokes, spec_type, **init_kwargs)
+    skyobj = SkyModel(
+        name=ids,
+        ra=ras,
+        dec=decs,
+        stokes=stokes,
+        spectral_type=spec_type,
+        **init_kwargs,
+    )
 
     minI_cut = 1.0
     maxI_cut = 2.3
@@ -1170,7 +1228,7 @@ def test_circumpolar_nonrising(time_location):
     stokes = np.zeros((4, 1, Nsrcs))
     stokes[0, ...] = 1.0
 
-    sky = SkyModel(names, ra, dec, stokes, "flat")
+    sky = SkyModel(name=names, ra=ra, dec=dec, stokes=stokes, spectral_type="flat")
 
     src_arr = sky.to_recarray()
     with pytest.warns(
@@ -1519,7 +1577,9 @@ def test_catalog_file_writer(tmp_path):
 
     names = "zen_source"
     stokes = [1.0, 0, 0, 0]
-    zenith_source = SkyModel(names, ra, dec, stokes, "flat")
+    zenith_source = SkyModel(
+        name=names, ra=ra, dec=dec, stokes=stokes, spectral_type="flat"
+    )
 
     fname = os.path.join(tmp_path, "temp_cat.txt")
 
