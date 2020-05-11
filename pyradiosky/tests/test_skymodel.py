@@ -33,7 +33,7 @@ GLEAM_vot = os.path.join(SKY_DATA_PATH, "gleam_50srcs.vot")
 def time_location():
     array_location = EarthLocation(lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0)
 
-    time = Time("2018-03-01 00:00:00", scale="utc", location=array_location)
+    time = Time("2015-03-01 00:00:00", scale="utc", location=array_location)
 
     return time, array_location
 
