@@ -273,7 +273,7 @@ def test_skymodel_init_errors(zenith_skycoord):
         )
 
 
-def test_skymodel_deprecated():
+def test_skymodel_deprecated(time_location):
     """Test that old init works with deprecation."""
     source_new = SkyModel(
         name="Test",
@@ -395,10 +395,8 @@ def test_skymodel_deprecated():
         )
     assert source_new == source_old
 
-    telescope_location = EarthLocation(
-        lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0
-    )
-    time = Time("2018-01-01 00:00")
+    time, telescope_location = time_location
+
     with pytest.warns(
         DeprecationWarning,
         match="Passing telescope_location to SkyModel.coherency_calc is deprecated",
@@ -435,16 +433,13 @@ def test_coherency_calc_errors():
             source.coherency_calc().squeeze()
 
 
-def test_calc_basis_rotation_matrix():
+def test_calc_basis_rotation_matrix(time_location):
     """
     This tests whether the 3-D rotation matrix from RA/Dec to Alt/Az is
     actually a rotation matrix (R R^T = R^T R = I)
     """
 
-    time = Time("2018-01-01 00:00")
-    telescope_location = EarthLocation(
-        lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0
-    )
+    time, telescope_location = time_location
 
     source = SkyModel(
         name="Test",
@@ -461,16 +456,12 @@ def test_calc_basis_rotation_matrix():
     assert np.allclose(np.matmul(basis_rot_matrix.T, basis_rot_matrix), np.eye(3))
 
 
-def test_calc_vector_rotation():
+def test_calc_vector_rotation(time_location):
     """
     This checks that the 2-D coherency rotation matrix is unit determinant.
     I suppose we could also have checked (R R^T = R^T R = I)
     """
-
-    time = Time("2018-01-01 00:00")
-    telescope_location = EarthLocation(
-        lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0
-    )
+    time, telescope_location = time_location
 
     source = SkyModel(
         name="Test",
@@ -486,15 +477,12 @@ def test_calc_vector_rotation():
     assert np.isclose(np.linalg.det(coherency_rotation), 1)
 
 
-def test_pol_rotator():
+def test_pol_rotator(time_location):
     """
     Test that when above_horizon is unset, the coherency rotation is done for
     all polarized sources.
     """
-    time = Time("2018-01-01 00:00")
-    telescope_location = EarthLocation(
-        lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0
-    )
+    time, telescope_location = time_location
 
     Nsrcs = 50
     ras = Longitude(np.linspace(0, 24, Nsrcs) * units.hr)
@@ -538,16 +526,17 @@ def analytic_beam_jones(za, az, sigma=0.3):
     """
     # B = np.exp(-np.tan(za/2.)**2. / 2. / sigma**2.)
     B = 1
+    # J alone gives you the dipole beam.
+    # B can be used to add another envelope in addition.
     J = np.array(
         [[np.cos(za) * np.sin(az), np.cos(az)], [np.cos(az) * np.cos(za), -np.sin(az)]]
     )
     return B * J
 
 
-def test_polarized_source_visibilities():
+def test_polarized_source_visibilities(time_location):
     """Test that visibilities of a polarized source match prior calculations."""
-    array_location = EarthLocation(lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0)
-    time0 = Time("2018-03-01 18:00:00", scale="utc", location=array_location)
+    time0, array_location = time_location
 
     ha_off = 1 / 6.0
     ha_delta = 0.1
@@ -649,7 +638,7 @@ def test_polarized_source_visibilities():
 def test_polarized_source_smooth_visibilities():
     """Test that visibilities change smoothly as a polarized source transits."""
     array_location = EarthLocation(lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0)
-    time0 = Time("2018-03-01 18:00:00", scale="utc", location=array_location)
+    time0 = Time("2015-03-01 18:00:00", scale="utc", location=array_location)
 
     ha_off = 1
     ha_delta = 0.01
@@ -952,7 +941,7 @@ def test_healpix_import_err():
             skymodel.write_healpix_hdf5("filename.hdf5", hpmap, inds, freqs)
 
 
-def test_healpix_positions(tmp_path):
+def test_healpix_positions(tmp_path, time_location):
     pytest.importorskip("astropy_healpix")
     import astropy_healpix
 
@@ -979,8 +968,7 @@ def test_healpix_positions(tmp_path):
     filename = os.path.join(tmp_path, "healpix_single.hdf5")
     skyobj.write_healpix_hdf5(filename)
 
-    time = Time("2018-03-01 00:00:00", scale="utc")
-    array_location = EarthLocation(lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0)
+    time, array_location = time_location
 
     ra, dec = astropy_healpix.healpix_to_lonlat(ipix, nside)
     skycoord_use = SkyCoord(ra, dec, frame="icrs")
