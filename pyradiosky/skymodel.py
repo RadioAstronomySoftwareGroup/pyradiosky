@@ -132,22 +132,25 @@ class SkyModel(UVBase):
     name : array_like of str
         Unique identifier for each source component, shape (Ncomponents,).
         Not used if nside is set.
-    ra : astropy Longitude object
+    ra : :class:`astropy.Longitude`
         source RA in J2000 (or ICRS) coordinates, shape (Ncomponents,).
-    dec : astropy Latitude object
+    dec : :class:`astropy.Latitude`
         source Dec in J2000 (or ICRS) coordinates, shape (Ncomponents,).
     stokes : array_like of float
         4 element vector giving the source [I, Q, U, V], shape (4, Nfreqs, Ncomponents).
     spectral_type : str
         Indicates how fluxes should be calculated at each frequency.
+
         Options:
+
         - 'flat' : Flat spectrum.
         - 'full' : Flux is defined by a saved value at each frequency.
-        - 'subband' : Flux is given at a set of band centers. (TODO)
-        - 'spectral_index' : Flux is given at a reference frequency. (TODO)
-    freq_array : astropy Quantity
+        - 'subband' : Flux is given at a set of band centers.
+        - 'spectral_index' : Flux is given at a reference frequency.
+
+    freq_array : :class:`astropy.Quantity`
         Array of frequencies that fluxes are provided for, shape (Nfreqs,).
-    reference_frequency : astropy Quantity
+    reference_frequency : :class:`astropy.Quantity`
         Reference frequencies of flux values, shape (Ncomponents,).
     spectral_index : array_like of float
         Spectral index of each source, shape (Ncomponents).
@@ -220,6 +223,9 @@ class SkyModel(UVBase):
 
         desc = (
             "Type of component, options are: 'healpix', 'point'. "
+            "If component_type is 'healpix', the components are the pixels in a "
+            "HEALPix map. If the component_type is 'point', the components are"
+            "point-like sources."
             "Determines which parameters are required."
         )
         self._component_type = UVParameter(
@@ -721,9 +727,9 @@ class SkyModel(UVBase):
 
         Parameters
         ----------
-        time : astropy Time object
+        time : :class:`astropy.Time`
             Time to update positions for.
-        telescope_location : astropy EarthLocation object
+        telescope_location : :class:`astropy.EarthLocation`
             Telescope location to update positions for.
         """
         if not isinstance(time, Time):
@@ -733,7 +739,7 @@ class SkyModel(UVBase):
 
         if not isinstance(telescope_location, (EarthLocation, MoonLocation)):
 
-            errm = "telescope_location must be an astropy EarthLocation object"
+            errm = "telescope_location must be an :class:`astropy.EarthLocation` object"
             if hasmoon:
                 errm += " or a lunarsky MoonLocation object "
             errm += ". "
@@ -824,8 +830,7 @@ class SkyModel(UVBase):
         Parameters
         ----------
         inds: array_like, optional
-            Index array to select components.
-            Defaults to all components.
+            Index array to select components. Defaults to all components.
 
         Returns
         -------
@@ -911,7 +916,7 @@ class SkyModel(UVBase):
         """
         Calculate the local coherency in alt/az basis.
 
-        SkyModel.update_positions() must be run prior to this method.
+        :meth:`SkyModel.update_positions` must be run prior to this method.
 
         The coherency is a 2x2 matrix giving electric field correlation in Jy.
         It's specified on the object as a coherency in the ra/dec basis,
@@ -919,7 +924,7 @@ class SkyModel(UVBase):
 
         Parameters
         ----------
-        deprecated_location : EarthLocation object
+        deprecated_location : :class:`astropy.EarthLocation`
             This keyword is deprecated. It is preserved to maintain backwards
             compatibility and sets the EarthLocation on this SkyModel object.
 
@@ -1103,7 +1108,7 @@ class SkyModel(UVBase):
             Minimum stokes I flux to select [Jy]
         max_flux : float
             Maximum stokes I flux to select [Jy]
-        freq_range : astropy Quantity
+        freq_range : :class:`astropy.Quantity`
             Frequency range over which the min and max flux tests should be performed.
             Must be length 2. If None, use the range over which the object is defined.
         run_check : bool
@@ -1542,9 +1547,9 @@ class SkyModel(UVBase):
             Part of expected Dec column. Should match only one column in the table.
         flux_columns : str or list of str
             Part of expected Flux column(s). Each one should match only one column in the table.
-        reference_frequency : astropy Quantity
+        reference_frequency : :class:`astropy.Quantity`
             Reference frequency for flux values, assumed to be the same value for all rows.
-        freq_array : astropy Quantity
+        freq_array : :class:`astropy.Quantity`
             Frequencies corresponding to flux_columns (should be same length).
             Required for multiple flux columns.
         return_table : bool, optional
@@ -2511,7 +2516,7 @@ def source_cuts(
         Minimum stokes I flux to select [Jy]
     max_flux : float
         Maximum stokes I flux to select [Jy]
-    freq_range : astropy Quantity
+    freq_range : :class:`astropy.Quantity`
         Frequency range over which the min and max flux tests should be performed.
         Must be length 2. If None, use the range over which the object is defined.
 
@@ -2571,9 +2576,9 @@ def read_votable_catalog(
         Part of expected Dec column. Should match only one column in the table.
     flux_columns : str or list of str
         Part of expected Flux column(s). Each one should match only one column in the table.
-    reference_frequency : astropy Quantity
+    reference_frequency : :class:`astropy.Quantity`
         Reference frequency for flux values, assumed to be the same value for all rows.
-    freq_array : astropy Quantity
+    freq_array : :class:`astropy.Quantity`
         Frequencies corresponding to flux_columns (should be same length).
         Required for multiple flux columns.
     return_table : bool, optional

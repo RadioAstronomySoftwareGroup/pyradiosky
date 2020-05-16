@@ -18,12 +18,12 @@ issues in the [issue log](https://github.com/RadioAstronomySoftwareGroup/pyradio
 are very welcome, as are bug reports and feature requests.
 Please see our [guide on contributing](.github/CONTRIBUTING.md)
 
-# Versioning
+## Versioning
 We have not yet decided on a definitive versioning approach.
 We track all changes in our [changelog](https://github.com/RadioAstronomySoftwareGroup/pyradiosky/blob/master/CHANGELOG.md).
 
-# Documentation
-We currently use docstrings in the code but will add Sphinx based documentation soon.
+## Documentation
+Developer API documentation is hosted [here](https://radioastronomysoftwaregroup.github.io/pyradiosky/).
 
 # Installation
 Simple installation via pip is available for users, developers should follow
@@ -36,14 +36,17 @@ There are some optional dependencies that are required for specific functionalit
 which will not be installed automatically by pip.
 See [Dependencies](#dependencies) for details on installing optional dependencies.
 
-## Dependencies
+### Dependencies
+
+If you are using `conda` to manage your environment, you may wish to install the
+following packages before installing `pyradiosky`:
 
 Required:
 
-* numpy >= 1.15
-* scipy
-* astropy >= 4.0
+* astropy>=4.0
 * h5py
+* numpy>=1.15
+* scipy>1.0.1
 * pyuvdata
 * setuptools_scm
 
@@ -51,8 +54,6 @@ Optional:
 
 * astropy-healpix (for working with beams in HEALPix formats)
 * astroquery (for downloading GLEAM and other VizieR catalogs)
-
-The numpy and astropy versions are important, so make sure these are up to date.
 
 We suggest using conda to install all the dependencies. To install
 pyuvdata, astropy-healpix and astroquery, you'll need to add conda-forge as a channel

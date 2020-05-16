@@ -64,7 +64,7 @@ instance/
 .scrapy
 
 # Sphinx documentation
-docs/_build/
+docs/build/
 
 # PyBuilder
 target/
@@ -102,3 +102,9 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# Sphinx documentation
+docs/_static/
+docs/_templates/
+docs/index.rst
+docs/skymodel_parameters.rst

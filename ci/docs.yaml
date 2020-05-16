@@ -1,0 +1,20 @@
+name: docs
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - astropy>=4.0
+  - astropy-healpix
+  - h5py
+  - numpy
+  - h5py
+  - scipy
+  - coverage
+  - pypandoc
+  - pytest-cov
+  - setuptools_scm
+  - sphinx
+  - pyuvdata>=2.0.1
+  - pip
+  - pip:
+      - git+https://github.com/aelanman/lunarsky.git
