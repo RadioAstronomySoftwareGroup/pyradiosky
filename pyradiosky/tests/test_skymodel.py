@@ -1925,11 +1925,6 @@ def test_stokes_eval(mock_point_skies, inplace, stype):
 
         if stype != "flat":
             assert np.allclose(new.stokes[0, :, 0], fine_spectrum)
-        elif not inplace:
-            # Check squeeze_flat option
-            new_flat = sky.evaluate_stokes(fine_freqs, inplace=False, squeeze_flat=True)
-            assert np.all(new_flat.stokes == oldsky.stokes)
-            assert new_flat.spectral_type == "flat"
 
         if stype == "subband" and not inplace:
             # Check for error if interpolating outside the defined range.

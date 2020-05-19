@@ -631,12 +631,7 @@ class SkyModel(UVBase):
         return equal
 
     def evaluate_stokes(
-        self,
-        freqs,
-        inplace=True,
-        squeeze_flat=False,
-        freq_interp_kind="cubic",
-        run_check=True,
+        self, freqs, inplace=True, freq_interp_kind="cubic", run_check=True,
     ):
         """
         Evaluate the stokes array to specified frequencies.
@@ -648,10 +643,6 @@ class SkyModel(UVBase):
         - spectral_index: Evaluate at the new frequencies.
         - flat: Copy to new frequencies.
 
-        Alternatively, if the "squeeze_flat" option is set, this will just return the input sky model.
-        Since the "flux is the same at all frequencies, there is no reason to copy it over. This can
-        prevent needless memory bloat.
-
         Parameters
         ----------
         freqs: Quantity
@@ -659,10 +650,6 @@ class SkyModel(UVBase):
         inplace: bool
             If True, modify the current SkyModel object.
             Otherwise, returns a new instance. Default True.
-        squeeze_flat: bool
-            If flat-spectrum, return the same flat-spectrum array.
-            This will avoid copying the Stokes array len(freqs) times.
-            Default False.
         freq_interp_kind: str or int
             Spline interpolation order, as can be understood by scipy.interpolate.interp1d.
             Defaults to 'cubic'
@@ -704,11 +691,6 @@ class SkyModel(UVBase):
             sky.stokes = finterp(freqs)
         else:
             # flat spectrum
-            if squeeze_flat:
-                sky.stokes = self.stokes
-                if not inplace:
-                    return sky
-                return
             sky.stokes = np.repeat(self.stokes, len(freqs), axis=1)
 
         sky.reference_frequency = None
