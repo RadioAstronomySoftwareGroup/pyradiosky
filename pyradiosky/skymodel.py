@@ -7,6 +7,7 @@ import warnings
 
 import h5py
 import numpy as np
+import copy
 from scipy.linalg import orthogonal_procrustes as ortho_procr
 import scipy.io
 from astropy.coordinates import Angle, EarthLocation, AltAz, Latitude, Longitude
@@ -275,7 +276,7 @@ class SkyModel(UVBase):
             "stokes",
             description=desc,
             form=(4, "Nfreqs", "Ncomponents"),
-            expected_type=float,
+            expected_type=(float, np.float64),
         )
 
         # The coherency is a 2x2 matrix giving electric field correlation in Jy
@@ -628,6 +629,99 @@ class SkyModel(UVBase):
             equal = super(SkyModel, self).__eq__(other, check_extra=False)
 
         return equal
+
+    def evaluate_stokes(
+        self,
+        freqs,
+        inplace=True,
+        squeeze_flat=False,
+        freq_interp_kind="cubic",
+        run_check=True,
+    ):
+        """
+        Evaluate the stokes array to specified frequencies.
+
+        Produces a SkyModel object that is in the `full` frequency spectral type, based on
+        the current spectral type:
+        - full: Extract a subset of existing frequencies.
+        - subband: Interpolate to new frequencies.
+        - spectral_index: Evaluate at the new frequencies.
+        - flat: Copy to new frequencies.
+
+        Alternatively, if the "squeeze_flat" option is set, this will just return the input sky model.
+        Since the "flux is the same at all frequencies, there is no reason to copy it over. This can
+        prevent needless memory bloat.
+
+        Parameters
+        ----------
+        freqs: Quantity
+            Frequencies at which Stokes parameters will be evaluated.
+        inplace: bool
+            If True, modify the current SkyModel object.
+            Otherwise, returns a new instance. Default True.
+        squeeze_flat: bool
+            If flat-spectrum, return the same flat-spectrum array.
+            This will avoid copying the Stokes array len(freqs) times.
+            Default False.
+        freq_interp_kind: str or int
+            Spline interpolation order, as can be understood by scipy.interpolate.interp1d.
+            Defaults to 'cubic'
+        run_check: bool
+            Run check on new SkyModel.
+            Default True.
+        """
+        freqs = np.atleast_1d(freqs)
+
+        if inplace:
+            sky = self
+        else:
+            sky = copy.deepcopy(self)
+
+        if self.spectral_type == "spectral_index":
+            sky.stokes = (
+                self.stokes
+                * (
+                    freqs[:, None].to("Hz").value
+                    / self.reference_frequency[None, :].to("Hz").value
+                )
+                ** self.spectral_index[None, :]
+            )
+            sky.reference_frequency = None
+        elif self.spectral_type == "full":
+            # Find a subset of the current array.
+            matches = np.isin(self.freq_array, freqs, assume_unique=True)
+            if not np.sum(matches) == freqs.size:
+                raise ValueError(
+                    "Some requested frequencies are not "
+                    "present in the current SkyModel."
+                )
+            sky.stokes = self.stokes[:, matches, :]
+        elif self.spectral_type == "subband":
+            # Interpolate.
+            finterp = scipy.interpolate.interp1d(
+                self.freq_array, self.stokes, axis=1, kind=freq_interp_kind
+            )
+            sky.stokes = finterp(freqs)
+        else:
+            # flat spectrum
+            if squeeze_flat:
+                sky.stokes = self.stokes
+                if not inplace:
+                    return sky
+                return
+            sky.stokes = np.repeat(self.stokes, len(freqs), axis=1)
+
+        sky.reference_frequency = None
+        sky.Nfreqs = freqs.size
+        sky.spectral_type = "full"
+        sky.freq_array = freqs
+        sky.coherency_radec = skyutils.stokes_to_coherency(sky.stokes)
+
+        if run_check:
+            sky.check()
+
+        if not inplace:
+            return sky
 
     def update_positions(self, time, telescope_location):
         """

@@ -9,6 +9,7 @@ import h5py
 import pytest
 import numpy as np
 import warnings
+import copy
 from astropy import units
 from astropy.coordinates import (
     SkyCoord,
@@ -132,6 +133,49 @@ def healpix_data():
         "pixel_area": pixel_area,
         "ipix_disc": ipix_disc,
     }
+
+
+@pytest.fixture
+def mock_point_skies():
+    # Provides a function that makes equivalent models of different spectral types.
+    Ncomp = 10
+    Nfreqs = 30
+    names = np.arange(Ncomp).astype(str)
+
+    ras = Longitude(np.linspace(0, 2 * np.pi, Ncomp), "rad")
+    decs = Latitude(np.linspace(-np.pi / 2, np.pi / 2, Ncomp), "rad")
+
+    freq_arr = np.linspace(100e6, 130e6, Nfreqs) * units.Hz
+
+    # Spectrum = Power law
+    alpha = -0.5
+    spectrum = ((freq_arr / freq_arr[0]) ** (alpha))[None, :, None]
+
+    def _func(stype):
+
+        stokes = spectrum.repeat(4, 0).repeat(Ncomp, 2)
+        if stype in ["full", "subband"]:
+            stokes = spectrum.repeat(4, 0).repeat(Ncomp, 2)
+            return SkyModel(
+                names, ras, decs, stokes, spectral_type=stype, freq_array=freq_arr
+            )
+        elif stype == "spectral_index":
+            stokes = stokes[:, :1, :]
+            spectral_index = np.ones(Ncomp) * alpha
+            return SkyModel(
+                names,
+                ras,
+                decs,
+                stokes,
+                spectral_type=stype,
+                spectral_index=spectral_index,
+                reference_frequency=np.repeat(freq_arr[0], Ncomp),
+            )
+        elif stype == "flat":
+            stokes = stokes[:, :1, :]
+            return SkyModel(names, ras, decs, stokes, spectral_type=stype)
+
+    yield _func
 
 
 def test_set_spectral_params(zenith_skymodel):
@@ -1844,3 +1888,50 @@ def test_source_motion(moonsky):
 
     maxf = _freqs[np.argmax(np.abs(_els[_freqs > 0]) ** 2)]
     assert np.isclose(maxf, f_28d, atol=2 / ets[-1])
+
+
+@pytest.mark.parametrize("inplace", [True, False])
+@pytest.mark.parametrize("stype", ["full", "subband", "spectral_index", "flat"])
+def test_stokes_eval(mock_point_skies, inplace, stype):
+
+    sind = mock_point_skies("spectral_index")
+    alpha = sind.spectral_index[0]
+
+    Nfreqs_fine = 50
+    fine_freqs = np.linspace(100e6, 130e6, Nfreqs_fine) * units.Hz
+    fine_spectrum = (fine_freqs / fine_freqs[0]) ** (alpha)
+
+    sky = mock_point_skies(stype)
+    oldsky = copy.deepcopy(sky)
+    old_freqs = oldsky.freq_array
+    if stype == "full":
+        with pytest.raises(ValueError, match="Some requested frequencies"):
+            sky.evaluate_stokes(fine_freqs, inplace=inplace)
+        new = sky.evaluate_stokes(old_freqs, inplace=inplace)
+        if inplace:
+            new = sky
+        assert np.allclose(new.freq_array, old_freqs)
+        new = sky.evaluate_stokes(old_freqs[5:10], inplace=inplace)
+        if inplace:
+            new = sky
+        assert np.allclose(new.freq_array, old_freqs[5:10])
+    else:
+        # Evaluate new frequencies, and confirm the new spectrum is correct.
+        new = sky.evaluate_stokes(fine_freqs, inplace=inplace)
+        if inplace:
+            new = sky
+        assert np.allclose(new.freq_array, fine_freqs)
+        assert new.spectral_type == "full"
+
+        if stype != "flat":
+            assert np.allclose(new.stokes[0, :, 0], fine_spectrum)
+        elif not inplace:
+            # Check squeeze_flat option
+            new_flat = sky.evaluate_stokes(fine_freqs, inplace=False, squeeze_flat=True)
+            assert np.all(new_flat.stokes == oldsky.stokes)
+            assert new_flat.spectral_type == "flat"
+
+        if stype == "subband" and not inplace:
+            # Check for error if interpolating outside the defined range.
+            with pytest.raises(ValueError, match="A value in x_new is above"):
+                sky.evaluate_stokes(fine_freqs + 10 * units.Hz, inplace=inplace)
