@@ -102,6 +102,7 @@ From the source pyradiosky directory run ```pytest``` or ```python -m pytest```.
 
 # Maintainers
 pyradiosky is maintained by the RASG Managers, which currently include:
+
  - Adam Beardsley (Arizona State University)
  - Bryna Hazelton (University of Washington)
  - Daniel Jacobs (Arizona State University)

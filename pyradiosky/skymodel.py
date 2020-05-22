@@ -741,7 +741,7 @@ class SkyModel(UVBase):
 
             errm = "telescope_location must be an :class:`astropy.EarthLocation` object"
             if hasmoon:
-                errm += " or a lunarsky MoonLocation object "
+                errm += " or a :class:`lunarsky.MoonLocation` object "
             errm += ". "
             raise ValueError(
                 errm + "value was: {al}".format(al=str(telescope_location))
