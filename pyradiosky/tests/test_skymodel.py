@@ -9,7 +9,6 @@ import h5py
 import pytest
 import numpy as np
 import warnings
-import copy
 from astropy import units
 from astropy.coordinates import (
     SkyCoord,
@@ -1902,22 +1901,22 @@ def test_stokes_eval(mock_point_skies, inplace, stype):
     fine_spectrum = (fine_freqs / fine_freqs[0]) ** (alpha)
 
     sky = mock_point_skies(stype)
-    oldsky = copy.deepcopy(sky)
+    oldsky = sky.copy()
     old_freqs = oldsky.freq_array
     if stype == "full":
         with pytest.raises(ValueError, match="Some requested frequencies"):
-            sky.evaluate_stokes(fine_freqs, inplace=inplace)
-        new = sky.evaluate_stokes(old_freqs, inplace=inplace)
+            sky.at_frequencies(fine_freqs, inplace=inplace)
+        new = sky.at_frequencies(old_freqs, inplace=inplace)
         if inplace:
             new = sky
         assert np.allclose(new.freq_array, old_freqs)
-        new = sky.evaluate_stokes(old_freqs[5:10], inplace=inplace)
+        new = sky.at_frequencies(old_freqs[5:10], inplace=inplace)
         if inplace:
             new = sky
         assert np.allclose(new.freq_array, old_freqs[5:10])
     else:
         # Evaluate new frequencies, and confirm the new spectrum is correct.
-        new = sky.evaluate_stokes(fine_freqs, inplace=inplace)
+        new = sky.at_frequencies(fine_freqs, inplace=inplace)
         if inplace:
             new = sky
         assert np.allclose(new.freq_array, fine_freqs)
@@ -1929,4 +1928,4 @@ def test_stokes_eval(mock_point_skies, inplace, stype):
         if stype == "subband" and not inplace:
             # Check for error if interpolating outside the defined range.
             with pytest.raises(ValueError, match="A value in x_new is above"):
-                sky.evaluate_stokes(fine_freqs + 10 * units.Hz, inplace=inplace)
+                sky.at_frequencies(fine_freqs + 10 * units.Hz, inplace=inplace)

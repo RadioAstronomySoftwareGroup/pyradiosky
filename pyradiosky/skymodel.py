@@ -7,7 +7,6 @@ import warnings
 
 import h5py
 import numpy as np
-import copy
 from scipy.linalg import orthogonal_procrustes as ortho_procr
 import scipy.io
 from astropy.coordinates import Angle, EarthLocation, AltAz, Latitude, Longitude
@@ -630,11 +629,11 @@ class SkyModel(UVBase):
 
         return equal
 
-    def evaluate_stokes(
+    def at_frequencies(
         self, freqs, inplace=True, freq_interp_kind="cubic", run_check=True,
     ):
         """
-        Evaluate the stokes array to specified frequencies.
+        Evaluate the stokes array at the specified frequencies.
 
         Produces a SkyModel object that is in the `full` frequency spectral type, based on
         the current spectral type:
@@ -662,7 +661,7 @@ class SkyModel(UVBase):
         if inplace:
             sky = self
         else:
-            sky = copy.deepcopy(self)
+            sky = self.copy()
 
         if self.spectral_type == "spectral_index":
             sky.stokes = (
