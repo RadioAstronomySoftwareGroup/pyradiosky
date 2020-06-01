@@ -1,12 +1,14 @@
 # -*- mode: python; coding: utf-8 -*
 # Copyright (c) 2019 Radio Astronomy Software Group
 # Licensed under the 3-clause BSD License
+import os
 
 import numpy as np
 import pytest
 from astropy.coordinates import Angle
 from astropy.time import Time
 
+from pyradiosky import SkyModel
 import pyradiosky.utils as skyutils
 
 
@@ -59,3 +61,36 @@ def test_stokes_tofrom_coherency():
     assert str(cm.value).startswith(
         "First two dimensions of coherency_matrix must be length 2."
     )
+
+
+def test_download_gleam(tmp_path):
+    pytest.importorskip("astroquery")
+
+    fname = "gleam_cat.vot"
+    filename = os.path.join(tmp_path, fname)
+
+    skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=10)
+
+    sky = SkyModel()
+    sky.read_gleam_catalog(filename)
+    assert sky.Ncomponents == 10
+
+    skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=5, overwrite=True)
+    sky2 = SkyModel()
+    sky2.read_gleam_catalog(filename)
+    assert sky2.Ncomponents == 5
+
+
+def test_astroquery_missing_error(tmp_path):
+    fname = "gleam_cat.vot"
+
+    try:
+        import astroquery  # noqa
+
+        pass
+    except ImportError:
+        with pytest.raises(
+            ImportError,
+            match="The astroquery module required to use the download_gleam function.",
+        ):
+            skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=10)
