@@ -192,7 +192,8 @@ def download_gleam(path=".", filename="gleam.vot", overwrite=False, row_limit=No
         )
         return
 
-    if row_limit is None:
+    # full download is too slow for unit tests
+    if row_limit is None:  # pragma: no cover
         Vizier.ROW_LIMIT = -1
     else:
         Vizier.ROW_LIMIT = row_limit

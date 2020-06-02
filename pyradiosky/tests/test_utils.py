@@ -75,6 +75,13 @@ def test_download_gleam(tmp_path):
     sky.read_gleam_catalog(filename)
     assert sky.Ncomponents == 10
 
+    # check there's not an error if the file exists and overwrite is False
+    # and that the file is not replaced
+    skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=5)
+    sky.read_gleam_catalog(filename)
+    assert sky.Ncomponents == 10
+
+    # check that the file is replaced if overwrite is True
     skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=5, overwrite=True)
     sky2 = SkyModel()
     sky2.read_gleam_catalog(filename)
