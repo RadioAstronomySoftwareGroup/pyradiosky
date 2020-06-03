@@ -224,8 +224,8 @@ class SkyModel(UVBase):
         desc = (
             "Type of component, options are: 'healpix', 'point'. "
             "If component_type is 'healpix', the components are the pixels in a "
-            "HEALPix map. If the component_type is 'point', the components are"
-            "point-like sources."
+            "HEALPix map. If the component_type is 'point', the components are "
+            "point-like sources. "
             "Determines which parameters are required."
         )
         self._component_type = UVParameter(
@@ -369,8 +369,8 @@ class SkyModel(UVBase):
         )
 
         desc = (
-            "Boolean indicator of whether this source is above the horizon"
-            "at the current time."
+            "Boolean indicator of whether this source is above the horizon "
+            "at the current time. "
             "True indicates the source is above the horizon."
         )
         self._above_horizon = UVParameter(
