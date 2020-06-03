@@ -496,13 +496,15 @@ class SkyModel(UVBase):
             if self.Ncomponents == 1:
                 self.stokes = self.stokes.reshape(4, self.Nfreqs, 1)
 
-            self._polarized = np.where(np.sum(self.stokes[1:, :, :], axis=0) != 0.0)[1]
-            self._n_polarized = self._polarized.size
+            # Indices along the component axis, such that the source is polarized at any frequency.
+            self._polarized = np.where(
+                np.any(np.sum(self.stokes[1:, :, :], axis=0) != 0.0, axis=0)
+            )[0]
+            self._n_polarized = np.unique(self._polarized).size
 
             self.coherency_radec = skyutils.stokes_to_coherency(self.stokes)
 
             self.history = history
-
             self.check()
 
     def _set_spectral_type_params(self, spectral_type):
@@ -598,6 +600,8 @@ class SkyModel(UVBase):
                 raise ValueError(
                     "reference_frequency must have a unit that can be converted to Hz."
                 ) from e
+
+        return True
 
     def __eq__(self, other, check_extra=True):
         """Check for equality, check for future equality."""
