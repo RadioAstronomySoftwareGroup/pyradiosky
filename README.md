@@ -26,16 +26,15 @@ We track all changes in our [changelog](https://github.com/RadioAstronomySoftwar
 We currently use docstrings in the code but will add Sphinx based documentation soon.
 
 # Installation
-Clone the repository using
-```git clone https://github.com/RadioAstronomySoftwareGroup/pyradiosky.git```
+Simple installation via pip is available for users, developers should follow
+the directions under [Developer Installation](#developer-installation) below.
 
-Navigate into the pyradiosky directory and run `pip install .`
-(note that `python setup.py install` is not recommended).
-Note that this will attempt to automatically install any missing dependencies.
-If you use anaconda or another package manager you might prefer to first install
-the dependencies as described in [Dependencies](#dependencies).
+For simple installation, the latest stable version is available via pip with
+`pip install pyradiosky`.
 
-To install without dependencies, run `pip install --no-deps .`
+There are some optional dependencies that are required for specific functionality,
+which will not be installed automatically by pip.
+See [Dependencies](#dependencies) for details on installing optional dependencies.
 
 ## Dependencies
 
@@ -51,30 +50,56 @@ Required:
 Optional:
 
 * astropy-healpix (for working with beams in HEALPix formats)
+* astroquery (for downloading GLEAM and other VizieR catalogs)
 
 The numpy and astropy versions are important, so make sure these are up to date.
 
-We suggest using conda to install all the dependencies. If you want to install
-astropy-healpix, you'll need to add conda-forge as a channel
-(```conda config --add channels conda-forge```). Developers may wish to use
-the included `environment.yaml` file to create a new environment that will
-contain all the optional dependencies along with dependencies required for
-testing and development (```conda env create -f environment.yml```).
+We suggest using conda to install all the dependencies. To install
+pyuvdata, astropy-healpix and astroquery, you'll need to add conda-forge as a channel
+(```conda config --add channels conda-forge```).
 
 If you do not want to use conda, the packages are also available on PyPI.
 You can install the optional dependencies via pip by specifying an option
 when you install pyradiosky, as in ```pip install .[healpix]```
 which will install all the required packages for using the HEALPix functionality
 in pyradiosky. The options that can be passed in this way are:
-[healpix, dev]. The `healpix` enables various specific functionality
-while `dev` will install dependencies required for testing and development.
+[healpix, astroquery, dev]. The `healpix` and  `astroquery` options enable
+various specific functionality
+while `dev` will install all the optional dependencies as well as those required
+for testing and development.
+
+## Developer Installation
+Clone the repository using
+```git clone https://github.com/RadioAstronomySoftwareGroup/pyradiosky.git```
+
+Navigate into the pyradiosky directory and run `pip install .`
+(note that `python setup.py install` does not work).
+Note that this will attempt to automatically install any missing dependencies.
+If you use anaconda or another package manager you might prefer to first install
+the dependencies as described in [Dependencies](#dependencies).
+
+To install without dependencies, run `pip install --no-deps`
+
+If you want to do development on pyradiosky, in addition to the other dependencies
+you will need the following packages:
+
+* pytest
+* pytest-cov
+* coverage
+* pre-commit
+
+One way to ensure you have all the needed packages is to use the included `environment.yaml` file to create a new environment that will
+contain all the optional dependencies along with dependencies required for
+testing and development (```conda env create -f environment.yml```). Alternatively, you can specify `dev` when installing pyradiosky (as in `pip install pyradiosky[dev]`) to install the packages needed for testing (including coverage and linting).
+
+To use pre-commit to prevent committing code that does not follow our style, you'll need to run `pre-commit install` in the top level `pyradiosky` directory.
 
 ## Tests
 Uses the `pytest` package to execute test suite.
 From the source pyradiosky directory run ```pytest``` or ```python -m pytest```.
 
 # Maintainers
-pyuvdata is maintained by the RASG Managers, which currently include:
+pyradiosky is maintained by the RASG Managers, which currently include:
  - Adam Beardsley (Arizona State University)
  - Bryna Hazelton (University of Washington)
  - Daniel Jacobs (Arizona State University)

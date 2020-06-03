@@ -2,6 +2,7 @@
 # Copyright (c) 2019 Radio Astronomy Software Group
 # Licensed under the 3-clause BSD License
 """Utility methods."""
+import os
 
 import numpy as np
 from astropy.constants import c
@@ -159,3 +160,73 @@ def jy_to_ksr(freqs):
     k_boltz = 1.380658e-16  # erg/K
     lambdas = c_cmps / freqs  # cm
     return 1e-23 * lambdas ** 2 / (2 * k_boltz)
+
+
+def download_gleam(path=".", filename="gleam.vot", overwrite=False, row_limit=None):
+    """
+    Download the GLEAM vot table from Vizier.
+
+    Parameters
+    ----------
+    path : str
+        Folder location to save catalog to.
+    filename : str
+        Filename to save catalog to.
+    overwrite : bool
+        Option to download the file even if it already exists.
+    row_limit : int, optional
+        Max number of rows (sources) to download, default is None meaning download all rows.
+
+    """
+    try:
+        from astroquery.vizier import Vizier
+    except ImportError as e:
+        raise ImportError(
+            "The astroquery module required to use the download_gleam function."
+        ) from e
+
+    opath = os.path.join(path, filename)
+    if os.path.exists(opath) and not overwrite:
+        print(
+            f"GLEAM already downloaded to {opath}. Set overwrite=True to re-download it."
+        )
+        return
+
+    # full download is too slow for unit tests
+    if row_limit is None:  # pragma: no cover
+        Vizier.ROW_LIMIT = -1
+    else:
+        Vizier.ROW_LIMIT = row_limit
+    Vizier.columns = [
+        "GLEAM",
+        "RAJ2000",
+        "DEJ2000",
+        "Fintwide",
+        "alpha",
+        "Fintfit200",
+        "Fint076",
+        "Fint084",
+        "Fint092",
+        "Fint099",
+        "Fint107",
+        "Fint115",
+        "Fint122",
+        "Fint130",
+        "Fint143",
+        "Fint151",
+        "Fint158",
+        "Fint166",
+        "Fint174",
+        "Fint181",
+        "Fint189",
+        "Fint197",
+        "Fint204",
+        "Fint212",
+        "Fint220",
+        "Fint227",
+    ]
+    catname = "VIII/100/gleamegc"
+    table = Vizier.get_catalogs(catname)[0]
+    table.write(opath, format="votable", overwrite=overwrite)
+
+    print("GLEAM catalog downloaded and saved to " + opath)
