@@ -520,11 +520,9 @@ def test_calc_vector_rotation(time_location):
     assert np.isclose(np.linalg.det(coherency_rotation), 1)
 
 
-def test_pol_rotator(time_location):
-    """
-    Test that when above_horizon is unset, the coherency rotation is done for
-    all polarized sources.
-    """
+@pytest.mark.parametrize("spectral_type", ["flat", "full"])
+def test_pol_rotator(time_location, spectral_type):
+    """Test that when above_horizon is unset, the coherency rotation is done for all polarized sources."""
     time, telescope_location = time_location
 
     Nsrcs = 50
@@ -536,7 +534,22 @@ def test_pol_rotator(time_location):
     # Make the last source non-polarized
     fluxes[..., -1] = [[1.0], [0], [0], [0]]
 
-    source = SkyModel(name=names, ra=ras, dec=decs, stokes=fluxes, spectral_type="flat")
+    extra = {}
+    # Add frequencies if "full" freq:
+    if spectral_type == "full":
+        Nfreqs = 10
+        freq_array = np.linspace(100e6, 110e6, Nfreqs) * units.Hz
+        fluxes = fluxes.repeat(Nfreqs, axis=1)
+        extra = {"freq_array": freq_array}
+
+    source = SkyModel(
+        name=names,
+        ra=ras,
+        dec=decs,
+        stokes=fluxes,
+        spectral_type=spectral_type,
+        **extra,
+    )
 
     assert source._n_polarized == Nsrcs - 1
 
