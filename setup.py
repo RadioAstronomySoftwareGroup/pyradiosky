@@ -38,7 +38,8 @@ setup_args = {
     "extras_require": {
         "healpix": ["astropy-healpix"],
         "astroquery": ["astroquery"],
-        "dev": ["pytest", "pre-commit", "astropy-healpix", "astroquery"],
+        "doc": ["sphinx", "pypandoc"],
+        "dev": ["pytest", "pre-commit", "astropy-healpix", "astroquery", "sphinx", "pypandoc"],
     },
     "classifiers": [
         "Development Status :: 1 - Planning",
