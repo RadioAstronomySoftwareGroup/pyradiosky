@@ -14,17 +14,17 @@ The primary user class is `SkyModel`, which supports:
   - conversion between RA/Dec and Azimuth/Elevation including calculating full
   polarization coherencies in Az/El.
 
-## Community Guidelines
+# Community Guidelines
 Contributions to this package to add new file formats or address any of the
 issues in the [issue log](https://github.com/RadioAstronomySoftwareGroup/pyradiosky/issues)
 are very welcome, as are bug reports and feature requests.
 Please see our [guide on contributing](.github/CONTRIBUTING.md)
 
-## Versioning
+# Versioning
 We have not yet decided on a definitive versioning approach.
 We track all changes in our [changelog](https://github.com/RadioAstronomySoftwareGroup/pyradiosky/blob/master/CHANGELOG.md).
 
-## Documentation
+# Documentation
 Developer API documentation is hosted [here](https://pyradiosky.readthedocs.io/en/latest/).
 
 # Installation
@@ -38,7 +38,7 @@ There are some optional dependencies that are required for specific functionalit
 which will not be installed automatically by pip.
 See [Dependencies](#dependencies) for details on installing optional dependencies.
 
-### Dependencies
+## Dependencies
 
 If you are using `conda` to manage your environment, you may wish to install the
 following packages before installing `pyradiosky`:
@@ -105,7 +105,7 @@ and documentation development.
 To use pre-commit to prevent committing code that does not follow our style,
 you'll need to run `pre-commit install` in the top level `pyradiosky` directory.
 
-## Tests
+# Tests
 Uses the `pytest` package to execute test suite.
 From the source pyradiosky directory run ```pytest``` or ```python -m pytest```.
 
