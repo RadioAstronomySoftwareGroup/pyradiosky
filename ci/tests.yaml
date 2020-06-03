@@ -16,4 +16,4 @@ dependencies:
   - pyuvdata>=2.0.1
   - pip
   - pip:
-      - git+https://github.com/aelanman/lunarsky.git
+      - lunarsky

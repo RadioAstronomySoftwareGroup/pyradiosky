@@ -38,11 +38,13 @@ setup_args = {
     "extras_require": {
         "healpix": ["astropy-healpix"],
         "astroquery": ["astroquery"],
+        "lunarsky": ["lunarsky"],
         "all": ["astropy-healpix", "astroquery"],
         "doc": ["sphinx", "pypandoc"],
         "dev": [
             "astropy-healpix",
             "astroquery",
+            "lunarsky",
             "pytest",
             "pre-commit",
             "sphinx",

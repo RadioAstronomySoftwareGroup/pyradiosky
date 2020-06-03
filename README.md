@@ -56,6 +56,7 @@ Optional:
 
 * astropy-healpix (for working with beams in HEALPix formats)
 * astroquery (for downloading GLEAM and other VizieR catalogs)
+* lunarsky (for supporting telescope locations on the moon)
 
 We suggest using conda to install all the dependencies. To install
 pyuvdata, astropy-healpix and astroquery, you'll need to add conda-forge as a channel
@@ -66,10 +67,10 @@ You can install the optional dependencies via pip by specifying an option
 when you install pyradiosky, as in ```pip install .[healpix]```
 which will install all the required packages for using the HEALPix functionality
 in pyradiosky. The options that can be passed in this way are:
-[`healpix`, `astroquery`, `all`, `doc`, `dev`]. The `healpix` and  `astroquery`
-options enable various specific functionality while `all` will install all optional
-dependencies. The last two (`doc` and `dev`) may be useful for developers
-of pyradiosky.
+[`healpix`, `astroquery`, `lunarsky`, `all`, `doc`, `dev`].
+The first three (`healpix`,  `astroquery`, `lunarsky`) enable various specific
+functionality while `all` will install all optional dependencies.
+The last two (`doc` and `dev`) may be useful for developers of pyradiosky.
 
 ## Developer Installation
 Clone the repository using

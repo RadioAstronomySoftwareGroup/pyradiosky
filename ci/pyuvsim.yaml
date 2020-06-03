@@ -9,6 +9,7 @@ dependencies:
   - line_profiler
   - numpy
   - mpi4py>=3.0.0
+  - pip
   - psutil
   - pytest
   - pytest-runner
@@ -16,3 +17,5 @@ dependencies:
   - pyyaml
   - scipy
   - setuptools_scm
+  - pip:
+      - lunarsky

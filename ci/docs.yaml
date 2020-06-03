@@ -4,7 +4,6 @@ channels:
   - defaults
 dependencies:
   - astropy>=4.0
-  - astropy-healpix
   - h5py
   - numpy
   - h5py
@@ -16,5 +15,3 @@ dependencies:
   - sphinx
   - pyuvdata>=2.0.1
   - pip
-  - pip:
-      - git+https://github.com/aelanman/lunarsky.git

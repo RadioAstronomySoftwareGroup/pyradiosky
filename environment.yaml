@@ -18,4 +18,5 @@ dependencies:
   - setuptools_scm
   - sphinx
   - pip:
+      - lunarsky
       - pre-commit
