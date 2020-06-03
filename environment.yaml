@@ -6,17 +6,16 @@ dependencies:
   - astropy>=4.0
   - astropy-healpix
   - astroquery
-  - numpy
-  - pyyaml
-  - scipy
   - h5py
+  - numpy
   - coverage
+  - pip
+  - pypandoc
   - pytest-cov
   - pyuvdata
+  - pyyaml
+  - scipy
   - setuptools_scm
-  - flake8
-  - pip
+  - sphinx
   - pip:
-      - flake8-docstrings
-      - flake8-pytest
-      - flake8-black
+      - pre-commit

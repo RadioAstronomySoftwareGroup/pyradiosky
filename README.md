@@ -2,7 +2,8 @@
 ![](https://github.com/RadioAstronomySoftwareGroup/pyradiosky/workflows/Tests/badge.svg?branch=master)
 [![codecov](https://codecov.io/gh/RadioAstronomySoftwareGroup/pyradiosky/branch/master/graph/badge.svg)](https://codecov.io/gh/RadioAstronomySoftwareGroup/pyradiosky)
 
-Python objects and interfaces for representing diffuse, extended and compact astrophysical radio sources.
+Python objects and interfaces for representing diffuse, extended and compact
+astrophysical radio sources.
 
 pyradiosky is currently in a very early development stage, interfaces are changing rapidly.
 
@@ -24,7 +25,7 @@ We have not yet decided on a definitive versioning approach.
 We track all changes in our [changelog](https://github.com/RadioAstronomySoftwareGroup/pyradiosky/blob/master/CHANGELOG.md).
 
 ## Documentation
-Developer API documentation is hosted [here](https://radioastronomysoftwaregroup.github.io/pyradiosky/).
+Developer API documentation is hosted [here](https://pyradiosky.readthedocs.io/en/latest/).
 
 # Installation
 Simple installation via pip is available for users, developers should follow
@@ -65,10 +66,10 @@ You can install the optional dependencies via pip by specifying an option
 when you install pyradiosky, as in ```pip install .[healpix]```
 which will install all the required packages for using the HEALPix functionality
 in pyradiosky. The options that can be passed in this way are:
-[healpix, astroquery, dev]. The `healpix` and  `astroquery` options enable
-various specific functionality
-while `dev` will install all the optional dependencies as well as those required
-for testing and development.
+[`healpix`, `astroquery`, `all`, `doc`, `dev`]. The `healpix` and  `astroquery`
+options enable various specific functionality while `all` will install all optional
+dependencies. The last two (`doc` and `dev`) may be useful for developers
+of pyradiosky.
 
 ## Developer Installation
 Clone the repository using
@@ -89,12 +90,19 @@ you will need the following packages:
 * pytest-cov
 * coverage
 * pre-commit
+* sphinx
+* pypandoc
 
-One way to ensure you have all the needed packages is to use the included `environment.yaml` file to create a new environment that will
+One way to ensure you have all the needed packages is to use the included
+`environment.yaml` file to create a new environment that will
 contain all the optional dependencies along with dependencies required for
-testing and development (```conda env create -f environment.yml```). Alternatively, you can specify `dev` when installing pyradiosky (as in `pip install pyradiosky[dev]`) to install the packages needed for testing (including coverage and linting).
+testing and development (```conda env create -f environment.yml```).
+Alternatively, you can specify `dev` when installing pyradiosky
+(as in `pip install pyradiosky[dev]`) to install the packages needed for testing
+and documentation development.
 
-To use pre-commit to prevent committing code that does not follow our style, you'll need to run `pre-commit install` in the top level `pyradiosky` directory.
+To use pre-commit to prevent committing code that does not follow our style,
+you'll need to run `pre-commit install` in the top level `pyradiosky` directory.
 
 ## Tests
 Uses the `pytest` package to execute test suite.
