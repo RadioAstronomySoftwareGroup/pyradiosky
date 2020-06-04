@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ## Added
+- Documentation is now hosted on ReadTheDocs at https://pyradiosky.readthedocs.io/en/latest/
+- A utility function and a script to download the GLEAM catalog.
 - An `at_frequencies` function that will return a new SkyModel at requested frequencies.
 - A new `component_type` parameter that can be set to "healpix" or "point".
 - Better support for HEALPix maps, with new `nside` and `hpx_inds` parameters.

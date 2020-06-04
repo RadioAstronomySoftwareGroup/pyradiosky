@@ -1,0 +1,60 @@
+name: Build Documentation
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: Build Docs
+    runs-on: ubuntu-latest
+    env:
+      ENV_NAME: docs
+      PYTHON: ${{ matrix.python-version }}
+    strategy:
+      max-parallel: 4
+      matrix:
+        python-version: [3.6, 3.7, 3.8]
+
+    steps:
+      - uses: actions/checkout@master
+        with:
+          fetch-depth: 1
+
+      - name: Get Miniconda Linux
+        run: |
+          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O $HOME/miniconda.sh;
+          bash $HOME/miniconda.sh -b -p $HOME/miniconda
+
+      - name: Setup paths
+        shell: bash
+        run: |
+          echo "::add-path::$HOME/miniconda/bin"
+          echo "::add-path::$HOME/miniconda/envs/test/bin"
+
+      - name: Setup Environment
+        run: ./ci/install_conda.sh
+
+      - name: Install
+        run: |
+          source activate $ENV_NAME
+          pip install .
+
+      - name: Build docs
+        run: |
+          source activate $ENV_NAME
+          cd docs
+          make html
+          touch build/html/.nojekyll
+
+      - name: Upload docs
+        uses: actions/upload-artifact@v1
+        with:
+          name: docs
+          path: docs/build/html
+
+      # - name: Publish docs to Github Pages
+      #   # only publish from master branch
+      #   if: {{ github.ref == 'ref/head/master' }}
+      #   uses: JamesIves/github-pages-deploy-action@releases/v3
+      #   with:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     BRANCH: gh-pages # The branch the action should deploy to.
+      #     FOLDER: docs/build/html # The folder the action should deploy.

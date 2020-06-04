@@ -1,22 +1,17 @@
-name: pyradiosky
+name: docs
 channels:
   - conda-forge
   - defaults
 dependencies:
   - astropy>=4.0
-  - astropy-healpix
-  - astroquery
   - h5py
   - numpy
+  - h5py
+  - scipy
   - coverage
-  - pip
   - pypandoc
   - pytest-cov
-  - pyuvdata
-  - pyyaml
-  - scipy
   - setuptools_scm
   - sphinx
-  - pip:
-      - lunarsky
-      - pre-commit
+  - pyuvdata>=2.0.1
+  - pip

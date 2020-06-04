@@ -2,17 +2,19 @@
 ![](https://github.com/RadioAstronomySoftwareGroup/pyradiosky/workflows/Tests/badge.svg?branch=master)
 [![codecov](https://codecov.io/gh/RadioAstronomySoftwareGroup/pyradiosky/branch/master/graph/badge.svg)](https://codecov.io/gh/RadioAstronomySoftwareGroup/pyradiosky)
 
-Python objects and interfaces for representing diffuse, extended and compact astrophysical radio sources.
+Python objects and interfaces for representing diffuse, extended and compact
+astrophysical radio sources.
 
 pyradiosky is currently in a very early development stage, interfaces are changing rapidly.
 
 The primary user class is `SkyModel`, which supports:
+
   - catalogs of point sources (read/write to text files, read VOTables)
   - diffuse models as HEALPix maps (read/write to hd5 format)
   - conversion between RA/Dec and Azimuth/Elevation including calculating full
   polarization coherencies in Az/El.
 
-## Community Guidelines
+# Community Guidelines
 Contributions to this package to add new file formats or address any of the
 issues in the [issue log](https://github.com/RadioAstronomySoftwareGroup/pyradiosky/issues)
 are very welcome, as are bug reports and feature requests.
@@ -23,7 +25,7 @@ We have not yet decided on a definitive versioning approach.
 We track all changes in our [changelog](https://github.com/RadioAstronomySoftwareGroup/pyradiosky/blob/master/CHANGELOG.md).
 
 # Documentation
-We currently use docstrings in the code but will add Sphinx based documentation soon.
+Developer API documentation is hosted [here](https://pyradiosky.readthedocs.io/en/latest/).
 
 # Installation
 Simple installation via pip is available for users, developers should follow
@@ -38,12 +40,15 @@ See [Dependencies](#dependencies) for details on installing optional dependencie
 
 ## Dependencies
 
+If you are using `conda` to manage your environment, you may wish to install the
+following packages before installing `pyradiosky`:
+
 Required:
 
-* numpy >= 1.15
-* scipy
-* astropy >= 4.0
+* astropy>=4.0
 * h5py
+* numpy>=1.15
+* scipy>1.0.1
 * pyuvdata
 * setuptools_scm
 
@@ -51,8 +56,7 @@ Optional:
 
 * astropy-healpix (for working with beams in HEALPix formats)
 * astroquery (for downloading GLEAM and other VizieR catalogs)
-
-The numpy and astropy versions are important, so make sure these are up to date.
+* lunarsky (for supporting telescope locations on the moon)
 
 We suggest using conda to install all the dependencies. To install
 pyuvdata, astropy-healpix and astroquery, you'll need to add conda-forge as a channel
@@ -63,10 +67,10 @@ You can install the optional dependencies via pip by specifying an option
 when you install pyradiosky, as in ```pip install .[healpix]```
 which will install all the required packages for using the HEALPix functionality
 in pyradiosky. The options that can be passed in this way are:
-[healpix, astroquery, dev]. The `healpix` and  `astroquery` options enable
-various specific functionality
-while `dev` will install all the optional dependencies as well as those required
-for testing and development.
+[`healpix`, `astroquery`, `lunarsky`, `all`, `doc`, `dev`].
+The first three (`healpix`,  `astroquery`, `lunarsky`) enable various specific
+functionality while `all` will install all optional dependencies.
+The last two (`doc` and `dev`) may be useful for developers of pyradiosky.
 
 ## Developer Installation
 Clone the repository using
@@ -87,19 +91,27 @@ you will need the following packages:
 * pytest-cov
 * coverage
 * pre-commit
+* sphinx
+* pypandoc
 
-One way to ensure you have all the needed packages is to use the included `environment.yaml` file to create a new environment that will
+One way to ensure you have all the needed packages is to use the included
+`environment.yaml` file to create a new environment that will
 contain all the optional dependencies along with dependencies required for
-testing and development (```conda env create -f environment.yml```). Alternatively, you can specify `dev` when installing pyradiosky (as in `pip install pyradiosky[dev]`) to install the packages needed for testing (including coverage and linting).
+testing and development (```conda env create -f environment.yml```).
+Alternatively, you can specify `dev` when installing pyradiosky
+(as in `pip install pyradiosky[dev]`) to install the packages needed for testing
+and documentation development.
 
-To use pre-commit to prevent committing code that does not follow our style, you'll need to run `pre-commit install` in the top level `pyradiosky` directory.
+To use pre-commit to prevent committing code that does not follow our style,
+you'll need to run `pre-commit install` in the top level `pyradiosky` directory.
 
-## Tests
+# Tests
 Uses the `pytest` package to execute test suite.
 From the source pyradiosky directory run ```pytest``` or ```python -m pytest```.
 
 # Maintainers
 pyradiosky is maintained by the RASG Managers, which currently include:
+
  - Adam Beardsley (Arizona State University)
  - Bryna Hazelton (University of Washington)
  - Daniel Jacobs (Arizona State University)
