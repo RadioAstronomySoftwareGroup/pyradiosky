@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.0.2] - 2020-6-4
+
 ## Added
 - Documentation is now hosted on ReadTheDocs at https://pyradiosky.readthedocs.io/en/latest/
 - A utility function and a script to download the GLEAM catalog.
