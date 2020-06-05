@@ -3,13 +3,15 @@
 # Licensed under the 3-clause BSD License
 """Utility methods."""
 import os
+import warnings
 
 import numpy as np
-from astropy.constants import c
 from astropy import _erfa as erfa
 from astropy.coordinates.builtin_frames.utils import get_jd12
 from astropy.time import Time
 from astropy.coordinates import Angle
+import astropy.units as units
+from astropy.units import Quantity
 
 
 # The frame radio astronomers call the apparent or current epoch is the
@@ -71,21 +73,28 @@ def _cirs_to_tee_ra(cirs_ra, time):
     return tee_ra
 
 
-def stokes_to_coherency(stokes_vector):
+def stokes_to_coherency(stokes_arr):
     """
-    Convert Stokes vector to coherency matrix.
+    Convert Stokes array to coherency matrix.
 
     Parameters
     ----------
-    stokes_vector : array_like of float
-        Vector(s) of stokes parameters in order [I, Q, U, V], shape(4,) or (4, Nfreqs, Ncomponents)
+    stokes_arr : Quantity
+        Array of stokes parameters in order [I, Q, U, V], shape(4,) or (4, Nfreqs, Ncomponents).
 
     Returns
     -------
     coherency matrix : array of float
         Array of coherencies, shape (2, 2) or (2, 2, Nfreqs, Ncomponents)
     """
-    stokes_arr = np.atleast_1d(np.asarray(stokes_vector))
+    if not isinstance(stokes_arr, Quantity):
+        warnings.warn(
+            "In the future, stokes_arr will be required to be an astropy "
+            "Quantity. Currently, floats are assumed to be in Jy.",
+            category=DeprecationWarning,
+        )
+        stokes_arr = stokes_arr * units.Jy
+
     initial_shape = stokes_arr.shape
     if initial_shape[0] != 4:
         raise ValueError("First dimension of stokes_vector must be length 4.")
@@ -93,21 +102,25 @@ def stokes_to_coherency(stokes_vector):
     if stokes_arr.size == 4 and len(initial_shape) == 1:
         stokes_arr = stokes_arr[:, np.newaxis, np.newaxis]
 
-    coherency = 0.5 * np.array(
-        [
+    coherency = (
+        0.5
+        * np.array(
             [
-                stokes_arr[0, :, :] + stokes_arr[1, :, :],
-                stokes_arr[2, :, :] - 1j * stokes_arr[3, :, :],
-            ],
-            [
-                stokes_arr[2, :, :] + 1j * stokes_arr[3, :, :],
-                stokes_arr[0, :, :] - stokes_arr[1, :, :],
-            ],
-        ]
+                [
+                    stokes_arr[0, :, :] + stokes_arr[1, :, :],
+                    stokes_arr[2, :, :] - 1j * stokes_arr[3, :, :],
+                ],
+                [
+                    stokes_arr[2, :, :] + 1j * stokes_arr[3, :, :],
+                    stokes_arr[0, :, :] - stokes_arr[1, :, :],
+                ],
+            ]
+        )
+        * stokes_arr.unit
     )
 
     if stokes_arr.size == 4 and len(initial_shape) == 1:
-        coherency = np.squeeze(coherency)
+        coherency = coherency.squeeze()
     return coherency
 
 
@@ -117,32 +130,42 @@ def coherency_to_stokes(coherency_matrix):
 
     Parameters
     ----------
-    coherency matrix : array_like of float
+    coherency matrix : Quantity
         Array of coherencies, shape (2, 2) or (2, 2, Ncomponents)
 
     Returns
     -------
-    stokes_vector : array of float
-        Vector(s) of stokes parameters, shape(4,) or (4, Ncomponents)
+    stokes_arr : array of float
+        Array of stokes parameters, shape(4,) or (4, Ncomponents)
     """
-    coherency_arr = np.asarray(coherency_matrix)
-    initial_shape = coherency_arr.shape
+    if not isinstance(coherency_matrix, Quantity):
+        warnings.warn(
+            "In the future, coherency_matrix will be required to be an astropy "
+            "Quantity. Currently, floats are assumed to be in Jy.",
+            category=DeprecationWarning,
+        )
+        coherency_matrix = coherency_matrix * units.Jy
+
+    initial_shape = coherency_matrix.shape
     if len(initial_shape) < 2 or initial_shape[0] != 2 or initial_shape[1] != 2:
         raise ValueError("First two dimensions of coherency_matrix must be length 2.")
 
-    if coherency_arr.size == 4 and len(initial_shape) == 2:
-        coherency_arr = coherency_arr[:, :, np.newaxis]
+    if coherency_matrix.size == 4 and len(initial_shape) == 2:
+        coherency_matrix = coherency_matrix[:, :, np.newaxis]
 
-    stokes = np.array(
-        [
-            coherency_arr[0, 0, :] + coherency_arr[1, 1, :],
-            coherency_arr[0, 0, :] - coherency_arr[1, 1, :],
-            coherency_arr[0, 1, :] + coherency_arr[1, 0, :],
-            -(coherency_arr[0, 1, :] - coherency_arr[1, 0, :]).imag,
-        ]
-    ).real
-    if coherency_arr.size == 4 and len(initial_shape) == 2:
-        stokes = np.squeeze(stokes)
+    stokes = (
+        np.array(
+            [
+                coherency_matrix[0, 0, :] + coherency_matrix[1, 1, :],
+                coherency_matrix[0, 0, :] - coherency_matrix[1, 1, :],
+                coherency_matrix[0, 1, :] + coherency_matrix[1, 0, :],
+                -(coherency_matrix[0, 1, :] - coherency_matrix[1, 0, :]).imag,
+            ]
+        ).real
+        * coherency_matrix.unit
+    )
+    if coherency_matrix.size == 4 and len(initial_shape) == 2:
+        stokes = stokes.squeeze()
 
     return stokes
 
@@ -153,13 +176,20 @@ def jy_to_ksr(freqs):
 
     Parameters
     ----------
-    freqs : array_like of float
-        Frequencies in Hz.
+    freqs : :class:`astropy.Quantity` or array_like of float (Deprecated)
+        Frequencies, assumed to be in Hz if not a Quantity.
+
+    Returns
+    -------
+    Quantity
+        Conversion factor(s) to go from [Jy] to [K sr]. Shape equal to shape of freqs.
     """
-    c_cmps = c.to("cm/s").value  # cm/s
-    k_boltz = 1.380658e-16  # erg/K
-    lambdas = c_cmps / freqs  # cm
-    return 1e-23 * lambdas ** 2 / (2 * k_boltz)
+    if not isinstance(freqs, Quantity):
+        freqs = freqs * units.Hz
+    equiv = units.brightness_temperature(freqs, beam_area=1 * units.sr)
+    conv_factor = (1 * units.Jy).to(units.K, equivalencies=equiv) * units.sr / units.Jy
+
+    return conv_factor
 
 
 def download_gleam(path=".", filename="gleam.vot", overwrite=False, row_limit=None):
