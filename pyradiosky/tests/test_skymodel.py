@@ -1184,11 +1184,11 @@ def test_healpix_import_err(zenith_skymodel):
         zenith_skymodel.nside = 32
         zenith_skymodel.hpx_inds = 0
         with pytest.raises(ImportError, match=errstr):
-            skymodel.point_to_healpix()
+            zenith_skymodel.point_to_healpix()
 
         zenith_skymodel._set_component_type_params("healpix")
         with pytest.raises(ImportError, match=errstr):
-            skymodel.healpix_to_point()
+            zenith_skymodel.healpix_to_point()
 
 
 def test_healpix_positions(tmp_path, time_location):
