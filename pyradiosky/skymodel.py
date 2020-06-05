@@ -506,9 +506,7 @@ class SkyModel(UVBase):
                     f"Currently, floats are assumed to be in {default_unit}.",
                     category=DeprecationWarning,
                 )
-                self.stokes = np.asarray(stokes, dtype=np.float) * units.Unit(
-                    default_unit
-                )
+                self.stokes = np.asarray(stokes) * units.Unit(default_unit)
 
             if self.Ncomponents == 1:
                 self.stokes = self.stokes.reshape(4, self.Nfreqs, 1)
@@ -1925,8 +1923,7 @@ class SkyModel(UVBase):
             )
 
         stokes = Quantity(
-            np.zeros((4, len(flux_cols_use), len(astropy_table)), dtype=np.float)
-            * units.Unit(unit_use)
+            np.zeros((4, len(flux_cols_use), len(astropy_table))) * units.Unit(unit_use)
         )
         for index, col in enumerate(flux_cols_use):
             stokes[0, index, :] = astropy_table[col].quantity.to(unit_use)
@@ -2177,9 +2174,7 @@ class SkyModel(UVBase):
         ras = Longitude(catalog_table[col_names[1]], units.deg)
         decs = Latitude(catalog_table[col_names[2]], units.deg)
 
-        stokes = Quantity(
-            np.zeros((4, n_freqs, len(catalog_table)), dtype=np.float) * units.Jy
-        )
+        stokes = Quantity(np.zeros((4, n_freqs, len(catalog_table))) * units.Jy)
         for ind in np.arange(n_freqs):
             stokes[0, ind, :] = catalog_table[col_names[ind + 3]] * units.Jy
 
