@@ -227,14 +227,13 @@ def test_source_zenith_from_icrs(time_location):
     ra = icrs_coord.ra
     dec = icrs_coord.dec
 
-    with pytest.warns(
-        DeprecationWarning,
-        match="In the future, stokes will be required to be an astropy "
-        "Quantity with units that are convertable to one of",
-    ):
-        zenith_source = SkyModel(
-            name="icrs_zen", ra=ra, dec=dec, stokes=[1.0, 0, 0, 0], spectral_type="flat"
-        )
+    zenith_source = SkyModel(
+        name="icrs_zen",
+        ra=ra,
+        dec=dec,
+        stokes=[1.0, 0, 0, 0] * units.Jy,
+        spectral_type="flat",
+    )
 
     zenith_source.update_positions(time, array_location)
     zenith_source_lmn = zenith_source.pos_lmn.squeeze()
@@ -315,6 +314,30 @@ def test_skymodel_init_errors(zenith_skycoord):
             freq_array=[1e8] * units.m,
         )
 
+    with pytest.raises(ValueError, match=("For point component types, the stokes")):
+        SkyModel(
+            name="icrs_zen",
+            ra=ra,
+            dec=dec,
+            stokes=[1.0, 0, 0, 0] * units.m,
+            spectral_type="flat",
+            freq_array=[1e8] * units.Hz,
+        )
+
+    with pytest.raises(
+        ValueError, match=("For point component types, the coherency_radec")
+    ):
+        sky = SkyModel(
+            name="icrs_zen",
+            ra=ra,
+            dec=dec,
+            stokes=[1.0, 0, 0, 0] * units.Jy,
+            spectral_type="flat",
+            freq_array=[1e8] * units.Hz,
+        )
+        sky.coherency_radec = sky.coherency_radec.value * units.m
+        sky.check()
+
     with pytest.raises(
         ValueError,
         match=("reference_frequency must have a unit that can be converted to Hz."),
@@ -365,6 +388,21 @@ def test_skymodel_deprecated(time_location):
             stokes=[1.0, 0.0, 0.0, 0.0] * units.Jy,
             spectral_type="flat",
             reference_frequency=np.array([1e8]),
+        )
+    assert source_new == source_old
+
+    with pytest.warns(
+        DeprecationWarning,
+        match="In the future, stokes will be required to be an astropy "
+        "Quantity with units that are convertable to one of",
+    ):
+        source_old = SkyModel(
+            name="Test",
+            ra=Longitude(12.0 * units.hr),
+            dec=Latitude(-30.0 * units.deg),
+            stokes=[1.0, 0.0, 0.0, 0.0],
+            spectral_type="flat",
+            reference_frequency=np.array([1e8]) * units.Hz,
         )
     assert source_new == source_old
 
@@ -459,6 +497,128 @@ def test_skymodel_deprecated(time_location):
     ):
         source_new.update_positions(time, telescope_location)
         source_new.coherency_calc(telescope_location)
+
+
+@pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index"])
+def test_jansky_to_kelvin_loop(spec_type):
+
+    skyobj = SkyModel()
+    skyobj.read_gleam_catalog(GLEAM_vot, spectral_type=spec_type)
+
+    stokes_expected = np.zeros_like(skyobj.stokes.value) * units.K * units.sr
+    if spec_type == "subband":
+        brightness_temperature_conv = units.brightness_temperature(skyobj.freq_array)
+        for compi in range(skyobj.Ncomponents):
+            stokes_expected[:, :, compi] = (skyobj.stokes[:, :, compi] / units.sr).to(
+                units.K, brightness_temperature_conv
+            ) * units.sr
+    else:
+        brightness_temperature_conv = units.brightness_temperature(
+            skyobj.reference_frequency
+        )
+        stokes_expected = (skyobj.stokes / units.sr).to(
+            units.K, brightness_temperature_conv
+        ) * units.sr
+
+    skyobj2 = skyobj.copy()
+    skyobj2.jansky_to_kelvin()
+
+    assert units.quantity.allclose(skyobj2.stokes, stokes_expected, equal_nan=True)
+
+    # check no change if already in K
+    skyobj3 = skyobj2.copy()
+    skyobj3.jansky_to_kelvin()
+
+    assert skyobj3 == skyobj2
+
+    skyobj2.kelvin_to_jansky()
+
+    assert skyobj == skyobj2
+
+    # check no change if already in Jy
+    skyobj3 = skyobj2.copy()
+    skyobj3.kelvin_to_jansky()
+
+    assert skyobj3 == skyobj2
+
+
+def test_jansky_to_kelvin_loop_healpix(healpix_data):
+    healpix_filename = os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
+
+    skyobj = SkyModel()
+    skyobj.read_healpix_hdf5(healpix_filename)
+
+    stokes_expected = np.zeros_like(skyobj.stokes.value) * units.Jy / units.sr
+    brightness_temperature_conv = units.brightness_temperature(skyobj.freq_array)
+    for compi in range(skyobj.Ncomponents):
+        stokes_expected[:, :, compi] = (skyobj.stokes[:, :, compi]).to(
+            units.Jy / units.sr, brightness_temperature_conv
+        )
+    skyobj2 = skyobj.copy()
+    skyobj2.kelvin_to_jansky()
+
+    assert units.quantity.allclose(skyobj2.stokes, stokes_expected, equal_nan=True)
+
+    # check no change if already in Jy
+    skyobj3 = skyobj2.copy()
+    skyobj3.kelvin_to_jansky()
+
+    assert skyobj3 == skyobj2
+
+    skyobj2.jansky_to_kelvin()
+
+    assert skyobj == skyobj2
+
+    # check no change if already in K
+    skyobj3 = skyobj2.copy()
+    skyobj3.jansky_to_kelvin()
+
+    assert skyobj3 == skyobj2
+
+
+def test_jansky_to_kelvin_errors(zenith_skymodel):
+    with pytest.raises(
+        ValueError,
+        match="Either reference_frequency or freq_array must be set to convert to K.",
+    ):
+        zenith_skymodel.jansky_to_kelvin()
+
+    with pytest.raises(
+        ValueError,
+        match="Either reference_frequency or freq_array must be set to convert to Jy.",
+    ):
+        zenith_skymodel.stokes = zenith_skymodel.stokes.value * units.K * units.sr
+        zenith_skymodel.kelvin_to_jansky()
+
+
+def test_healpix_to_point_loop(healpix_data):
+
+    healpix_filename = os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
+
+    skyobj = SkyModel()
+    skyobj.read_healpix_hdf5(healpix_filename)
+
+    skyobj2 = skyobj.copy()
+    skyobj2.healpix_to_point()
+
+    skyobj2.point_to_healpix()
+
+    assert skyobj == skyobj2
+
+
+def test_healpix_to_point_errors(zenith_skymodel):
+    with pytest.raises(
+        ValueError,
+        match="This method can only be called if component_type is 'healpix'.",
+    ):
+        zenith_skymodel.healpix_to_point()
+
+    with pytest.raises(
+        ValueError,
+        match="This method can only be called if component_type is 'point' and "
+        "the nside and hpx_inds parameters are set.",
+    ):
+        zenith_skymodel.point_to_healpix()
 
 
 def test_update_position_errors(zenith_skymodel, time_location):
@@ -994,7 +1154,7 @@ def test_write_healpix_error(tmp_path):
         skyobj.write_healpix_hdf5(test_filename)
 
 
-def test_healpix_import_err():
+def test_healpix_import_err(zenith_skymodel):
     try:
         import astropy_healpix
 
@@ -1021,6 +1181,15 @@ def test_healpix_import_err():
         with pytest.raises(ImportError, match=errstr):
             skymodel.write_healpix_hdf5("filename.hdf5", hpmap, inds, freqs)
 
+        zenith_skymodel.nside = 32
+        zenith_skymodel.hpx_inds = 0
+        with pytest.raises(ImportError, match=errstr):
+            skymodel.point_to_healpix()
+
+        zenith_skymodel._set_component_type_params("healpix")
+        with pytest.raises(ImportError, match=errstr):
+            skymodel.healpix_to_point()
+
 
 def test_healpix_positions(tmp_path, time_location):
     pytest.importorskip("astropy_healpix")
@@ -1038,6 +1207,34 @@ def test_healpix_positions(tmp_path, time_location):
 
     stokes = np.zeros((4, Nfreqs, Npix))
     stokes[0] = hpx_map
+
+    with pytest.raises(
+        ValueError,
+        match="For healpix component types, the stokes parameter must have a "
+        "unit that can be converted to",
+    ):
+        skyobj = SkyModel(
+            nside=nside,
+            hpx_inds=range(Npix),
+            stokes=stokes * units.m,
+            freq_array=freqs * units.Hz,
+            spectral_type="full",
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="For healpix component types, the coherency_radec parameter must have a "
+        "unit that can be converted to",
+    ):
+        skyobj = SkyModel(
+            nside=nside,
+            hpx_inds=range(Npix),
+            stokes=stokes * units.K,
+            freq_array=freqs * units.Hz,
+            spectral_type="full",
+        )
+        skyobj.coherency_radec = skyobj.coherency_radec.value * units.m
+        skyobj.check()
 
     with pytest.warns(
         DeprecationWarning,
@@ -1632,6 +1829,17 @@ def test_read_votable_errors():
             "DEJ2000",
             "Fintwide",
             reference_frequency=200e6,
+        )
+
+    with pytest.raises(ValueError, match="All flux columns must have compatible units"):
+        skyobj.read_votable_catalog(
+            GLEAM_vot,
+            "GLEAM",
+            "GLEAM",
+            "RAJ2000",
+            "DEJ2000",
+            ["Fintwide", "Fpwide"],
+            freq_array=[150e6, 200e6] * units.Hz,
         )
 
 

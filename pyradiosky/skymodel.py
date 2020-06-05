@@ -598,24 +598,21 @@ class SkyModel(UVBase):
 
         for param in [self._stokes, self._coherency_radec]:
             param_unit = param.value.unit
-            if self.component_type == "healpix":
-                if not (
-                    param_unit.is_equivalent("Jy/sr") or param_unit.is_equivalent("K")
-                ):
-                    raise ValueError(
-                        f"For 'healpix' component types, the {param.name} parameter "
-                        "must have a unit that can be converted to Jy/sr or K."
-                        f"Currently units are {self.stokes.unit}"
-                    )
+            if self.component_type == "point":
+                allowed_units = ["Jy", "K sr"]
             else:
-                if not (
-                    param_unit.is_equivalent("Jy") or param_unit.is_equivalent("K sr")
-                ):
-                    raise ValueError(
-                        f"For 'point' component types, the {param.name} parameter "
-                        "must have a unit that can be converted to Jy or K sr."
-                        f"Currently units are {self.stokes.unit}"
-                    )
+                allowed_units = ["Jy/sr", "K"]
+
+            if not (
+                param_unit.is_equivalent(allowed_units[0])
+                or param_unit.is_equivalent(allowed_units[1])
+            ):
+                raise ValueError(
+                    f"For {self.component_type} component types, the "
+                    f"{param.name} parameter must have a unit that can be "
+                    f"converted to {allowed_units}. "
+                    f"Currently units are {self.stokes.unit}"
+                )
 
         # Run the basic check from UVBase
         super(SkyModel, self).check(
@@ -716,7 +713,7 @@ class SkyModel(UVBase):
         """
         this_unit = self.stokes.unit
         if self.component_type == "point":
-            if this_unit.is_equivalent("Kr sr"):
+            if this_unit.is_equivalent("K sr"):
                 return
 
         else:
@@ -741,7 +738,7 @@ class SkyModel(UVBase):
             )
         else:
             raise ValueError(
-                "Either reference_frequency or freq_array must be set to convert to Jy."
+                "Either reference_frequency or freq_array must be set to convert to K."
             )
 
         self.stokes = self.stokes * conv_factor
@@ -1911,18 +1908,20 @@ class SkyModel(UVBase):
         for index, col in enumerate(flux_cols_use):
             col_units.append(astropy_table[col].unit)
 
-        possible_units = ["Jy", "Jy/sr", "K", "K sr"]
+        allowed_units = ["Jy", "Jy/sr", "K", "K sr"]
         unit_use = None
-        for pos_unit in possible_units:
+        for unit_option in allowed_units:
             if np.all(
-                np.array([this_unit.is_equivalent(pos_unit) for this_unit in col_units])
+                np.array(
+                    [this_unit.is_equivalent(unit_option) for this_unit in col_units]
+                )
             ):
-                unit_use = pos_unit
+                unit_use = unit_option
                 break
         if unit_use is None:
             raise ValueError(
                 "All flux columns must have compatible units and must be compatible "
-                f"with one of {possible_units}."
+                f"with one of {allowed_units}."
             )
 
         stokes = Quantity(
@@ -2393,10 +2392,7 @@ class SkyModel(UVBase):
             raise ValueError("component_type must be 'healpix' to use this method.")
 
         self.check()
-        if isinstance(self.stokes, Quantity):
-            hpmap = self.stokes[0, :, :].to(units.K).value
-        else:
-            hpmap = self.stokes[0, :, :]
+        hpmap = self.stokes[0, :, :].to(units.K).value
 
         history = self.history
         if history is None:

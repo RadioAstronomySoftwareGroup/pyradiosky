@@ -184,8 +184,10 @@ def jy_to_ksr(freqs):
     Quantity
         Conversion factor(s) to go from [Jy] to [K sr]. Shape equal to shape of freqs.
     """
+    freqs = np.atleast_1d(freqs)
     if not isinstance(freqs, Quantity):
         freqs = freqs * units.Hz
+
     equiv = units.brightness_temperature(freqs, beam_area=1 * units.sr)
     conv_factor = (1 * units.Jy).to(units.K, equivalencies=equiv) * units.sr / units.Jy
 
