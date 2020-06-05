@@ -197,6 +197,18 @@ def test_init_error(zenith_skycoord):
         )
 
 
+@pytest.mark.parametrize("spec_type", ["spectral_index", "full", "subband"])
+def test_init_error_freqparams(zenith_skycoord, spec_type):
+    with pytest.raises(ValueError, match="If initializing with values, all of"):
+        SkyModel(
+            name="zenith_source",
+            ra=zenith_skycoord.ra,
+            dec=zenith_skycoord.dec,
+            stokes=[1.0, 0, 0, 0],
+            spectral_type=spec_type,
+        )
+
+
 def test_source_zenith_from_icrs(time_location):
     """Test single source position at zenith constructed using icrs."""
     time, array_location = time_location
