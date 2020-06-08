@@ -753,6 +753,10 @@ class SkyModel(UVBase):
         Convert a healpix component_type object to a point component_type.
 
         Multiply by the pixel area and optionally convert to Jy.
+        This effectively treats diffuse pixels as unresolved point sources by
+        integrating over the pixel area. Whether or not this is a good assumption
+        depends on the nside and the resolution of the telescope, so it should be
+        used with care, but it is provided here as a convenience.
 
         Parameters
         ----------
@@ -805,8 +809,10 @@ class SkyModel(UVBase):
         """
         Convert a point component_type object to a healpix component_type.
 
-        Requires that the `hpx_inds` and `nside` parameters are set.
+        Requires that the `hpx_inds` and `nside` parameters are set on the object.
         Divide by the pixel area and optionally convert to K.
+        This method is provided as a convenience for users to be able to undo
+        the `healpix_to_point` method.
 
         Parameters
         ----------
