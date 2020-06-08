@@ -506,7 +506,7 @@ class SkyModel(UVBase):
                     f"Currently, floats are assumed to be in {default_unit}.",
                     category=DeprecationWarning,
                 )
-                self.stokes = np.asarray(stokes) * units.Unit(default_unit)
+                self.stokes = Quantity(np.asarray(stokes), default_unit)
 
             if self.Ncomponents == 1:
                 self.stokes = self.stokes.reshape(4, self.Nfreqs, 1)
@@ -1324,9 +1324,9 @@ class SkyModel(UVBase):
             done using lst, and the lsts are calculated with astropy, the
             required buffer should _not_ drift with time since the J2000 epoch.
             The default buffer has been tested around julian date 2457458.0.
-        min_flux : Quantity
+        min_flux : Quantity or float
             Minimum stokes I flux to select on. If not a Quantity, assumed to be in Jy.
-        max_flux : float
+        max_flux : Quantity or float
             Maximum stokes I flux to select. If not a Quantity, assumed to be in Jy.
         freq_range : :class:`astropy.Quantity`
             Frequency range over which the min and max flux tests should be performed.
@@ -1524,15 +1524,15 @@ class SkyModel(UVBase):
 
         for ii in range(4):
             if stokes_keep[ii]:
-                arr[stokes_names[ii][0]] = self.stokes[ii].T
+                arr[stokes_names[ii][0]] = self.stokes[ii].T.to("Jy").value
 
         if self.freq_array is not None:
             if self.spectral_type == "subband":
-                arr["subband_frequency"] = self.freq_array
+                arr["subband_frequency"] = self.freq_array.to("Hz").value
             else:
-                arr["frequency"] = self.freq_array
+                arr["frequency"] = self.freq_array.to("Hz").value
         elif self.reference_frequency is not None:
-            arr["frequency"] = self.reference_frequency
+            arr["frequency"] = self.reference_frequency.to("Hz").value
             if self.spectral_index is not None:
                 arr["spectral_index"] = self.spectral_index
 
@@ -1633,7 +1633,7 @@ class SkyModel(UVBase):
 
         # Read Stokes parameters
         Nfreqs = 1 if freq_array is None else freq_array.size
-        stokes = Quantity(np.zeros((4, Nfreqs, Ncomponents)) * units.Jy)
+        stokes = Quantity(np.zeros((4, Nfreqs, Ncomponents)), "Jy")
         for ii, spar in enumerate(["I", "Q", "U", "V"]):
             if spar in recarray_in.dtype.names:
                 stokes[ii] = recarray_in[spar].T * units.Jy
@@ -1729,9 +1729,7 @@ class SkyModel(UVBase):
         freq = Quantity(freqs, "hertz")
 
         # hmap is in K
-        stokes = Quantity(
-            np.zeros((4, len(freq), len(indices))) * units.Unit(hpmap_units)
-        )
+        stokes = Quantity(np.zeros((4, len(freq), len(indices))), hpmap_units)
         stokes[0] = hpmap * units.Unit(hpmap_units)
 
         self.__init__(
@@ -1775,6 +1773,9 @@ class SkyModel(UVBase):
     ):
         """
         Read a votable catalog file into this object.
+
+        This reader uses the units in the file, the units should be specified
+        following the VOTable conventions.
 
         Parameters
         ----------
@@ -1923,7 +1924,7 @@ class SkyModel(UVBase):
             )
 
         stokes = Quantity(
-            np.zeros((4, len(flux_cols_use), len(astropy_table))) * units.Unit(unit_use)
+            np.zeros((4, len(flux_cols_use), len(astropy_table))), unit_use
         )
         for index, col in enumerate(flux_cols_use):
             stokes[0, index, :] = astropy_table[col].quantity.to(unit_use)
@@ -2174,7 +2175,7 @@ class SkyModel(UVBase):
         ras = Longitude(catalog_table[col_names[1]], units.deg)
         decs = Latitude(catalog_table[col_names[2]], units.deg)
 
-        stokes = Quantity(np.zeros((4, n_freqs, len(catalog_table))) * units.Jy)
+        stokes = Quantity(np.zeros((4, n_freqs, len(catalog_table))), "Jy")
         for ind in np.arange(n_freqs):
             stokes[0, ind, :] = catalog_table[col_names[ind + 3]] * units.Jy
 
@@ -2270,7 +2271,7 @@ class SkyModel(UVBase):
         else:
             use_beam_amps = False
             beam_amp = None
-        stokes = Quantity(np.zeros((4, Nsrcs)) * units.Jy)
+        stokes = Quantity(np.zeros((4, Nsrcs)), "Jy")
         for src in range(Nsrcs):
             stokes[0, src] = catalog["flux"][src]["I"][0] * units.Jy
             stokes[1, src] = catalog["flux"][src]["Q"][0] * units.Jy
@@ -2312,7 +2313,7 @@ class SkyModel(UVBase):
                     source_group_id += 1
                     ra = np.insert(ra, use_index, src["ra"])
                     dec = np.insert(dec, use_index, src["dec"])
-                    stokes_ext = Quantity(np.zeros((4, Ncomps)) * units.Jy)
+                    stokes_ext = Quantity(np.zeros((4, Ncomps)), "Jy")
                     if use_beam_amps:
                         beam_amp_ext = np.zeros((4, Ncomps))
                     for comp in range(Ncomps):
@@ -2671,7 +2672,7 @@ def healpix_to_sky(hpmap, indices, freqs):
     ra, dec = astropy_healpix.healpix_to_lonlat(indices, nside)
     freq = Quantity(freqs, "hertz")
 
-    stokes = Quantity(np.zeros((4, len(freq), len(indices))) * units.K)
+    stokes = Quantity(np.zeros((4, len(freq), len(indices))), "K")
     stokes[0] = hpmap * units.K
 
     sky = SkyModel(
