@@ -62,16 +62,6 @@ except ImportError:
         pass
 
 
-# Nov 5 2019 notes
-#    Read/write methods to add:
-#        FHD save file -- (read only)
-#        VOTable -- (needs a write method)
-#        HDF5 HEALPix --- (needs a write method)
-#        HEALPix fits files
-
-#    Convert stokes and coherency to Astropy quantities.
-
-
 class TelescopeLocationParameter(UVParameter):
     def __eq__(self, other):
         return self.value == other.value
@@ -136,8 +126,9 @@ class SkyModel(UVBase):
         source RA in J2000 (or ICRS) coordinates, shape (Ncomponents,).
     dec : :class:`astropy.Latitude`
         source Dec in J2000 (or ICRS) coordinates, shape (Ncomponents,).
-    stokes : array_like of float
-        4 element vector giving the source [I, Q, U, V], shape (4, Nfreqs, Ncomponents).
+    stokes : :class:`astropy.Quantity` or array_like of float (Deprecated)
+        The source flux, shape (4, Nfreqs, Ncomponents). The first axis indexes
+        the polarization as [I, Q, U, V].
     spectral_type : str
         Indicates how fluxes should be calculated at each frequency.
 
@@ -224,8 +215,9 @@ class SkyModel(UVBase):
         desc = (
             "Type of component, options are: 'healpix', 'point'. "
             "If component_type is 'healpix', the components are the pixels in a "
-            "HEALPix map. If the component_type is 'point', the components are "
-            "point-like sources. "
+            "HEALPix map in units compatible with K or Jy/sr. "
+            "If the component_type is 'point', the components are "
+            "point-like sources in units compatible with Jy or K sr. "
             "Determines which parameters are required."
         )
         self._component_type = UVParameter(
@@ -281,7 +273,7 @@ class SkyModel(UVBase):
             "stokes",
             description=desc,
             form=(4, "Nfreqs", "Ncomponents"),
-            expected_type=(float, np.float64),
+            expected_type=Quantity,
         )
 
         # The coherency is a 2x2 matrix giving electric field correlation in Jy
@@ -289,7 +281,7 @@ class SkyModel(UVBase):
             "coherency_radec",
             description="Ra/Dec coherency per component",
             form=(2, 2, "Nfreqs", "Ncomponents"),
-            expected_type=np.complex,
+            expected_type=Quantity,
         )
 
         desc = (
@@ -370,7 +362,7 @@ class SkyModel(UVBase):
 
         desc = (
             "Boolean indicator of whether this source is above the horizon "
-            "at the current time. "
+            "at the current time and location. "
             "True indicates the source is above the horizon."
         )
         self._above_horizon = UVParameter(
@@ -498,7 +490,24 @@ class SkyModel(UVBase):
             if spectral_index is not None:
                 self.spectral_index = np.atleast_1d(spectral_index)
 
-            self.stokes = np.asarray(stokes, dtype=np.float)
+            if self.component_type == "point":
+                allowed_units = ["Jy", "K sr"]
+                default_unit = "Jy"
+            else:
+                allowed_units = ["Jy/sr", "K"]
+                default_unit = "K"
+
+            if isinstance(stokes, Quantity):
+                self.stokes = stokes
+            else:
+                warnings.warn(
+                    "In the future, stokes will be required to be an astropy "
+                    f"Quantity with units that are convertable to one of {allowed_units}. "
+                    f"Currently, floats are assumed to be in {default_unit}.",
+                    category=DeprecationWarning,
+                )
+                self.stokes = Quantity(np.asarray(stokes), default_unit)
+
             if self.Ncomponents == 1:
                 self.stokes = self.stokes.reshape(4, self.Nfreqs, 1)
 
@@ -585,6 +594,24 @@ class SkyModel(UVBase):
                 "Only one of freq_array and reference_frequency can be specified, not both."
             )
 
+        for param in [self._stokes, self._coherency_radec]:
+            param_unit = param.value.unit
+            if self.component_type == "point":
+                allowed_units = ["Jy", "K sr"]
+            else:
+                allowed_units = ["Jy/sr", "K"]
+
+            if not (
+                param_unit.is_equivalent(allowed_units[0])
+                or param_unit.is_equivalent(allowed_units[1])
+            ):
+                raise ValueError(
+                    f"For {self.component_type} component types, the "
+                    f"{param.name} parameter must have a unit that can be "
+                    f"converted to {allowed_units}. "
+                    f"Currently units are {self.stokes.unit}"
+                )
+
         # Run the basic check from UVBase
         super(SkyModel, self).check(
             check_extra=check_extra, run_check_acceptability=run_check_acceptability
@@ -592,20 +619,16 @@ class SkyModel(UVBase):
 
         # make sure freq_array or reference_frequency if present is compatible with Hz
         if self.freq_array is not None:
-            try:
-                self.freq_array.to("Hz")
-            except (units.UnitConversionError) as e:
+            if not self.freq_array.unit.is_equivalent("Hz"):
                 raise ValueError(
                     "freq_array must have a unit that can be converted to Hz."
-                ) from e
+                )
 
         if self.reference_frequency is not None:
-            try:
-                self.reference_frequency.to("Hz")
-            except (units.UnitConversionError) as e:
+            if not self.reference_frequency.unit.is_equivalent("Hz"):
                 raise ValueError(
                     "reference_frequency must have a unit that can be converted to Hz."
-                ) from e
+                )
 
         return True
 
@@ -639,6 +662,207 @@ class SkyModel(UVBase):
 
         return equal
 
+    def kelvin_to_jansky(self):
+        """
+        Apply a conversion to stokes from K-based units to Jy-based units.
+
+        No conversion is applied if stokes is already compatible with Jy
+        (for point component_type) or Jy/sr (for healpix component_type).
+        """
+        this_unit = self.stokes.unit
+        if self.component_type == "point":
+            if this_unit.is_equivalent("Jy"):
+                return
+
+        else:
+            if this_unit.is_equivalent("Jy/sr"):
+                return
+
+        if self.spectral_type == "spectral_index" or (
+            self.spectral_type == "flat" and self.reference_frequency is not None
+        ):
+            conv_factor = 1 / skyutils.jy_to_ksr(self.reference_frequency)
+            conv_factor = np.repeat(
+                np.repeat(conv_factor[np.newaxis, np.newaxis, :], 4, axis=0),
+                self.Nfreqs,
+                axis=1,
+            )
+        elif self.freq_array is not None:
+            conv_factor = 1 / skyutils.jy_to_ksr(self.freq_array)
+            conv_factor = np.repeat(
+                np.repeat(conv_factor[np.newaxis, :, np.newaxis], 4, axis=0),
+                self.Ncomponents,
+                axis=2,
+            )
+        else:
+            raise ValueError(
+                "Either reference_frequency or freq_array must be set to convert to Jy."
+            )
+
+        self.stokes = self.stokes * conv_factor
+        self.coherency_radec = skyutils.stokes_to_coherency(self.stokes)
+
+    def jansky_to_kelvin(self):
+        """
+        Apply a conversion to stokes from Jy-based units to K-based units.
+
+        No conversion is applied if stokes is already compatible with K sr
+        (for point component_type) or K (for healpix component_type).
+        """
+        this_unit = self.stokes.unit
+        if self.component_type == "point":
+            if this_unit.is_equivalent("K sr"):
+                return
+
+        else:
+            if this_unit.is_equivalent("K"):
+                return
+
+        if self.spectral_type == "spectral_index" or (
+            self.spectral_type == "flat" and self.reference_frequency is not None
+        ):
+            conv_factor = skyutils.jy_to_ksr(self.reference_frequency)
+            conv_factor = np.repeat(
+                np.repeat(conv_factor[np.newaxis, np.newaxis, :], 4, axis=0),
+                self.Nfreqs,
+                axis=1,
+            )
+        elif self.freq_array is not None:
+            conv_factor = skyutils.jy_to_ksr(self.freq_array)
+            conv_factor = np.repeat(
+                np.repeat(conv_factor[np.newaxis, :, np.newaxis], 4, axis=0),
+                self.Ncomponents,
+                axis=2,
+            )
+        else:
+            raise ValueError(
+                "Either reference_frequency or freq_array must be set to convert to K."
+            )
+
+        self.stokes = self.stokes * conv_factor
+        self.coherency_radec = skyutils.stokes_to_coherency(self.stokes)
+
+    def healpix_to_point(
+        self,
+        to_jy=True,
+        run_check=True,
+        check_extra=True,
+        run_check_acceptability=True,
+    ):
+        """
+        Convert a healpix component_type object to a point component_type.
+
+        Multiply by the pixel area and optionally convert to Jy.
+        This effectively treats diffuse pixels as unresolved point sources by
+        integrating over the pixel area. Whether or not this is a good assumption
+        depends on the nside and the resolution of the telescope, so it should be
+        used with care, but it is provided here as a convenience.
+
+        Parameters
+        ----------
+        to_jy : bool
+            Option to convert to Jy compatible units.
+        run_check : bool
+            Option to check for the existence and proper shapes of parameters
+            after downselecting data on this object (the default is True,
+            meaning the check will be run).
+        check_extra : bool
+            Option to check optional parameters as well as required ones (the
+            default is True, meaning the optional parameters will be checked).
+        run_check_acceptability : bool
+            Option to check acceptable range of the values of parameters after
+            downselecting data on this object (the default is True, meaning the
+            acceptable range check will be done).
+
+        """
+        if self.component_type != "healpix":
+            raise ValueError(
+                "This method can only be called if component_type is 'healpix'."
+            )
+
+        try:
+            import astropy_healpix
+        except ImportError as e:
+            raise ImportError(
+                "The astropy-healpix module must be installed to use HEALPix methods"
+            ) from e
+
+        self._set_component_type_params("point")
+        self.stokes = self.stokes * astropy_healpix.nside_to_pixel_area(self.nside)
+        self.coherency_radec = (
+            self.coherency_radec * astropy_healpix.nside_to_pixel_area(self.nside)
+        )
+        name_use = ["nside" + str(self.nside) + "_" + str(ind) for ind in self.hpx_inds]
+        self.name = name_use
+
+        if to_jy:
+            self.kelvin_to_jansky()
+
+        if run_check:
+            self.check(
+                check_extra=check_extra, run_check_acceptability=run_check_acceptability
+            )
+
+    def point_to_healpix(
+        self, to_k=True, run_check=True, check_extra=True, run_check_acceptability=True,
+    ):
+        """
+        Convert a point component_type object to a healpix component_type.
+
+        Requires that the `hpx_inds` and `nside` parameters are set on the object.
+        Divide by the pixel area and optionally convert to K.
+        This method is provided as a convenience for users to be able to undo
+        the `healpix_to_point` method.
+
+        Parameters
+        ----------
+        to_k : bool
+            Option to convert to K compatible units.
+        run_check : bool
+            Option to check for the existence and proper shapes of parameters
+            after downselecting data on this object (the default is True,
+            meaning the check will be run).
+        check_extra : bool
+            Option to check optional parameters as well as required ones (the
+            default is True, meaning the optional parameters will be checked).
+        run_check_acceptability : bool
+            Option to check acceptable range of the values of parameters after
+            downselecting data on this object (the default is True, meaning the
+            acceptable range check will be done).
+
+        """
+        if (
+            not self.component_type == "point"
+            or self.nside is None
+            or self.hpx_inds is None
+        ):
+            raise ValueError(
+                "This method can only be called if component_type is 'point' and "
+                "the nside and hpx_inds parameters are set."
+            )
+
+        try:
+            import astropy_healpix
+        except ImportError as e:
+            raise ImportError(
+                "The astropy-healpix module must be installed to use HEALPix methods"
+            ) from e
+
+        self._set_component_type_params("healpix")
+        self.stokes = self.stokes / astropy_healpix.nside_to_pixel_area(self.nside)
+        self.coherency_radec = (
+            self.coherency_radec / astropy_healpix.nside_to_pixel_area(self.nside)
+        )
+        self.name = None
+
+        if to_k:
+            self.jansky_to_kelvin()
+
+        if run_check:
+            self.check(
+                check_extra=check_extra, run_check_acceptability=run_check_acceptability
+            )
+
     def at_frequencies(
         self, freqs, inplace=True, freq_interp_kind="cubic", run_check=True,
     ):
@@ -666,8 +890,6 @@ class SkyModel(UVBase):
             Run check on new SkyModel.
             Default True.
         """
-        freqs = np.atleast_1d(freqs)
-
         if inplace:
             sky = self
         else:
@@ -676,16 +898,15 @@ class SkyModel(UVBase):
         if self.spectral_type == "spectral_index":
             sky.stokes = (
                 self.stokes
-                * (
-                    freqs[:, None].to("Hz").value
-                    / self.reference_frequency[None, :].to("Hz").value
-                )
+                * (freqs[:, None].to("Hz") / self.reference_frequency[None, :].to("Hz"))
                 ** self.spectral_index[None, :]
             )
             sky.reference_frequency = None
         elif self.spectral_type == "full":
             # Find a subset of the current array.
-            matches = np.isin(self.freq_array, freqs, assume_unique=True)
+            matches = np.isin(
+                self.freq_array.to("Hz"), freqs.to("Hz"), assume_unique=True
+            )
             if not np.sum(matches) == freqs.size:
                 raise ValueError(
                     "Some requested frequencies are not "
@@ -694,13 +915,18 @@ class SkyModel(UVBase):
             sky.stokes = self.stokes[:, matches, :]
         elif self.spectral_type == "subband":
             # Interpolate.
+            stokes_unit = self.stokes.unit
             finterp = scipy.interpolate.interp1d(
-                self.freq_array, self.stokes, axis=1, kind=freq_interp_kind
+                self.freq_array.to("Hz").value,
+                self.stokes.value,
+                axis=1,
+                kind=freq_interp_kind,
             )
-            sky.stokes = finterp(freqs)
+            sky.stokes = finterp(freqs) * stokes_unit
         else:
             # flat spectrum
-            sky.stokes = np.repeat(self.stokes, len(freqs), axis=1)
+            stokes_unit = self.stokes.unit
+            sky.stokes = np.repeat(self.stokes.value, len(freqs), axis=1) * stokes_unit
 
         sky.reference_frequency = None
         sky.Nfreqs = freqs.size
@@ -1104,10 +1330,10 @@ class SkyModel(UVBase):
             done using lst, and the lsts are calculated with astropy, the
             required buffer should _not_ drift with time since the J2000 epoch.
             The default buffer has been tested around julian date 2457458.0.
-        min_flux : float
-            Minimum stokes I flux to select [Jy]
-        max_flux : float
-            Maximum stokes I flux to select [Jy]
+        min_flux : Quantity or float
+            Minimum stokes I flux to select on. If not a Quantity, assumed to be in Jy.
+        max_flux : Quantity or float
+            Maximum stokes I flux to select. If not a Quantity, assumed to be in Jy.
         freq_range : :class:`astropy.Quantity`
             Frequency range over which the min and max flux tests should be performed.
             Must be length 2. If None, use the range over which the object is defined.
@@ -1140,11 +1366,16 @@ class SkyModel(UVBase):
             if not np.atleast_1d(freq_range).size == 2:
                 raise ValueError("freq_range must have 2 elements.")
 
-        if min_flux or max_flux:
+        if min_flux is not None or max_flux is not None:
             if skyobj.spectral_type == "spectral_index":
                 raise NotImplementedError(
                     "Flux cuts with spectral index type objects is not supported yet."
                 )
+
+            if min_flux is not None and not isinstance(min_flux, Quantity):
+                min_flux = min_flux * units.Jy
+            if max_flux is not None and not isinstance(max_flux, Quantity):
+                max_flux = max_flux * units.Jy
 
             freq_inds_use = slice(None)
 
@@ -1160,13 +1391,13 @@ class SkyModel(UVBase):
                     freqs_inds_use = np.arange(skyobj.Nfreqs)
 
             # just cut on Stokes I
-            if min_flux:
+            if min_flux is not None:
                 comp_inds_to_keep = np.where(
                     np.min(skyobj.stokes[0, freq_inds_use, :], axis=0) > min_flux
                 )[0]
                 skyobj.select(component_inds=comp_inds_to_keep, run_check=False)
 
-            if max_flux:
+            if max_flux is not None:
                 comp_inds_to_keep = np.where(
                     np.max(skyobj.stokes[0, freq_inds_use, :], axis=0) < max_flux
                 )[0]
@@ -1224,14 +1455,19 @@ class SkyModel(UVBase):
         This is used by pyuvsim for sharing catalog data via MPI.
         """
         self.check()
+        original_comp_type = self.component_type
+        if isinstance(self.stokes, Quantity):
+            original_units_k = self.stokes.unit.is_equivalent(
+                "K"
+            ) or self.stokes.unit.is_equivalent("K sr")
 
-        if self.name is None:
-            name_use = [
-                "nside" + str(self.nside) + "_" + str(ind) for ind in self.hpx_inds
-            ]
+        if self.component_type == "healpix":
+            self.healpix_to_point(to_jy=True)
         else:
-            name_use = self.name
-        max_name_len = np.max([len(name) for name in name_use])
+            # make sure we're in Jy units
+            self.kelvin_to_jansky()
+
+        max_name_len = np.max([len(name) for name in self.name])
         fieldtypes = ["U" + str(max_name_len), "f8", "f8"]
         fieldnames = ["source_id", "ra_j2000", "dec_j2000"]
         # Alias "flux_density_" for "I", etc.
@@ -1241,7 +1477,7 @@ class SkyModel(UVBase):
 
         n_stokes = 0
         stokes_keep = []
-        for si, total in enumerate(np.nansum(self.stokes, axis=(1, 2))):
+        for si, total in enumerate(np.nansum(self.stokes.to("Jy"), axis=(1, 2))):
             if total > 0:
                 fieldnames.append(stokes_names[si])
                 fieldshapes.append((self.Nfreqs,))
@@ -1288,21 +1524,21 @@ class SkyModel(UVBase):
         dt = np.dtype(list(zip(fieldnames, fieldtypes, fieldshapes)))
 
         arr = np.empty(self.Ncomponents, dtype=dt)
-        arr["source_id"] = name_use
+        arr["source_id"] = self.name
         arr["ra_j2000"] = self.ra.deg
         arr["dec_j2000"] = self.dec.deg
 
         for ii in range(4):
             if stokes_keep[ii]:
-                arr[stokes_names[ii][0]] = self.stokes[ii].T
+                arr[stokes_names[ii][0]] = self.stokes[ii].T.to("Jy").value
 
         if self.freq_array is not None:
             if self.spectral_type == "subband":
-                arr["subband_frequency"] = self.freq_array
+                arr["subband_frequency"] = self.freq_array.to("Hz").value
             else:
-                arr["frequency"] = self.freq_array
+                arr["frequency"] = self.freq_array.to("Hz").value
         elif self.reference_frequency is not None:
-            arr["frequency"] = self.reference_frequency
+            arr["frequency"] = self.reference_frequency.to("Hz").value
             if self.spectral_index is not None:
                 arr["spectral_index"] = self.spectral_index
 
@@ -1316,6 +1552,11 @@ class SkyModel(UVBase):
             " `flux_density_I` etc. in the future. Use `I` instead.",
             DeprecationWarning,
         )
+
+        if original_comp_type == "healpix":
+            self.point_to_healpix()
+        if original_units_k:
+            self.jansky_to_kelvin()
 
         return arr
 
@@ -1398,19 +1639,12 @@ class SkyModel(UVBase):
 
         # Read Stokes parameters
         Nfreqs = 1 if freq_array is None else freq_array.size
-        stokes = np.zeros((4, Nfreqs, Ncomponents))
+        stokes = Quantity(np.zeros((4, Nfreqs, Ncomponents)), "Jy")
         for ii, spar in enumerate(["I", "Q", "U", "V"]):
             if spar in recarray_in.dtype.names:
-                stokes[ii] = recarray_in[spar].T
+                stokes[ii] = recarray_in[spar].T * units.Jy
 
-        if ids[0].startswith("nside"):
-            nside = int(ids[0][len("nside") : ids[0].find("_")])
-            hpx_inds = [int(name[name.find("_") + 1 :]) for name in ids]
-            names = None
-        else:
-            names = ids
-            nside = None
-            hpx_inds = None
+        names = ids
 
         self.__init__(
             name=names,
@@ -1421,9 +1655,16 @@ class SkyModel(UVBase):
             freq_array=freq_array,
             reference_frequency=reference_frequency,
             spectral_index=spectral_index,
-            nside=nside,
-            hpx_inds=hpx_inds,
         )
+
+        if ids[0].startswith("nside"):
+            self.nside = int(ids[0][len("nside") : ids[0].find("_")])
+            self.hpx_inds = np.array([int(name[name.find("_") + 1 :]) for name in ids])
+            self.point_to_healpix(
+                run_check=run_check,
+                check_extra=check_extra,
+                run_check_acceptability=run_check_acceptability,
+            )
 
         if rise_lst is not None:
             self._rise_lst = rise_lst
@@ -1485,12 +1726,17 @@ class SkyModel(UVBase):
                 nside = int(fileobj.attrs["nside"])
             except KeyError:
                 nside = int(astropy_healpix.npix_to_nside(hpmap.shape[-1]))
+            try:
+                hpmap_units = fileobj["units"][()]
+            except KeyError:
+                hpmap_units = "K"
 
         ra, dec = astropy_healpix.healpix_to_lonlat(indices, nside)
         freq = Quantity(freqs, "hertz")
-        stokes = np.zeros((4, len(freq), len(indices)))
-        stokes[0] = (hpmap.T / skyutils.jy_to_ksr(freq)).T
-        stokes[0] = stokes[0] * astropy_healpix.nside_to_pixel_area(nside)
+
+        # hmap is in K
+        stokes = Quantity(np.zeros((4, len(freq), len(indices))), hpmap_units)
+        stokes[0] = hpmap * units.Unit(hpmap_units)
 
         self.__init__(
             nside=nside,
@@ -1500,6 +1746,7 @@ class SkyModel(UVBase):
             freq_array=freq,
             history=history,
         )
+        assert self.component_type == "healpix"
 
         if history is None:
             self.history = self.pyradiosky_version_str
@@ -1532,6 +1779,9 @@ class SkyModel(UVBase):
     ):
         """
         Read a votable catalog file into this object.
+
+        This reader uses the units in the file, the units should be specified
+        following the VOTable conventions.
 
         Parameters
         ----------
@@ -1659,18 +1909,36 @@ class SkyModel(UVBase):
             spectral_type = "subband"
             spectral_index = None
 
-        stokes = np.zeros((4, len(flux_cols_use), len(astropy_table)), dtype=np.float)
+        col_units = []
         for index, col in enumerate(flux_cols_use):
-            stokes[0, index, :] = astropy_table[col].data.data
+            col_units.append(astropy_table[col].unit)
+
+        allowed_units = ["Jy", "Jy/sr", "K", "K sr"]
+        unit_use = None
+        for unit_option in allowed_units:
+            if np.all(
+                np.array(
+                    [this_unit.is_equivalent(unit_option) for this_unit in col_units]
+                )
+            ):
+                unit_use = unit_option
+                break
+        if unit_use is None:
+            raise ValueError(
+                "All flux columns must have compatible units and must be compatible "
+                f"with one of {allowed_units}."
+            )
+
+        stokes = Quantity(
+            np.zeros((4, len(flux_cols_use), len(astropy_table))), unit_use
+        )
+        for index, col in enumerate(flux_cols_use):
+            stokes[0, index, :] = astropy_table[col].quantity.to(unit_use)
 
         self.__init__(
             name=astropy_table[id_col_use].data.data.astype("str"),
-            ra=Longitude(
-                astropy_table[ra_col_use].data.data, astropy_table[ra_col_use].unit
-            ),
-            dec=Latitude(
-                astropy_table[dec_col_use].data.data, astropy_table[dec_col_use].unit
-            ),
+            ra=Longitude(astropy_table[ra_col_use].quantity),
+            dec=Latitude(astropy_table[dec_col_use].quantity),
             stokes=stokes,
             spectral_type=spectral_type,
             freq_array=freq_array,
@@ -1913,9 +2181,9 @@ class SkyModel(UVBase):
         ras = Longitude(catalog_table[col_names[1]], units.deg)
         decs = Latitude(catalog_table[col_names[2]], units.deg)
 
-        stokes = np.zeros((4, n_freqs, len(catalog_table)), dtype=np.float)
+        stokes = Quantity(np.zeros((4, n_freqs, len(catalog_table))), "Jy")
         for ind in np.arange(n_freqs):
-            stokes[0, ind, :] = catalog_table[col_names[ind + 3]]
+            stokes[0, ind, :] = catalog_table[col_names[ind + 3]] * units.Jy
 
         if "frequency" in header_lower and freq_array is None:
             freq_ind = np.where(np.array(header_lower) == "frequency")[0][0]
@@ -2009,12 +2277,12 @@ class SkyModel(UVBase):
         else:
             use_beam_amps = False
             beam_amp = None
-        stokes = np.zeros((4, Nsrcs))
+        stokes = Quantity(np.zeros((4, Nsrcs)), "Jy")
         for src in range(Nsrcs):
-            stokes[0, src] = catalog["flux"][src]["I"][0]
-            stokes[1, src] = catalog["flux"][src]["Q"][0]
-            stokes[2, src] = catalog["flux"][src]["U"][0]
-            stokes[3, src] = catalog["flux"][src]["V"][0]
+            stokes[0, src] = catalog["flux"][src]["I"][0] * units.Jy
+            stokes[1, src] = catalog["flux"][src]["Q"][0] * units.Jy
+            stokes[2, src] = catalog["flux"][src]["U"][0] * units.Jy
+            stokes[3, src] = catalog["flux"][src]["V"][0] * units.Jy
             if use_beam_amps:
                 beam_amp[0, src] = catalog["beam"][src]["XX"][0]
                 beam_amp[1, src] = catalog["beam"][src]["YY"][0]
@@ -2051,14 +2319,14 @@ class SkyModel(UVBase):
                     source_group_id += 1
                     ra = np.insert(ra, use_index, src["ra"])
                     dec = np.insert(dec, use_index, src["dec"])
-                    stokes_ext = np.zeros((4, Ncomps))
+                    stokes_ext = Quantity(np.zeros((4, Ncomps)), "Jy")
                     if use_beam_amps:
                         beam_amp_ext = np.zeros((4, Ncomps))
                     for comp in range(Ncomps):
-                        stokes_ext[0, comp] = src["flux"][comp]["I"][0]
-                        stokes_ext[1, comp] = src["flux"][comp]["Q"][0]
-                        stokes_ext[2, comp] = src["flux"][comp]["U"][0]
-                        stokes_ext[3, comp] = src["flux"][comp]["V"][0]
+                        stokes_ext[0, comp] = src["flux"][comp]["I"][0] * units.Jy
+                        stokes_ext[1, comp] = src["flux"][comp]["Q"][0] * units.Jy
+                        stokes_ext[2, comp] = src["flux"][comp]["U"][0] * units.Jy
+                        stokes_ext[3, comp] = src["flux"][comp]["V"][0] * units.Jy
                         if use_beam_amps:
                             beam_amp_ext[0, comp] = src["beam"][comp]["XX"][0]
                             beam_amp_ext[1, comp] = src["beam"][comp]["YY"][0]
@@ -2126,7 +2394,7 @@ class SkyModel(UVBase):
             raise ValueError("component_type must be 'healpix' to use this method.")
 
         self.check()
-        hpmap = self.stokes[0, :, :]
+        hpmap = self.stokes[0, :, :].to(units.K).value
 
         history = self.history
         if history is None:
@@ -2143,6 +2411,7 @@ class SkyModel(UVBase):
             "data": hpmap[None, ...],
             "indices": self.hpx_inds,
             "freqs": self.freq_array,
+            "units": "K",
             "history": history,
         }
         dsets = {
@@ -2223,7 +2492,6 @@ class SkyModel(UVBase):
             fo.write(header)
             arr = self.to_recarray()
             fieldnames = arr.dtype.names
-            print(fieldnames)
             for src in arr:
                 fieldvals = src
                 entry = dict(zip(fieldnames, fieldvals))
@@ -2340,6 +2608,7 @@ def write_healpix_hdf5(filename, hpmap, indices, freqs, nside=None, history=None
         "data": hpmap[None, ...],
         "indices": indices,
         "freqs": freqs,
+        "units": "K",
         "history": history,
     }
     dsets = {
@@ -2408,9 +2677,9 @@ def healpix_to_sky(hpmap, indices, freqs):
 
     ra, dec = astropy_healpix.healpix_to_lonlat(indices, nside)
     freq = Quantity(freqs, "hertz")
-    stokes = np.zeros((4, len(freq), len(indices)))
-    stokes[0] = (hpmap.T / skyutils.jy_to_ksr(freq)).T
-    stokes[0] = stokes[0] * astropy_healpix.nside_to_pixel_area(nside)
+
+    stokes = Quantity(np.zeros((4, len(freq), len(indices))), "K")
+    stokes[0] = hpmap * units.K
 
     sky = SkyModel(
         ra=ra,

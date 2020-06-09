@@ -6,6 +6,7 @@ import os
 import numpy as np
 import pytest
 from astropy.coordinates import Angle
+import astropy.units as units
 from astropy.time import Time
 
 from pyradiosky import SkyModel
@@ -28,27 +29,42 @@ def test_stokes_tofrom_coherency():
     stokesV = -0.15
     stokes = np.array([stokesI, stokesQ, stokesU, stokesV])
 
-    expected_coherency = 0.5 * np.array([[4.2, 1.2 + 0.15j], [1.2 - 0.15j, 4.8]])
+    expected_coherency = (
+        0.5 * np.array([[4.2, 1.2 + 0.15j], [1.2 - 0.15j, 4.8]]) * units.Jy
+    )
 
-    coherency = skyutils.stokes_to_coherency(stokes)
+    with pytest.warns(
+        DeprecationWarning,
+        match="In the future, stokes_arr will be required to be an astropy "
+        "Quantity. Currently, floats are assumed to be in Jy.",
+    ):
+        coherency = skyutils.stokes_to_coherency(stokes)
 
-    assert np.allclose(expected_coherency, coherency.squeeze())
+    assert np.allclose(expected_coherency, coherency)
 
-    back_to_stokes = skyutils.coherency_to_stokes(coherency)
+    with pytest.warns(
+        DeprecationWarning,
+        match="In the future, coherency_matrix will be required to be an astropy "
+        "Quantity. Currently, floats are assumed to be in Jy.",
+    ):
+        back_to_stokes = skyutils.coherency_to_stokes(coherency.value)
 
-    assert np.allclose(stokes, back_to_stokes)
+    assert np.allclose(stokes * units.Jy, back_to_stokes)
 
     # again, with multiple sources and a frequency axis.
-    stokes = np.array(
-        [[stokesI, stokesQ, stokesU, stokesV], [stokesI, stokesQ, stokesU, stokesV]]
-    ).T
+    stokes = (
+        np.array(
+            [[stokesI, stokesQ, stokesU, stokesV], [stokesI, stokesQ, stokesU, stokesV]]
+        ).T
+        * units.Jy
+    )
 
     stokes = stokes[:, np.newaxis, :]
 
     coherency = skyutils.stokes_to_coherency(stokes)
     back_to_stokes = skyutils.coherency_to_stokes(coherency)
 
-    assert np.allclose(stokes, back_to_stokes)
+    assert units.quantity.allclose(stokes, back_to_stokes)
 
     with pytest.raises(ValueError) as cm:
         skyutils.stokes_to_coherency(stokes[0:2, :])

@@ -10,6 +10,7 @@ import pytest
 import numpy as np
 import warnings
 from astropy import units
+from astropy.units import Quantity
 from astropy.coordinates import (
     SkyCoord,
     EarthLocation,
@@ -62,7 +63,7 @@ def zenith_skymodel(zenith_skycoord):
     dec = icrs_coord.dec
 
     names = "zen_source"
-    stokes = [1.0, 0, 0, 0]
+    stokes = [1.0, 0, 0, 0] * units.Jy
     zenith_source = SkyModel(
         name=names, ra=ra, dec=dec, stokes=stokes, spectral_type="flat"
     )
@@ -93,7 +94,7 @@ def moonsky():
     ra = icrs_coord.ra
     dec = icrs_coord.dec
     names = "zen_source"
-    stokes = [1.0, 0, 0, 0]
+    stokes = [1.0, 0, 0, 0] * units.Jy
     zenith_source = SkyModel(
         name=names, ra=ra, dec=dec, stokes=stokes, spectral_type="flat"
     )
@@ -148,7 +149,7 @@ def mock_point_skies():
 
     # Spectrum = Power law
     alpha = -0.5
-    spectrum = ((freq_arr / freq_arr[0]) ** (alpha))[None, :, None]
+    spectrum = ((freq_arr / freq_arr[0]) ** (alpha))[None, :, None] * units.Jy
 
     def _func(stype):
 
@@ -156,23 +157,30 @@ def mock_point_skies():
         if stype in ["full", "subband"]:
             stokes = spectrum.repeat(4, 0).repeat(Ncomp, 2)
             return SkyModel(
-                names, ras, decs, stokes, spectral_type=stype, freq_array=freq_arr
+                name=names,
+                ra=ras,
+                dec=decs,
+                stokes=stokes,
+                spectral_type=stype,
+                freq_array=freq_arr,
             )
         elif stype == "spectral_index":
             stokes = stokes[:, :1, :]
             spectral_index = np.ones(Ncomp) * alpha
             return SkyModel(
-                names,
-                ras,
-                decs,
-                stokes,
+                name=names,
+                ra=ras,
+                dec=decs,
+                stokes=stokes,
                 spectral_type=stype,
                 spectral_index=spectral_index,
                 reference_frequency=np.repeat(freq_arr[0], Ncomp),
             )
         elif stype == "flat":
             stokes = stokes[:, :1, :]
-            return SkyModel(names, ras, decs, stokes, spectral_type=stype)
+            return SkyModel(
+                name=names, ra=ras, dec=decs, stokes=stokes, spectral_type=stype,
+            )
 
     yield _func
 
@@ -192,7 +200,7 @@ def test_init_error(zenith_skycoord):
         SkyModel(
             ra=zenith_skycoord.ra,
             dec=zenith_skycoord.dec,
-            stokes=[1.0, 0, 0, 0],
+            stokes=[1.0, 0, 0, 0] * units.Jy,
             spectral_type="flat",
         )
 
@@ -232,7 +240,11 @@ def test_source_zenith_from_icrs(time_location):
     dec = icrs_coord.dec
 
     zenith_source = SkyModel(
-        name="icrs_zen", ra=ra, dec=dec, stokes=[1.0, 0, 0, 0], spectral_type="flat"
+        name="icrs_zen",
+        ra=ra,
+        dec=dec,
+        stokes=[1.0, 0, 0, 0] * units.Jy,
+        spectral_type="flat",
     )
 
     zenith_source.update_positions(time, array_location)
@@ -267,7 +279,7 @@ def test_skymodel_init_errors(zenith_skycoord):
             name="icrs_zen",
             ra=ra.rad,
             dec=dec,
-            stokes=[1.0, 0, 0, 0],
+            stokes=[1.0, 0, 0, 0] * units.Jy,
             spectral_type="flat",
         )
 
@@ -282,7 +294,7 @@ def test_skymodel_init_errors(zenith_skycoord):
             name="icrs_zen",
             ra=ra,
             dec=dec.rad,
-            stokes=[1.0, 0, 0, 0],
+            stokes=[1.0, 0, 0, 0] * units.Jy,
             spectral_type="flat",
         )
 
@@ -296,7 +308,7 @@ def test_skymodel_init_errors(zenith_skycoord):
             name="icrs_zen",
             ra=ra,
             dec=dec,
-            stokes=[1.0, 0, 0, 0],
+            stokes=[1.0, 0, 0, 0] * units.Jy,
             spectral_type="flat",
             reference_frequency=[1e8] * units.Hz,
             freq_array=[1e8] * units.Hz,
@@ -309,10 +321,34 @@ def test_skymodel_init_errors(zenith_skycoord):
             name="icrs_zen",
             ra=ra,
             dec=dec,
-            stokes=[1.0, 0, 0, 0],
+            stokes=[1.0, 0, 0, 0] * units.Jy,
             spectral_type="flat",
             freq_array=[1e8] * units.m,
         )
+
+    with pytest.raises(ValueError, match=("For point component types, the stokes")):
+        SkyModel(
+            name="icrs_zen",
+            ra=ra,
+            dec=dec,
+            stokes=[1.0, 0, 0, 0] * units.m,
+            spectral_type="flat",
+            freq_array=[1e8] * units.Hz,
+        )
+
+    with pytest.raises(
+        ValueError, match=("For point component types, the coherency_radec")
+    ):
+        sky = SkyModel(
+            name="icrs_zen",
+            ra=ra,
+            dec=dec,
+            stokes=[1.0, 0, 0, 0] * units.Jy,
+            spectral_type="flat",
+            freq_array=[1e8] * units.Hz,
+        )
+        sky.coherency_radec = sky.coherency_radec.value * units.m
+        sky.check()
 
     with pytest.raises(
         ValueError,
@@ -322,7 +358,7 @@ def test_skymodel_init_errors(zenith_skycoord):
             name="icrs_zen",
             ra=ra,
             dec=dec,
-            stokes=[1.0, 0, 0, 0],
+            stokes=[1.0, 0, 0, 0] * units.Jy,
             spectral_type="flat",
             reference_frequency=[1e8] * units.m,
         )
@@ -334,7 +370,7 @@ def test_skymodel_deprecated(time_location):
         name="Test",
         ra=Longitude(12.0 * units.hr),
         dec=Latitude(-30.0 * units.deg),
-        stokes=[1.0, 0.0, 0.0, 0.0],
+        stokes=[1.0, 0.0, 0.0, 0.0] * units.Jy,
         spectral_type="flat",
         reference_frequency=np.array([1e8]) * units.Hz,
     )
@@ -347,7 +383,7 @@ def test_skymodel_deprecated(time_location):
             "Test",
             Longitude(12.0 * units.hr),
             Latitude(-30.0 * units.deg),
-            [1.0, 0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0, 0.0] * units.Jy,
             np.array([1e8]) * units.Hz,
             "flat",
         )
@@ -361,9 +397,24 @@ def test_skymodel_deprecated(time_location):
             name="Test",
             ra=Longitude(12.0 * units.hr),
             dec=Latitude(-30.0 * units.deg),
-            stokes=[1.0, 0.0, 0.0, 0.0],
+            stokes=[1.0, 0.0, 0.0, 0.0] * units.Jy,
             spectral_type="flat",
             reference_frequency=np.array([1e8]),
+        )
+    assert source_new == source_old
+
+    with pytest.warns(
+        DeprecationWarning,
+        match="In the future, stokes will be required to be an astropy "
+        "Quantity with units that are convertable to one of",
+    ):
+        source_old = SkyModel(
+            name="Test",
+            ra=Longitude(12.0 * units.hr),
+            dec=Latitude(-30.0 * units.deg),
+            stokes=[1.0, 0.0, 0.0, 0.0],
+            spectral_type="flat",
+            reference_frequency=np.array([1e8]) * units.Hz,
         )
     assert source_new == source_old
 
@@ -371,7 +422,7 @@ def test_skymodel_deprecated(time_location):
         name="Test",
         ra=Longitude(12.0 * units.hr),
         dec=Latitude(-30.0 * units.deg),
-        stokes=[1.0, 0.0, 0.0, 0.0],
+        stokes=[1.0, 0.0, 0.0, 0.0] * units.Jy,
         spectral_type="flat",
         reference_frequency=np.array([1.5e8]) * units.Hz,
     )
@@ -388,7 +439,7 @@ def test_skymodel_deprecated(time_location):
         name="Test",
         ra=Longitude(12.0 * units.hr),
         dec=Latitude(-30.0 * units.deg + 2e-3 * units.arcsec),
-        stokes=[1.0, 0.0, 0.0, 0.0],
+        stokes=[1.0, 0.0, 0.0, 0.0] * units.Jy,
         spectral_type="flat",
         reference_frequency=np.array([1e8]) * units.Hz,
     )
@@ -402,7 +453,7 @@ def test_skymodel_deprecated(time_location):
         name="Test",
         ra=Longitude(Longitude(12.0 * units.hr) + Longitude(2e-3 * units.arcsec)),
         dec=Latitude(-30.0 * units.deg),
-        stokes=[1.0, 0.0, 0.0, 0.0],
+        stokes=[1.0, 0.0, 0.0, 0.0] * units.Jy,
         spectral_type="flat",
         reference_frequency=np.array([1e8]) * units.Hz,
     )
@@ -412,8 +463,8 @@ def test_skymodel_deprecated(time_location):
     ):
         assert source_new == source_old
 
-    stokes = np.zeros((4, 2, 1), dtype=np.float)
-    stokes[0, :, :] = 1.0
+    stokes = np.zeros((4, 2, 1)) * units.Jy
+    stokes[0, :, :] = 1.0 * units.Jy
     source_new = SkyModel(
         name="Test",
         ra=Longitude(12.0 * units.hr),
@@ -460,6 +511,128 @@ def test_skymodel_deprecated(time_location):
         source_new.coherency_calc(telescope_location)
 
 
+@pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index"])
+def test_jansky_to_kelvin_loop(spec_type):
+
+    skyobj = SkyModel()
+    skyobj.read_gleam_catalog(GLEAM_vot, spectral_type=spec_type)
+
+    stokes_expected = np.zeros_like(skyobj.stokes.value) * units.K * units.sr
+    if spec_type == "subband":
+        brightness_temperature_conv = units.brightness_temperature(skyobj.freq_array)
+        for compi in range(skyobj.Ncomponents):
+            stokes_expected[:, :, compi] = (skyobj.stokes[:, :, compi] / units.sr).to(
+                units.K, brightness_temperature_conv
+            ) * units.sr
+    else:
+        brightness_temperature_conv = units.brightness_temperature(
+            skyobj.reference_frequency
+        )
+        stokes_expected = (skyobj.stokes / units.sr).to(
+            units.K, brightness_temperature_conv
+        ) * units.sr
+
+    skyobj2 = skyobj.copy()
+    skyobj2.jansky_to_kelvin()
+
+    assert units.quantity.allclose(skyobj2.stokes, stokes_expected, equal_nan=True)
+
+    # check no change if already in K
+    skyobj3 = skyobj2.copy()
+    skyobj3.jansky_to_kelvin()
+
+    assert skyobj3 == skyobj2
+
+    skyobj2.kelvin_to_jansky()
+
+    assert skyobj == skyobj2
+
+    # check no change if already in Jy
+    skyobj3 = skyobj2.copy()
+    skyobj3.kelvin_to_jansky()
+
+    assert skyobj3 == skyobj2
+
+
+def test_jansky_to_kelvin_loop_healpix(healpix_data):
+    healpix_filename = os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
+
+    skyobj = SkyModel()
+    skyobj.read_healpix_hdf5(healpix_filename)
+
+    stokes_expected = np.zeros_like(skyobj.stokes.value) * units.Jy / units.sr
+    brightness_temperature_conv = units.brightness_temperature(skyobj.freq_array)
+    for compi in range(skyobj.Ncomponents):
+        stokes_expected[:, :, compi] = (skyobj.stokes[:, :, compi]).to(
+            units.Jy / units.sr, brightness_temperature_conv
+        )
+    skyobj2 = skyobj.copy()
+    skyobj2.kelvin_to_jansky()
+
+    assert units.quantity.allclose(skyobj2.stokes, stokes_expected, equal_nan=True)
+
+    # check no change if already in Jy
+    skyobj3 = skyobj2.copy()
+    skyobj3.kelvin_to_jansky()
+
+    assert skyobj3 == skyobj2
+
+    skyobj2.jansky_to_kelvin()
+
+    assert skyobj == skyobj2
+
+    # check no change if already in K
+    skyobj3 = skyobj2.copy()
+    skyobj3.jansky_to_kelvin()
+
+    assert skyobj3 == skyobj2
+
+
+def test_jansky_to_kelvin_errors(zenith_skymodel):
+    with pytest.raises(
+        ValueError,
+        match="Either reference_frequency or freq_array must be set to convert to K.",
+    ):
+        zenith_skymodel.jansky_to_kelvin()
+
+    with pytest.raises(
+        ValueError,
+        match="Either reference_frequency or freq_array must be set to convert to Jy.",
+    ):
+        zenith_skymodel.stokes = zenith_skymodel.stokes.value * units.K * units.sr
+        zenith_skymodel.kelvin_to_jansky()
+
+
+def test_healpix_to_point_loop(healpix_data):
+
+    healpix_filename = os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
+
+    skyobj = SkyModel()
+    skyobj.read_healpix_hdf5(healpix_filename)
+
+    skyobj2 = skyobj.copy()
+    skyobj2.healpix_to_point()
+
+    skyobj2.point_to_healpix()
+
+    assert skyobj == skyobj2
+
+
+def test_healpix_to_point_errors(zenith_skymodel):
+    with pytest.raises(
+        ValueError,
+        match="This method can only be called if component_type is 'healpix'.",
+    ):
+        zenith_skymodel.healpix_to_point()
+
+    with pytest.raises(
+        ValueError,
+        match="This method can only be called if component_type is 'point' and "
+        "the nside and hpx_inds parameters are set.",
+    ):
+        zenith_skymodel.point_to_healpix()
+
+
 def test_update_position_errors(zenith_skymodel, time_location):
     time, array_location = time_location
     with pytest.raises(ValueError, match=("time must be an astropy Time object.")):
@@ -473,7 +646,7 @@ def test_coherency_calc_errors():
     """Test that correct errors are raised when providing invalid location object."""
     coord = SkyCoord(ra=30.0 * units.deg, dec=40 * units.deg, frame="icrs")
 
-    stokes_radec = [1, -0.2, 0.3, 0.1]
+    stokes_radec = [1, -0.2, 0.3, 0.1] * units.Jy
 
     source = SkyModel(
         name="test",
@@ -500,7 +673,7 @@ def test_calc_basis_rotation_matrix(time_location):
         name="Test",
         ra=Longitude(12.0 * units.hr),
         dec=Latitude(-30.0 * units.deg),
-        stokes=[1.0, 0.0, 0.0, 0.0],
+        stokes=[1.0, 0.0, 0.0, 0.0] * units.Jy,
         spectral_type="flat",
     )
     source.update_positions(time, telescope_location)
@@ -522,7 +695,7 @@ def test_calc_vector_rotation(time_location):
         name="Test",
         ra=Longitude(12.0 * units.hr),
         dec=Latitude(-30.0 * units.deg),
-        stokes=[1.0, 0.0, 0.0, 0.0],
+        stokes=[1.0, 0.0, 0.0, 0.0] * units.Jy,
         spectral_type="flat",
     )
     source.update_positions(time, telescope_location)
@@ -541,10 +714,10 @@ def test_pol_rotator(time_location, spectral_type):
     ras = Longitude(np.linspace(0, 24, Nsrcs) * units.hr)
     decs = Latitude(np.linspace(-90, 90, Nsrcs) * units.deg)
     names = np.arange(Nsrcs).astype("str")
-    fluxes = np.array([[[5.5, 0.7, 0.3, 0.0]]] * Nsrcs).T
+    fluxes = np.array([[[5.5, 0.7, 0.3, 0.0]]] * Nsrcs).T * units.Jy
 
     # Make the last source non-polarized
-    fluxes[..., -1] = [[1.0], [0], [0], [0]]
+    fluxes[..., -1] = [[1.0], [0], [0], [0]] * units.Jy
 
     extra = {}
     # Add frequencies if "full" freq:
@@ -554,6 +727,7 @@ def test_pol_rotator(time_location, spectral_type):
         fluxes = fluxes.repeat(Nfreqs, axis=1)
         extra = {"freq_array": freq_array}
 
+    assert isinstance(fluxes, Quantity)
     source = SkyModel(
         name=names,
         ra=ras,
@@ -579,11 +753,16 @@ def test_pol_rotator(time_location, spectral_type):
     with pytest.warns(UserWarning, match="Horizon cutoff undefined"):
         local_coherency = source.coherency_calc()
 
+    assert local_coherency.unit == units.Jy
     # Check that all polarized sources are rotated.
     assert not np.all(
-        np.isclose(local_coherency[..., :-1], source.coherency_radec[..., :-1])
+        units.quantity.isclose(
+            local_coherency[..., :-1], source.coherency_radec[..., :-1]
+        )
     )
-    assert np.allclose(local_coherency[..., -1], source.coherency_radec[..., -1])
+    assert units.quantity.allclose(
+        local_coherency[..., -1], source.coherency_radec[..., -1]
+    )
 
 
 def analytic_beam_jones(za, az, sigma=0.3):
@@ -630,7 +809,7 @@ def test_polarized_source_visibilities(time_location):
     src_astropy_altaz = src_astropy.transform_to("altaz")
     assert np.isclose(src_astropy_altaz.alt.rad[zero_indx], np.pi / 2)
 
-    stokes_radec = [1, -0.2, 0.3, 0.1]
+    stokes_radec = [1, -0.2, 0.3, 0.1] * units.Jy
 
     decoff = 0.0 * units.arcmin  # -0.17 * units.arcsec
     raoff = 0.0 * units.arcsec
@@ -643,7 +822,7 @@ def test_polarized_source_visibilities(time_location):
         spectral_type="flat",
     )
 
-    coherency_matrix_local = np.zeros([2, 2, ntimes], dtype="complex128")
+    coherency_matrix_local = np.zeros([2, 2, ntimes], dtype="complex128") * units.Jy
     alts = np.zeros(ntimes)
     azs = np.zeros(ntimes)
     for ti, time in enumerate(times):
@@ -663,44 +842,47 @@ def test_polarized_source_visibilities(time_location):
         "ab...,bc...,dc...->ad...", Jbeam, coherency_matrix_local, np.conj(Jbeam)
     )
 
-    expected_instr_local = np.array(
-        [
+    expected_instr_local = (
+        np.array(
             [
                 [
-                    0.60572311 - 1.08420217e-19j,
-                    0.60250361 + 5.42106496e-20j,
-                    0.5999734 + 0.00000000e00j,
-                    0.59400581 + 0.00000000e00j,
-                    0.58875092 + 0.00000000e00j,
+                    [
+                        0.60572311 - 1.08420217e-19j,
+                        0.60250361 + 5.42106496e-20j,
+                        0.5999734 + 0.00000000e00j,
+                        0.59400581 + 0.00000000e00j,
+                        0.58875092 + 0.00000000e00j,
+                    ],
+                    [
+                        0.14530468 + 4.99646383e-02j,
+                        0.14818987 + 4.99943414e-02j,
+                        0.15001773 + 5.00000000e-02j,
+                        0.15342311 + 4.99773672e-02j,
+                        0.15574023 + 4.99307016e-02j,
+                    ],
                 ],
                 [
-                    0.14530468 + 4.99646383e-02j,
-                    0.14818987 + 4.99943414e-02j,
-                    0.15001773 + 5.00000000e-02j,
-                    0.15342311 + 4.99773672e-02j,
-                    0.15574023 + 4.99307016e-02j,
+                    [
+                        0.14530468 - 4.99646383e-02j,
+                        0.14818987 - 4.99943414e-02j,
+                        0.15001773 - 5.00000000e-02j,
+                        0.15342311 - 4.99773672e-02j,
+                        0.15574023 - 4.99307016e-02j,
+                    ],
+                    [
+                        0.39342384 - 1.08420217e-19j,
+                        0.39736029 + 2.71045133e-20j,
+                        0.4000266 + 0.00000000e00j,
+                        0.40545359 + 0.00000000e00j,
+                        0.40960028 + 0.00000000e00j,
+                    ],
                 ],
-            ],
-            [
-                [
-                    0.14530468 - 4.99646383e-02j,
-                    0.14818987 - 4.99943414e-02j,
-                    0.15001773 - 5.00000000e-02j,
-                    0.15342311 - 4.99773672e-02j,
-                    0.15574023 - 4.99307016e-02j,
-                ],
-                [
-                    0.39342384 - 1.08420217e-19j,
-                    0.39736029 + 2.71045133e-20j,
-                    0.4000266 + 0.00000000e00j,
-                    0.40545359 + 0.00000000e00j,
-                    0.40960028 + 0.00000000e00j,
-                ],
-            ],
-        ]
+            ]
+        )
+        * units.Jy
     )
 
-    assert np.allclose(coherency_instr_local, expected_instr_local)
+    assert units.quantity.allclose(coherency_instr_local, expected_instr_local)
 
 
 def test_polarized_source_smooth_visibilities():
@@ -732,7 +914,7 @@ def test_polarized_source_smooth_visibilities():
     src_astropy_altaz = src_astropy.transform_to("altaz")
     assert np.isclose(src_astropy_altaz.alt.rad[zero_indx], np.pi / 2)
 
-    stokes_radec = [1, -0.2, 0.3, 0.1]
+    stokes_radec = [1, -0.2, 0.3, 0.1] * units.Jy
 
     source = SkyModel(
         name="icrs_zen",
@@ -742,7 +924,7 @@ def test_polarized_source_smooth_visibilities():
         spectral_type="flat",
     )
 
-    coherency_matrix_local = np.zeros([2, 2, ntimes], dtype="complex128")
+    coherency_matrix_local = np.zeros([2, 2, ntimes], dtype="complex128") * units.Jy
     alts = np.zeros(ntimes)
     azs = np.zeros(ntimes)
     for ti, time in enumerate(times):
@@ -766,11 +948,11 @@ def test_polarized_source_smooth_visibilities():
     t_diff_sec = np.diff(times.jd) * 24 * 3600
     for pol_i in [0, 1]:
         for pol_j in [0, 1]:
-            real_coherency = coherency_instr_local[pol_i, pol_j, :].real
+            real_coherency = coherency_instr_local[pol_i, pol_j, :].real.value
             real_derivative = np.diff(real_coherency) / t_diff_sec
             real_derivative_diff = np.diff(real_derivative)
             assert np.max(np.abs(real_derivative_diff)) < 1e-6
-            imag_coherency = coherency_instr_local[pol_i, pol_j, :].imag
+            imag_coherency = coherency_instr_local[pol_i, pol_j, :].imag.value
             imag_derivative = np.diff(imag_coherency) / t_diff_sec
             imag_derivative_diff = np.diff(imag_derivative)
             assert np.max(np.abs(imag_derivative_diff)) < 1e-6
@@ -778,11 +960,11 @@ def test_polarized_source_smooth_visibilities():
     # test that the stokes coherencies are smooth
     stokes_instr_local = skyutils.coherency_to_stokes(coherency_instr_local)
     for pol_i in range(4):
-        real_stokes = stokes_instr_local[pol_i, :].real
+        real_stokes = stokes_instr_local[pol_i, :].real.value
         real_derivative = np.diff(real_stokes) / t_diff_sec
         real_derivative_diff = np.diff(real_derivative)
         assert np.max(np.abs(real_derivative_diff)) < 1e-6
-        imag_stokes = stokes_instr_local[pol_i, :].imag
+        imag_stokes = stokes_instr_local[pol_i, :].imag.value
         assert np.all(imag_stokes == 0)
 
 
@@ -817,19 +999,19 @@ def test_healpix_to_sky(healpix_data):
     hmap_orig[healpix_data["ipix_disc"]] = healpix_data["npix"] - 1
 
     hmap_orig = np.repeat(hmap_orig[None, :], 10, axis=0)
-    hmap_orig = (hmap_orig.T / skyutils.jy_to_ksr(freqs)).T
-    hmap_orig = hmap_orig * healpix_data["pixel_area"]
+    hmap_orig = hmap_orig * units.K
     with pytest.warns(
         DeprecationWarning,
         match="This function is deprecated, use `SkyModel.read_healpix_hdf5` instead.",
     ):
         sky = skymodel.healpix_to_sky(hpmap, indices, freqs)
+        assert isinstance(sky.stokes, Quantity)
 
     sky2 = SkyModel()
     sky2.read_healpix_hdf5(healpix_filename)
 
     assert sky2 == sky
-    assert np.allclose(sky2.stokes[0], hmap_orig.value)
+    assert units.quantity.allclose(sky2.stokes[0], hmap_orig)
 
 
 def test_units_healpix_to_sky(healpix_data):
@@ -847,8 +1029,9 @@ def test_units_healpix_to_sky(healpix_data):
     stokes = (hpmap.T * units.K).to(units.Jy, brightness_temperature_conv).T
     sky = SkyModel()
     sky.read_healpix_hdf5(healpix_filename)
+    sky.healpix_to_point()
 
-    assert np.allclose(sky.stokes[0, 0], stokes.value[0])
+    assert units.quantity.allclose(sky.stokes[0, 0], stokes[0])
 
 
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
@@ -862,6 +1045,8 @@ def test_healpix_recarray_loop(healpix_data):
 
     skyobj2 = SkyModel()
     skyobj2.from_recarray(skyarr)
+    assert skyobj.component_type == "healpix"
+    assert skyobj2.component_type == "healpix"
 
     assert skyobj == skyobj2
 
@@ -981,7 +1166,7 @@ def test_write_healpix_error(tmp_path):
         skyobj.write_healpix_hdf5(test_filename)
 
 
-def test_healpix_import_err():
+def test_healpix_import_err(zenith_skymodel):
     try:
         import astropy_healpix
 
@@ -1008,6 +1193,15 @@ def test_healpix_import_err():
         with pytest.raises(ImportError, match=errstr):
             skymodel.write_healpix_hdf5("filename.hdf5", hpmap, inds, freqs)
 
+        zenith_skymodel.nside = 32
+        zenith_skymodel.hpx_inds = 0
+        with pytest.raises(ImportError, match=errstr):
+            zenith_skymodel.point_to_healpix()
+
+        zenith_skymodel._set_component_type_params("healpix")
+        with pytest.raises(ImportError, match=errstr):
+            zenith_skymodel.healpix_to_point()
+
 
 def test_healpix_positions(tmp_path, time_location):
     pytest.importorskip("astropy_healpix")
@@ -1025,13 +1219,47 @@ def test_healpix_positions(tmp_path, time_location):
 
     stokes = np.zeros((4, Nfreqs, Npix))
     stokes[0] = hpx_map
-    skyobj = SkyModel(
-        nside=nside,
-        hpx_inds=range(Npix),
-        stokes=stokes,
-        freq_array=freqs * units.Hz,
-        spectral_type="full",
-    )
+
+    with pytest.raises(
+        ValueError,
+        match="For healpix component types, the stokes parameter must have a "
+        "unit that can be converted to",
+    ):
+        skyobj = SkyModel(
+            nside=nside,
+            hpx_inds=range(Npix),
+            stokes=stokes * units.m,
+            freq_array=freqs * units.Hz,
+            spectral_type="full",
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="For healpix component types, the coherency_radec parameter must have a "
+        "unit that can be converted to",
+    ):
+        skyobj = SkyModel(
+            nside=nside,
+            hpx_inds=range(Npix),
+            stokes=stokes * units.K,
+            freq_array=freqs * units.Hz,
+            spectral_type="full",
+        )
+        skyobj.coherency_radec = skyobj.coherency_radec.value * units.m
+        skyobj.check()
+
+    with pytest.warns(
+        DeprecationWarning,
+        match="In the future, stokes will be required to be an astropy "
+        "Quantity with units that are convertable to one of",
+    ):
+        skyobj = SkyModel(
+            nside=nside,
+            hpx_inds=range(Npix),
+            stokes=stokes,
+            freq_array=freqs * units.Hz,
+            spectral_type="full",
+        )
 
     filename = os.path.join(tmp_path, "healpix_single.hdf5")
     skyobj.write_healpix_hdf5(filename)
@@ -1114,14 +1342,16 @@ def test_param_flux_cuts():
     skyobj = SkyModel()
     skyobj.read_gleam_catalog(GLEAM_vot)
 
-    skyobj2 = skyobj.source_cuts(min_flux=0.2, max_flux=1.5, inplace=False)
+    skyobj2 = skyobj.source_cuts(
+        min_flux=0.2 * units.Jy, max_flux=1.5 * units.Jy, inplace=False
+    )
 
     for sI in skyobj2.stokes[0, 0, :]:
-        assert np.all(0.2 < sI < 1.5)
+        assert np.all(0.2 * units.Jy < sI < 1.5 * units.Jy)
 
     components_to_keep = np.where(
-        (np.min(skyobj.stokes[0, :, :], axis=0) > 0.2)
-        & (np.max(skyobj.stokes[0, :, :], axis=0) < 1.5)
+        (np.min(skyobj.stokes[0, :, :], axis=0) > 0.2 * units.Jy)
+        & (np.max(skyobj.stokes[0, :, :], axis=0) < 1.5 * units.Jy)
     )[0]
     skyobj3 = skyobj.select(component_inds=components_to_keep, inplace=False)
 
@@ -1191,17 +1421,17 @@ def test_flux_cuts(spec_type, init_kwargs, cut_kwargs):
     ids = ["src{}".format(i) for i in range(Nsrcs)]
     ras = Longitude(np.random.uniform(0, 360.0, Nsrcs), units.deg)
     decs = Latitude(np.linspace(-90, 90, Nsrcs), units.deg)
-    stokes = np.zeros((4, 1, Nsrcs), dtype=np.float)
+    stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
     if spec_type == "flat":
-        stokes[0, :, :] = np.linspace(minflux, maxflux, Nsrcs)
+        stokes[0, :, :] = np.linspace(minflux, maxflux, Nsrcs) * units.Jy
     else:
-        stokes = np.zeros((4, 2, Nsrcs), dtype=np.float)
-        stokes[0, 0, :] = np.linspace(minflux, maxflux / 2.0, Nsrcs)
-        stokes[0, 1, :] = np.linspace(minflux * 2.0, maxflux, Nsrcs)
+        stokes = np.zeros((4, 2, Nsrcs)) * units.Jy
+        stokes[0, 0, :] = np.linspace(minflux, maxflux / 2.0, Nsrcs) * units.Jy
+        stokes[0, 1, :] = np.linspace(minflux * 2.0, maxflux, Nsrcs) * units.Jy
 
     # Add a nonzero polarization.
     Ucomp = maxflux + 1.3
-    stokes[2, :, :] = Ucomp  # Should not be affected by cuts.
+    stokes[2, :, :] = Ucomp * units.Jy  # Should not be affected by cuts.
 
     skyobj = SkyModel(
         name=ids,
@@ -1277,14 +1507,14 @@ def test_source_cut_error(
     ids = ["src{}".format(i) for i in range(Nsrcs)]
     ras = Longitude(np.random.uniform(0, 360.0, Nsrcs), units.deg)
     decs = Latitude(np.linspace(-90, 90, Nsrcs), units.deg)
-    stokes = np.zeros((4, 1, Nsrcs), dtype=np.float)
-    stokes = np.zeros((4, 1, Nsrcs), dtype=np.float)
+    stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
+    stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
     if spec_type == "flat" or spec_type == "spectral_index":
-        stokes[0, :, :] = np.linspace(minflux, maxflux, Nsrcs)
+        stokes[0, :, :] = np.linspace(minflux, maxflux, Nsrcs) * units.Jy
     else:
-        stokes = np.zeros((4, 2, Nsrcs), dtype=np.float)
-        stokes[0, 0, :] = np.linspace(minflux, maxflux / 2.0, Nsrcs)
-        stokes[0, 1, :] = np.linspace(minflux * 2.0, maxflux, Nsrcs)
+        stokes = np.zeros((4, 2, Nsrcs)) * units.Jy
+        stokes[0, 0, :] = np.linspace(minflux, maxflux / 2.0, Nsrcs) * units.Jy
+        stokes[0, 1, :] = np.linspace(minflux * 2.0, maxflux, Nsrcs) * units.Jy
 
     skyobj = SkyModel(
         name=ids,
@@ -1327,8 +1557,8 @@ def test_circumpolar_nonrising(time_location):
     dec = Latitude(dec, units.deg)
 
     names = ["src{}".format(i) for i in range(Nsrcs)]
-    stokes = np.zeros((4, 1, Nsrcs))
-    stokes[0, ...] = 1.0
+    stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
+    stokes[0, ...] = 1.0 * units.Jy
 
     sky = SkyModel(name=names, ra=ra, dec=dec, stokes=stokes, spectral_type="flat")
 
@@ -1613,6 +1843,17 @@ def test_read_votable_errors():
             reference_frequency=200e6,
         )
 
+    with pytest.raises(ValueError, match="All flux columns must have compatible units"):
+        skyobj.read_votable_catalog(
+            GLEAM_vot,
+            "GLEAM",
+            "GLEAM",
+            "RAJ2000",
+            "DEJ2000",
+            ["Fintwide", "Fpwide"],
+            freq_array=[150e6, 200e6] * units.Hz,
+        )
+
 
 def test_idl_catalog_reader():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
@@ -1679,9 +1920,11 @@ def test_point_catalog_reader():
     )
 
     assert sorted(skyobj.name) == sorted(catalog_table["source_id"])
-    assert skyobj.ra.deg in catalog_table["ra_j2000"]
-    assert skyobj.dec.deg in catalog_table["dec_j2000"]
-    assert skyobj.stokes in catalog_table["flux_density"]
+    assert np.allclose(skyobj.ra.deg, catalog_table["ra_j2000"])
+    assert np.allclose(skyobj.dec.deg, catalog_table["dec_j2000"])
+    assert np.allclose(
+        skyobj.stokes[0, :].to("Jy").value, catalog_table["flux_density"]
+    )
 
     # Check cuts
     source_select_kwds = {"min_flux": 1.0}
@@ -1722,7 +1965,7 @@ def test_catalog_file_writer(tmp_path):
     dec = icrs_coord.dec
 
     names = "zen_source"
-    stokes = [1.0, 0, 0, 0]
+    stokes = [1.0, 0, 0, 0] * units.Jy
     zenith_source = SkyModel(
         name=names, ra=ra, dec=dec, stokes=stokes, spectral_type="flat"
     )
@@ -1923,7 +2166,7 @@ def test_stokes_eval(mock_point_skies, inplace, stype):
 
     Nfreqs_fine = 50
     fine_freqs = np.linspace(100e6, 130e6, Nfreqs_fine) * units.Hz
-    fine_spectrum = (fine_freqs / fine_freqs[0]) ** (alpha)
+    fine_spectrum = (fine_freqs / fine_freqs[0]) ** (alpha) * units.Jy
 
     sky = mock_point_skies(stype)
     oldsky = sky.copy()
@@ -1934,21 +2177,21 @@ def test_stokes_eval(mock_point_skies, inplace, stype):
         new = sky.at_frequencies(old_freqs, inplace=inplace)
         if inplace:
             new = sky
-        assert np.allclose(new.freq_array, old_freqs)
+        assert units.quantity.allclose(new.freq_array, old_freqs)
         new = sky.at_frequencies(old_freqs[5:10], inplace=inplace)
         if inplace:
             new = sky
-        assert np.allclose(new.freq_array, old_freqs[5:10])
+        assert units.quantity.allclose(new.freq_array, old_freqs[5:10])
     else:
         # Evaluate new frequencies, and confirm the new spectrum is correct.
         new = sky.at_frequencies(fine_freqs, inplace=inplace)
         if inplace:
             new = sky
-        assert np.allclose(new.freq_array, fine_freqs)
+        assert units.quantity.allclose(new.freq_array, fine_freqs)
         assert new.spectral_type == "full"
 
         if stype != "flat":
-            assert np.allclose(new.stokes[0, :, 0], fine_spectrum)
+            assert units.quantity.allclose(new.stokes[0, :, 0], fine_spectrum)
 
         if stype == "subband" and not inplace:
             # Check for error if interpolating outside the defined range.
