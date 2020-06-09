@@ -9,6 +9,7 @@ and K based units.
 component types.
 
 ### Changed
+- Renamed the `read_idl_catalog` method to `read_fhd_catalog`.
 - The `stokes` and `coherency_radec` parameters are now Quantity objects and must
 have units of 'Jy' or 'K sr' if `component_type` is 'point' and 'Jy/sr' or 'K'
 if the `component_type` is 'healpix'.
@@ -17,6 +18,7 @@ must now be Quantity objects.
 - The utility function `jy_to_ksr` now uses astropy's built in conversion methods.
 
 ### Deprecated
+- The `read_idl_catalog` method.
 - Initializing a SkyModel object with a float array rather than a Quantity for
 `stokes` is deprecated and support will be removed in a future version.
 - Passing floats rather than Quantity objects as inputs to the

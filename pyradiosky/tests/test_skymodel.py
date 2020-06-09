@@ -1855,43 +1855,52 @@ def test_read_votable_errors():
         )
 
 
-def test_idl_catalog_reader():
+def test_fhd_catalog_reader():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
 
     skyobj = SkyModel()
-    skyobj.read_idl_catalog(catfile, expand_extended=False)
+    skyobj.read_fhd_catalog(catfile, expand_extended=False)
 
     catalog = scipy.io.readsav(catfile)["catalog"]
     assert skyobj.Ncomponents == len(catalog)
 
     with pytest.warns(
         DeprecationWarning,
-        match="This function is deprecated, use `SkyModel.read_idl_catalog` instead.",
+        match="This function is deprecated, use `SkyModel.read_fhd_catalog` instead.",
     ):
         skyobj2 = skymodel.read_idl_catalog(catfile, expand_extended=False)
 
     assert skyobj == skyobj2
 
+    skyobj3 = SkyModel()
+    with pytest.warns(
+        DeprecationWarning,
+        match="This method is deprecated, use `read_fhd_catalog` instead.",
+    ):
+        skyobj3.read_idl_catalog(catfile, expand_extended=False)
 
-def test_idl_catalog_reader_source_cuts():
+    assert skyobj == skyobj3
+
+
+def test_fhd_catalog_reader_source_cuts():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
 
     skyobj = SkyModel()
-    skyobj.read_idl_catalog(catfile, expand_extended=False)
+    skyobj.read_fhd_catalog(catfile, expand_extended=False)
     skyobj.source_cuts(latitude_deg=30.0)
 
     skyobj2 = SkyModel()
-    skyobj2.read_idl_catalog(
+    skyobj2.read_fhd_catalog(
         catfile, expand_extended=False, source_select_kwds={"latitude_deg": 30.0}
     )
 
     assert skyobj == skyobj2
 
 
-def test_idl_catalog_reader_extended_sources():
+def test_fhd_catalog_reader_extended_sources():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
     skyobj = SkyModel()
-    skyobj.read_idl_catalog(catfile, expand_extended=True)
+    skyobj.read_fhd_catalog(catfile, expand_extended=True)
 
     catalog = scipy.io.readsav(catfile)["catalog"]
     ext_inds = np.where(

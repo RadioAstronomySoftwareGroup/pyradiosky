@@ -2218,7 +2218,7 @@ class SkyModel(UVBase):
 
         return
 
-    def read_idl_catalog(
+    def read_fhd_catalog(
         self,
         filename_sav,
         expand_extended=True,
@@ -2228,7 +2228,9 @@ class SkyModel(UVBase):
         run_check_acceptability=True,
     ):
         """
-        Read in an FHD-readable IDL .sav file catalog.
+        Read in an FHD style catalog file.
+
+        FHD catalog files are IDL save files.
 
         Parameters
         ----------
@@ -2379,6 +2381,66 @@ class SkyModel(UVBase):
             )
 
         return
+
+    def read_idl_catalog(
+        self,
+        filename_sav,
+        expand_extended=True,
+        source_select_kwds=None,
+        run_check=True,
+        check_extra=True,
+        run_check_acceptability=True,
+    ):
+        """
+        Read in an FHD style catalog file.
+
+        Deprecated. Use `read_fhd_catalog` instead.
+
+        Parameters
+        ----------
+        filename_sav: str
+            Path to IDL .sav file.
+
+        expand_extended: bool
+            If True, return extended source components.
+            Default: True
+        source_select_kwds : dict, optional
+            Dictionary of keywords for source selection. Valid options:
+
+            * `lst_array`: For coarse RA horizon cuts, lsts used in the simulation [radians]
+            * `latitude_deg`: Latitude of telescope in degrees. Used for declination coarse
+            *  horizon cut.
+            * `horizon_buffer`: Angle (float, in radians) of buffer for coarse horizon cut.
+              Default is about 10 minutes of sky rotation. (See caveats in
+              :func:`array_to_skymodel` docstring)
+            * `min_flux`: Minimum stokes I flux to select [Jy]
+            * `max_flux`: Maximum stokes I flux to select [Jy]
+        run_check : bool
+            Option to check for the existence and proper shapes of parameters
+            after downselecting data on this object (the default is True,
+            meaning the check will be run).
+        check_extra : bool
+            Option to check optional parameters as well as required ones (the
+            default is True, meaning the optional parameters will be checked).
+        run_check_acceptability : bool
+            Option to check acceptable range of the values of parameters after
+            downselecting data on this object (the default is True, meaning the
+            acceptable range check will be done).
+
+
+        """
+        warnings.warn(
+            "This method is deprecated, use `read_fhd_catalog` instead.",
+            category=DeprecationWarning,
+        )
+        self.read_fhd_catalog(
+            filename_sav,
+            expand_extended=expand_extended,
+            source_select_kwds=source_select_kwds,
+            run_check=run_check,
+            check_extra=check_extra,
+            run_check_acceptability=run_check_acceptability,
+        )
 
     def write_healpix_hdf5(self, filename):
         """
@@ -3011,7 +3073,7 @@ def read_idl_catalog(filename_sav, expand_extended=True):
     """
     Read in an FHD-readable IDL .sav file catalog.
 
-    Deprecated. Use `SkyModel.read_idl_catalog` instead.
+    Deprecated. Use `SkyModel.read_fhd_catalog` instead.
 
     Parameters
     ----------
@@ -3027,12 +3089,12 @@ def read_idl_catalog(filename_sav, expand_extended=True):
     :class:`pyradiosky.SkyModel`
     """
     warnings.warn(
-        "This function is deprecated, use `SkyModel.read_idl_catalog` instead.",
+        "This function is deprecated, use `SkyModel.read_fhd_catalog` instead.",
         category=DeprecationWarning,
     )
 
     skyobj = SkyModel()
-    skyobj.read_idl_catalog(
+    skyobj.read_fhd_catalog(
         filename_sav, expand_extended=expand_extended,
     )
 
