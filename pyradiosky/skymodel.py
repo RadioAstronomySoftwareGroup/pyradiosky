@@ -389,38 +389,57 @@ class SkyModel(UVBase):
             "  Read/written with pyradiosky version: " + __version__ + "."
         )
 
+        # handle old parameter order
+        # (use to be: name, ra, dec, stokes, freq_array spectral_type)
+        if isinstance(spectral_type, (np.ndarray, list, float, Quantity)):
+            warnings.warn(
+                "The input parameters to SkyModel.__init__ have changed. Please "
+                "update the call.",
+                category=DeprecationWarning,
+            )
+            freqs_use = spectral_type
+            spectral_type = freq_array
+
+            if spectral_type == "flat" and np.unique(freqs_use).size == 1:
+                reference_frequency = np.zeros((self.Ncomponents), dtype=np.float)
+                reference_frequency.fill(freqs_use[0])
+                freq_array = None
+            else:
+                freq_array = freqs_use
+                reference_frequency = None
+
         if nside is not None:
             self._set_component_type_params("healpix")
             req_args = ["nside", "hpx_inds", "stokes", "spectral_type"]
-            args_set_req = np.array(
-                [
-                    nside is not None,
-                    hpx_inds is not None,
-                    stokes is not None,
-                    spectral_type is not None,
-                ],
-                dtype=bool,
-            )
+            args_set_req = [
+                nside is not None,
+                hpx_inds is not None,
+                stokes is not None,
+                spectral_type is not None,
+            ]
         else:
             self._set_component_type_params("point")
             req_args = ["name", "ra", "dec", "stokes", "spectral_type"]
-            args_set_req = np.array(
-                [
-                    name is not None,
-                    ra is not None,
-                    dec is not None,
-                    stokes is not None,
-                    spectral_type is not None,
-                ],
-                dtype=bool,
+            args_set_req = [
+                name is not None,
+                ra is not None,
+                dec is not None,
+                stokes is not None,
+                spectral_type is not None,
+            ]
+        if spectral_type == "spectral_index":
+            req_args.extend(["spectral_index", "reference_frequency"])
+            args_set_req.extend(
+                [spectral_index is not None, reference_frequency is not None]
             )
+        elif spectral_type == "full" or spectral_type == "subband":
+            req_args.append("freq_array")
+            args_set_req.append(freq_array is not None)
+
+        args_set_req = np.array(args_set_req, dtype=bool)
+
         arg_set_opt = np.array(
-            [
-                freq_array is not None,
-                reference_frequency is not None,
-                spectral_index is not None,
-            ],
-            dtype=bool,
+            [freq_array is not None, reference_frequency is not None], dtype=bool,
         )
 
         if np.any(np.concatenate((args_set_req, arg_set_opt))):
@@ -448,25 +467,6 @@ class SkyModel(UVBase):
                 self.Ncomponents = self.name.size
                 self.ra = np.atleast_1d(ra)
                 self.dec = np.atleast_1d(dec)
-
-            # handle old parameter order
-            # (use to be: name, ra, dec, stokes, freq_array spectral_type)
-            if isinstance(spectral_type, (np.ndarray, list, float, Quantity)):
-                warnings.warn(
-                    "The input parameters to SkyModel.__init__ have changed. Please "
-                    "update the call.",
-                    category=DeprecationWarning,
-                )
-                freqs_use = spectral_type
-                spectral_type = freq_array
-
-                if spectral_type == "flat" and np.unique(freqs_use).size == 1:
-                    reference_frequency = np.zeros((self.Ncomponents), dtype=np.float)
-                    reference_frequency.fill(freqs_use[0])
-                    freq_array = None
-                else:
-                    freq_array = freqs_use
-                    reference_frequency = None
 
             self._set_spectral_type_params(spectral_type)
 
