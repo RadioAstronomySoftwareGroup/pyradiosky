@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.1.0] - 2020-6-29
+
 ### Added
 - The methods `jansky_to_kelvin` and 'kelvin_to_jansky' to convert between Jy
 and K based units.
