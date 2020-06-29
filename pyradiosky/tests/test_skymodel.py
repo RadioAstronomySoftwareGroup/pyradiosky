@@ -391,7 +391,7 @@ def test_skymodel_deprecated(time_location):
 
     with pytest.warns(
         DeprecationWarning,
-        match="In the future, the reference_frequency will be required to be an astropy Quantity",
+        match="In version 0.2.0, the reference_frequency will be required to be an astropy Quantity",
     ):
         source_old = SkyModel(
             name="Test",
@@ -405,7 +405,7 @@ def test_skymodel_deprecated(time_location):
 
     with pytest.warns(
         DeprecationWarning,
-        match="In the future, stokes will be required to be an astropy "
+        match="In version 0.2.0, stokes will be required to be an astropy "
         "Quantity with units that are convertable to one of",
     ):
         source_old = SkyModel(
@@ -489,7 +489,7 @@ def test_skymodel_deprecated(time_location):
 
     with pytest.warns(
         DeprecationWarning,
-        match="In the future, the freq_array will be required to be an astropy Quantity",
+        match="In version 0.2.0, the freq_array will be required to be an astropy Quantity",
     ):
         source_old = SkyModel(
             name="Test",
@@ -1250,7 +1250,7 @@ def test_healpix_positions(tmp_path, time_location):
 
     with pytest.warns(
         DeprecationWarning,
-        match="In the future, stokes will be required to be an astropy "
+        match="In version 0.2.0, stokes will be required to be an astropy "
         "Quantity with units that are convertable to one of",
     ):
         skyobj = SkyModel(

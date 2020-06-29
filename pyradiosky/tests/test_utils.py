@@ -35,7 +35,7 @@ def test_stokes_tofrom_coherency():
 
     with pytest.warns(
         DeprecationWarning,
-        match="In the future, stokes_arr will be required to be an astropy "
+        match="In version 0.2.0, stokes_arr will be required to be an astropy "
         "Quantity. Currently, floats are assumed to be in Jy.",
     ):
         coherency = skyutils.stokes_to_coherency(stokes)
@@ -44,7 +44,7 @@ def test_stokes_tofrom_coherency():
 
     with pytest.warns(
         DeprecationWarning,
-        match="In the future, coherency_matrix will be required to be an astropy "
+        match="In version 0.2.0, coherency_matrix will be required to be an astropy "
         "Quantity. Currently, floats are assumed to be in Jy.",
     ):
         back_to_stokes = skyutils.coherency_to_stokes(coherency.value)
