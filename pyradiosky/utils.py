@@ -89,7 +89,7 @@ def stokes_to_coherency(stokes_arr):
     """
     if not isinstance(stokes_arr, Quantity):
         warnings.warn(
-            "In the future, stokes_arr will be required to be an astropy "
+            "In version 0.2.0, stokes_arr will be required to be an astropy "
             "Quantity. Currently, floats are assumed to be in Jy.",
             category=DeprecationWarning,
         )
@@ -140,7 +140,7 @@ def coherency_to_stokes(coherency_matrix):
     """
     if not isinstance(coherency_matrix, Quantity):
         warnings.warn(
-            "In the future, coherency_matrix will be required to be an astropy "
+            "In version 0.2.0, coherency_matrix will be required to be an astropy "
             "Quantity. Currently, floats are assumed to be in Jy.",
             category=DeprecationWarning,
         )

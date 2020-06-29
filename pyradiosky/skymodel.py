@@ -386,7 +386,7 @@ class SkyModel(UVBase):
         if isinstance(spectral_type, (np.ndarray, list, float, Quantity)):
             warnings.warn(
                 "The input parameters to SkyModel.__init__ have changed. Please "
-                "update the call.",
+                "update the call. This will become an error in version 0.2.0.",
                 category=DeprecationWarning,
             )
             freqs_use = spectral_type
@@ -465,7 +465,7 @@ class SkyModel(UVBase):
             if freq_array is not None:
                 if not isinstance(freq_array, (Quantity,)):
                     warnings.warn(
-                        "In the future, the freq_array will be required to be an "
+                        "In version 0.2.0, the freq_array will be required to be an "
                         "astropy Quantity with units that are convertable to Hz. "
                         "Currently, floats are assumed to be in Hz.",
                         category=DeprecationWarning,
@@ -479,7 +479,7 @@ class SkyModel(UVBase):
             if reference_frequency is not None:
                 if not isinstance(reference_frequency, (Quantity,)):
                     warnings.warn(
-                        "In the future, the reference_frequency will be required to be an "
+                        "In version 0.2.0, the reference_frequency will be required to be an "
                         "astropy Quantity with units that are convertable to Hz. "
                         "Currently, floats are assumed to be in Hz.",
                         category=DeprecationWarning,
@@ -501,7 +501,7 @@ class SkyModel(UVBase):
                 self.stokes = stokes
             else:
                 warnings.warn(
-                    "In the future, stokes will be required to be an astropy "
+                    "In version 0.2.0, stokes will be required to be an astropy "
                     f"Quantity with units that are convertable to one of {allowed_units}. "
                     f"Currently, floats are assumed to be in {default_unit}.",
                     category=DeprecationWarning,
@@ -549,7 +549,8 @@ class SkyModel(UVBase):
         Deprecated, use _set_spectral_type_params
         """
         warnings.warn(
-            "This function is deprecated, use `_set_spectral_type_params` instead.",
+            "This function is deprecated, use `_set_spectral_type_params` instead. "
+            "This funtion will be removed in 0.2.0.",
             category=DeprecationWarning,
         )
 
@@ -641,21 +642,24 @@ class SkyModel(UVBase):
         if not np.allclose(self.ra, other.ra, rtol=0, atol=self.future_angle_tol):
             warnings.warn(
                 "The _ra parameters are not within the future tolerance. "
-                f"Left is {self.ra}, right is {other.ra}",
+                f"Left is {self.ra}, right is {other.ra}. "
+                "This will become an error in version 0.2.0",
                 category=DeprecationWarning,
             )
 
         if not np.allclose(self.dec, other.dec, rtol=0, atol=self.future_angle_tol):
             warnings.warn(
                 "The _dec parameters are not within the future tolerance. "
-                f"Left is {self.dec}, right is {other.dec}",
+                f"Left is {self.dec}, right is {other.dec}. "
+                "This will become an error in version 0.2.0",
                 category=DeprecationWarning,
             )
 
         if not equal:
             warnings.warn(
                 "Future equality does not pass, probably because the "
-                "frequencies were not checked in the deprecated equality checking.",
+                "frequencies were not checked in the deprecated equality checking. "
+                "This will become an error in version 0.2.0",
                 category=DeprecationWarning,
             )
             equal = super(SkyModel, self).__eq__(other, check_extra=False)
@@ -1171,7 +1175,8 @@ class SkyModel(UVBase):
         if deprecated_location is not None:
             warnings.warn(
                 "Passing telescope_location to SkyModel.coherency_calc is "
-                "deprecated. Set the telescope_location via SkyModel.update_positions.",
+                "deprecated. Set the telescope_location via SkyModel.update_positions. "
+                "This will become an error in version 0.2.0",
                 category=DeprecationWarning,
             )
             self.update_positions(self.time, deprecated_location)
@@ -1499,7 +1504,7 @@ class SkyModel(UVBase):
             # compatibility.
             warnings.warn(
                 "The reference_frequency is aliased as `frequency` in the recarray "
-                "for backwards compatibility. In the future "
+                "for backwards compatibility. In version 0.2.0, "
                 "only `reference_frequency` will be an accepted column key.",
                 category=DeprecationWarning,
             )
@@ -1549,7 +1554,7 @@ class SkyModel(UVBase):
 
         warnings.warn(
             "recarray flux columns will no longer be labeled"
-            " `flux_density_I` etc. in the future. Use `I` instead.",
+            " `flux_density_I` etc. in version 0.2.0. Use `I` instead.",
             DeprecationWarning,
         )
 
@@ -1848,7 +1853,7 @@ class SkyModel(UVBase):
         else:
             warnings.warn(
                 f"File {votable_file} contains tables with no name or ID, Support for "
-                "such files is deprecated.",
+                "such files is deprecated and will be removed in version 0.2.0.",
                 category=DeprecationWarning,
             )
             # Find correct table using the field names
@@ -2430,7 +2435,8 @@ class SkyModel(UVBase):
 
         """
         warnings.warn(
-            "This method is deprecated, use `read_fhd_catalog` instead.",
+            "This method is deprecated, use `read_fhd_catalog` instead. "
+            "This method will be removed in version 0.2.0.",
             category=DeprecationWarning,
         )
         self.read_fhd_catalog(
@@ -2598,7 +2604,8 @@ def read_healpix_hdf5(hdf5_filename):
         Frequencies in Hz. Shape (Nfreqs)
     """
     warnings.warn(
-        "This function is deprecated, use `SkyModel.read_healpix_hdf5` instead.",
+        "This function is deprecated, use `SkyModel.read_healpix_hdf5` instead. "
+        "This function will be removed in version 0.2.0.",
         category=DeprecationWarning,
     )
 
@@ -2642,7 +2649,8 @@ def write_healpix_hdf5(filename, hpmap, indices, freqs, nside=None, history=None
         ) from e
 
     warnings.warn(
-        "This function is deprecated, use `SkyModel.write_healpix_hdf5` instead.",
+        "This function is deprecated, use `SkyModel.write_healpix_hdf5` instead. "
+        "This function will be removed in version 0.2.0.",
         category=DeprecationWarning,
     )
 
@@ -2731,7 +2739,8 @@ def healpix_to_sky(hpmap, indices, freqs):
         ) from e
 
     warnings.warn(
-        "This function is deprecated, use `SkyModel.read_healpix_hdf5` instead.",
+        "This function is deprecated, use `SkyModel.read_healpix_hdf5` instead. "
+        "This function will be removed in version 0.2.0.",
         category=DeprecationWarning,
     )
 
@@ -2778,7 +2787,8 @@ def skymodel_to_array(sky):
     This is used by pyuvsim for sharing catalog data via MPI.
     """
     warnings.warn(
-        "This function is deprecated, use `SkyModel.to_recarray` instead.",
+        "This function is deprecated, use `SkyModel.to_recarray` instead. "
+        "This function will be removed in version 0.2.0.",
         category=DeprecationWarning,
     )
 
@@ -2802,7 +2812,8 @@ def array_to_skymodel(catalog_table):
 
     """
     warnings.warn(
-        "This function is deprecated, use `SkyModel.from_recarray` instead.",
+        "This function is deprecated, use `SkyModel.from_recarray` instead. "
+        "This function will be removed in version 0.2.0.",
         category=DeprecationWarning,
     )
 
@@ -2858,7 +2869,8 @@ def source_cuts(
 
     """
     warnings.warn(
-        "This function is deprecated, use `SkyModel.source_cuts` instead.",
+        "This function is deprecated, use `SkyModel.source_cuts` instead. "
+        "This function will be removed in version 0.2.0.",
         category=DeprecationWarning,
     )
 
@@ -2933,7 +2945,8 @@ def read_votable_catalog(
 
     """
     warnings.warn(
-        "This function is deprecated, use `SkyModel.read_votable_catalog` instead.",
+        "This function is deprecated, use `SkyModel.read_votable_catalog` instead. "
+        "This function will be removed in version 0.2.0.",
         category=DeprecationWarning,
     )
 
@@ -2995,7 +3008,8 @@ def read_gleam_catalog(
         if return_table, recarray of source parameters, otherwise :class:`pyradiosky.SkyModel` instance
     """
     warnings.warn(
-        "This function is deprecated, use `SkyModel.read_gleam_catalog` instead.",
+        "This function is deprecated, use `SkyModel.read_gleam_catalog` instead. "
+        "This function will be removed in version 0.2.0.",
         category=DeprecationWarning,
     )
 
@@ -3054,7 +3068,8 @@ def read_text_catalog(catalog_csv, source_select_kwds=None, return_table=False):
         A sky model created from the text catalog.
     """
     warnings.warn(
-        "This function is deprecated, use `SkyModel.read_text_catalog` instead.",
+        "This function is deprecated, use `SkyModel.read_text_catalog` instead. "
+        "This function will be removed in version 0.2.0.",
         category=DeprecationWarning,
     )
 
@@ -3089,7 +3104,8 @@ def read_idl_catalog(filename_sav, expand_extended=True):
     :class:`pyradiosky.SkyModel`
     """
     warnings.warn(
-        "This function is deprecated, use `SkyModel.read_fhd_catalog` instead.",
+        "This function is deprecated, use `SkyModel.read_fhd_catalog` instead. "
+        "This function will be removed in version 0.2.0.",
         category=DeprecationWarning,
     )
 
@@ -3115,7 +3131,8 @@ def write_catalog_to_file(filename, skymodel):
         The sky model to write to file.
     """
     warnings.warn(
-        "This function is deprecated, use `SkyModel.write_text_catalog` instead.",
+        "This function is deprecated, use `SkyModel.write_text_catalog` instead. "
+        "This function will be removed in version 0.2.0.",
         category=DeprecationWarning,
     )
 
