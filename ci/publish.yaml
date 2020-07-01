@@ -7,5 +7,6 @@ dependencies:
   - numpy
   - h5py
   - scipy
+  - pep517
   - pyuvdata>=2.0.1
   - setuptools_scm
