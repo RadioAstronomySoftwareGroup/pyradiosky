@@ -51,8 +51,8 @@ jobs:
           path: docs/build/html
 
       # - name: Publish docs to Github Pages
-      #   # only publish from master branch
-      #   if: {{ github.ref == 'ref/head/master' }}
+      #   # only publish from main branch
+      #   if: {{ github.ref == 'ref/head/main' }}
       #   uses: JamesIves/github-pages-deploy-action@releases/v3
       #   with:
       #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

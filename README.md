@@ -1,6 +1,6 @@
 # pyradiosky
-![](https://github.com/RadioAstronomySoftwareGroup/pyradiosky/workflows/Tests/badge.svg?branch=master)
-[![codecov](https://codecov.io/gh/RadioAstronomySoftwareGroup/pyradiosky/branch/master/graph/badge.svg)](https://codecov.io/gh/RadioAstronomySoftwareGroup/pyradiosky)
+![](https://github.com/RadioAstronomySoftwareGroup/pyradiosky/workflows/Tests/badge.svg?branch=main)
+[![codecov](https://codecov.io/gh/RadioAstronomySoftwareGroup/pyradiosky/branch/main/graph/badge.svg)](https://codecov.io/gh/RadioAstronomySoftwareGroup/pyradiosky)
 
 Python objects and interfaces for representing diffuse, extended and compact
 astrophysical radio sources.
@@ -28,7 +28,7 @@ and the `minor` number to release smaller incremental updates (intended to be
 released approximately monthly and which usually do not include breaking API
 changes). We do our best to provide a significant period (usually 2 major
 generations) of deprecation warnings for all breaking changes to the API.
-We track all changes in our [changelog](https://github.com/RadioAstronomySoftwareGroup/pyradiosky/blob/master/CHANGELOG.md).
+We track all changes in our [changelog](https://github.com/RadioAstronomySoftwareGroup/pyradiosky/blob/main/CHANGELOG.md).
 
 # Documentation
 Developer API documentation is hosted [here](https://pyradiosky.readthedocs.io/en/latest/).
