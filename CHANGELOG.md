@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+- A `from_xxx` classmethod for every `read_xxx` method, to enable instantiation from
+  different formats directly.
+
 ## [0.1.0] - 2020-6-29
 
 ### Added
