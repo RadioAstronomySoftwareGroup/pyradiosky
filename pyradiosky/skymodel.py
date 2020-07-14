@@ -424,7 +424,7 @@ class SkyModel(UVBase):
             args_set_req.extend(
                 [spectral_index is not None, reference_frequency is not None]
             )
-        elif spectral_type == "full" or spectral_type == "subband":
+        elif spectral_type in ["full", "subband"]:
             req_args.append("freq_array")
             args_set_req.append(freq_array is not None)
 
@@ -619,17 +619,16 @@ class SkyModel(UVBase):
         )
 
         # make sure freq_array or reference_frequency if present is compatible with Hz
-        if self.freq_array is not None:
-            if not self.freq_array.unit.is_equivalent("Hz"):
-                raise ValueError(
-                    "freq_array must have a unit that can be converted to Hz."
-                )
+        if not (self.freq_array is None or self.freq_array.unit.is_equivalent("Hz")):
+            raise ValueError("freq_array must have a unit that can be converted to Hz.")
 
-        if self.reference_frequency is not None:
-            if not self.reference_frequency.unit.is_equivalent("Hz"):
-                raise ValueError(
-                    "reference_frequency must have a unit that can be converted to Hz."
-                )
+        if (
+            self.reference_frequency is not None
+            and not self.reference_frequency.unit.is_equivalent("Hz")
+        ):
+            raise ValueError(
+                "reference_frequency must have a unit that can be converted to Hz."
+            )
 
         return True
 
@@ -840,7 +839,7 @@ class SkyModel(UVBase):
 
         """
         if (
-            not self.component_type == "point"
+            self.component_type != "point"
             or self.nside is None
             or self.hpx_inds is None
         ):
@@ -898,10 +897,7 @@ class SkyModel(UVBase):
             Run check on new SkyModel.
             Default True.
         """
-        if inplace:
-            sky = self
-        else:
-            sky = self.copy()
+        sky = self if inplace else self.copy()
 
         if self.spectral_type == "spectral_index":
             sky.stokes = (
@@ -915,7 +911,7 @@ class SkyModel(UVBase):
             matches = np.isin(
                 self.freq_array.to("Hz"), freqs.to("Hz"), assume_unique=True
             )
-            if not np.sum(matches) == freqs.size:
+            if np.sum(matches) != freqs.size:
                 raise ValueError(
                     "Some requested frequencies are not "
                     "present in the current SkyModel."
@@ -1263,10 +1259,7 @@ class SkyModel(UVBase):
             object with just the selected data (the default is True, meaning the
             select will be done on self).
         """
-        if inplace:
-            skyobj = self
-        else:
-            skyobj = self.copy()
+        skyobj = self if inplace else self.copy()
 
         if component_inds is None:
             if not inplace:
@@ -1482,7 +1475,6 @@ class SkyModel(UVBase):
         # Alias "flux_density_" for "I", etc.
         stokes_names = [(f"flux_density_{k}", k) for k in ["I", "Q", "U", "V"]]
         fieldshapes = [()] * 3
-        fieldshapes = [()] * 3
 
         n_stokes = 0
         stokes_keep = []
@@ -1569,8 +1561,9 @@ class SkyModel(UVBase):
 
         return arr
 
+    @classmethod
     def from_recarray(
-        self,
+        cls,
         recarray_in,
         run_check=True,
         check_extra=True,
@@ -1655,7 +1648,7 @@ class SkyModel(UVBase):
 
         names = ids
 
-        self.__init__(
+        self = cls(
             name=names,
             ra=ra,
             dec=dec,
@@ -1666,6 +1659,8 @@ class SkyModel(UVBase):
             spectral_index=spectral_index,
         )
 
+        # TODO: not sure if the following is really necessary if we're newly creating
+        # the full object
         if ids[0].startswith("nside"):
             self.nside = int(ids[0][len("nside") : ids[0].find("_")])
             self.hpx_inds = np.array([int(name[name.find("_") + 1 :]) for name in ids])
@@ -1684,6 +1679,48 @@ class SkyModel(UVBase):
             self.check(
                 check_extra=check_extra, run_check_acceptability=run_check_acceptability
             )
+
+        return self
+
+    @classmethod
+    def from_healpix_hdf5(
+        cls,
+        hdf5_filename,
+        run_check=True,
+        check_extra=True,
+        run_check_acceptability=True,
+    ):
+        """
+        Create a new :class:`SkyModel` from a hdf5 healpix file.
+
+        Parameters
+        ----------
+        hdf5_filename : str
+            Path and name of the hdf5 file to read.
+        run_check : bool
+            Option to check for the existence and proper shapes of parameters
+            after downselecting data on this object (the default is True,
+            meaning the check will be run).
+        check_extra : bool
+            Option to check optional parameters as well as required ones (the
+            default is True, meaning the optional parameters will be checked).
+        run_check_acceptability : bool
+            Option to check acceptable range of the values of parameters after
+            downselecting data on this object (the default is True, meaning the
+            acceptable range check will be done).
+
+        Notes
+        -----
+        Currently, this function only converts a HEALPix map with a frequency axis.
+        """
+        self = cls()
+        self.read_healpix_hdf5(
+            hdf5_filename,
+            run_check=run_check,
+            check_extra=check_extra,
+            run_check_acceptability=run_check_acceptability,
+        )
+        return self
 
     def read_healpix_hdf5(
         self,
@@ -1740,7 +1777,6 @@ class SkyModel(UVBase):
             except KeyError:
                 hpmap_units = "K"
 
-        ra, dec = astropy_healpix.healpix_to_lonlat(indices, nside)
         freq = Quantity(freqs, "hertz")
 
         # hmap is in K
@@ -1769,6 +1805,24 @@ class SkyModel(UVBase):
                 check_extra=check_extra, run_check_acceptability=run_check_acceptability
             )
         return
+
+    @classmethod
+    def from_votable_catalog(cls, votable_file, *args, **kwargs):
+        """Create a :class:`SkyModel` from a votable catalog.
+
+        Parameters
+        ----------
+        kwargs :
+            All parameters are sent through to :meth:`read_votable_catalog`.
+
+        Returns
+        -------
+        sky_model : :class:`SkyModel`
+            The object instantiated using the votable catalog.
+        """
+        self = cls()
+        self.read_votable_catalog(votable_file, *args, **kwargs)
+        return self
 
     def read_votable_catalog(
         self,
@@ -1965,6 +2019,24 @@ class SkyModel(UVBase):
 
         return
 
+    @classmethod
+    def from_gleam_catalog(cls, gleam_file, **kwargs):
+        """Create a :class:`SkyModel` from a GLEAM catalog.
+
+        Parameters
+        ----------
+        kwargs :
+            All parameters are sent through to :meth:`read_gleam_catalog`.
+
+        Returns
+        -------
+        sky_model : :class:`SkyModel`
+            The object instantiated using the GLEAM catalog.
+        """
+        self = cls()
+        self.read_gleam_catalog(gleam_file, **kwargs)
+        return self
+
     def read_gleam_catalog(
         self,
         gleam_file,
@@ -2056,7 +2128,26 @@ class SkyModel(UVBase):
             source_select_kwds=source_select_kwds,
         )
 
+        # TODO: checks not run here?
         return
+
+    @classmethod
+    def from_text_catalog(cls, catalog_csv, **kwargs):
+        """Create a :class:`SkyModel` from a text catalog.
+
+        Parameters
+        ----------
+        kwargs :
+            All parameters are sent through to :meth:`read_text_catalog`.
+
+        Returns
+        -------
+        sky_model : :class:`SkyModel`
+            The object instantiated using the text catalog.
+        """
+        self = cls()
+        self.read_text_catalog(catalog_csv, **kwargs)
+        return self
 
     def read_text_catalog(
         self,
@@ -2227,6 +2318,24 @@ class SkyModel(UVBase):
 
         return
 
+    @classmethod
+    def from_fhd_catalog(cls, filename_sav, **kwargs):
+        """Create a :class:`SkyModel` from an FHD catalog.
+
+        Parameters
+        ----------
+        kwargs :
+            All parameters are sent through to :meth:`read_fhd_catalog`.
+
+        Returns
+        -------
+        sky_model : :class:`SkyModel`
+            The object instantiated using the FHD catalog.
+        """
+        self = cls()
+        self.read_fhd_catalog(filename_sav, **kwargs)
+        return self
+
     def read_fhd_catalog(
         self,
         filename_sav,
@@ -2390,6 +2499,24 @@ class SkyModel(UVBase):
             )
 
         return
+
+    @classmethod
+    def from_idl_catalog(cls, filename_sav, **kwargs):
+        """Create a :class:`SkyModel` from a IDL catalog.
+
+        Parameters
+        ----------
+        kwargs :
+            All parameters are sent through to :meth:`read_idl_catalog`.
+
+        Returns
+        -------
+        sky_model : :class:`SkyModel`
+            The object instantiated using the IDL catalog.
+        """
+        self = cls()
+        self.read_idl_catalog(filename_sav, **kwargs)
+        return self
 
     def read_idl_catalog(
         self,

@@ -50,9 +50,7 @@ def zenith_skycoord(time_location):
         frame="altaz",
         location=array_location,
     )
-    icrs_coord = source_coord.transform_to("icrs")
-
-    return icrs_coord
+    return source_coord.transform_to("icrs")
 
 
 @pytest.fixture
@@ -64,11 +62,7 @@ def zenith_skymodel(zenith_skycoord):
 
     names = "zen_source"
     stokes = [1.0, 0, 0, 0] * units.Jy
-    zenith_source = SkyModel(
-        name=names, ra=ra, dec=dec, stokes=stokes, spectral_type="flat"
-    )
-
-    return zenith_source
+    return SkyModel(name=names, ra=ra, dec=dec, stokes=stokes, spectral_type="flat")
 
 
 @pytest.fixture
@@ -183,6 +177,11 @@ def mock_point_skies():
             )
 
     yield _func
+
+
+@pytest.fixture(scope="function")
+def healpix_disk():
+    return SkyModel.from_healpix_hdf5(os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5"))
 
 
 def test_set_spectral_params(zenith_skymodel):
@@ -514,8 +513,7 @@ def test_skymodel_deprecated(time_location):
 @pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index"])
 def test_jansky_to_kelvin_loop(spec_type):
 
-    skyobj = SkyModel()
-    skyobj.read_gleam_catalog(GLEAM_vot, spectral_type=spec_type)
+    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type=spec_type)
 
     stokes_expected = np.zeros_like(skyobj.stokes.value) * units.K * units.sr
     if spec_type == "subband":
@@ -554,11 +552,8 @@ def test_jansky_to_kelvin_loop(spec_type):
     assert skyobj3 == skyobj2
 
 
-def test_jansky_to_kelvin_loop_healpix(healpix_data):
-    healpix_filename = os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
-
-    skyobj = SkyModel()
-    skyobj.read_healpix_hdf5(healpix_filename)
+def test_jansky_to_kelvin_loop_healpix(healpix_data, healpix_disk):
+    skyobj = healpix_disk
 
     stokes_expected = np.zeros_like(skyobj.stokes.value) * units.Jy / units.sr
     brightness_temperature_conv = units.brightness_temperature(skyobj.freq_array)
@@ -603,12 +598,8 @@ def test_jansky_to_kelvin_errors(zenith_skymodel):
         zenith_skymodel.kelvin_to_jansky()
 
 
-def test_healpix_to_point_loop(healpix_data):
-
-    healpix_filename = os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
-
-    skyobj = SkyModel()
-    skyobj.read_healpix_hdf5(healpix_filename)
+def test_healpix_to_point_loop(healpix_data, healpix_disk):
+    skyobj = healpix_disk
 
     skyobj2 = skyobj.copy()
     skyobj2.healpix_to_point()
@@ -987,7 +978,7 @@ def test_read_healpix_hdf5(healpix_data):
     assert np.allclose(freqs, healpix_data["frequencies"])
 
 
-def test_healpix_to_sky(healpix_data):
+def test_healpix_to_sky(healpix_data, healpix_disk):
 
     healpix_filename = os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
     with h5py.File(healpix_filename, "r") as fileobj:
@@ -1007,14 +998,11 @@ def test_healpix_to_sky(healpix_data):
         sky = skymodel.healpix_to_sky(hpmap, indices, freqs)
         assert isinstance(sky.stokes, Quantity)
 
-    sky2 = SkyModel()
-    sky2.read_healpix_hdf5(healpix_filename)
-
-    assert sky2 == sky
-    assert units.quantity.allclose(sky2.stokes[0], hmap_orig)
+    assert healpix_disk == sky
+    assert units.quantity.allclose(healpix_disk.stokes[0], hmap_orig)
 
 
-def test_units_healpix_to_sky(healpix_data):
+def test_units_healpix_to_sky(healpix_data, healpix_disk):
 
     healpix_filename = os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
     with h5py.File(healpix_filename, "r") as fileobj:
@@ -1027,24 +1015,19 @@ def test_units_healpix_to_sky(healpix_data):
         freqs, beam_area=healpix_data["pixel_area"]
     )
     stokes = (hpmap.T * units.K).to(units.Jy, brightness_temperature_conv).T
-    sky = SkyModel()
-    sky.read_healpix_hdf5(healpix_filename)
+    sky = healpix_disk
     sky.healpix_to_point()
 
     assert units.quantity.allclose(sky.stokes[0, 0], stokes[0])
 
 
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
-def test_healpix_recarray_loop(healpix_data):
+def test_healpix_recarray_loop(healpix_data, healpix_disk):
 
-    healpix_filename = os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
-
-    skyobj = SkyModel()
-    skyobj.read_healpix_hdf5(healpix_filename)
+    skyobj = healpix_disk
     skyarr = skyobj.to_recarray()
 
-    skyobj2 = SkyModel()
-    skyobj2.from_recarray(skyarr)
+    skyobj2 = SkyModel.from_recarray(skyarr)
     assert skyobj.component_type == "healpix"
     assert skyobj2.component_type == "healpix"
 
@@ -1103,61 +1086,47 @@ def test_read_write_healpix_old(tmp_path, healpix_data):
     assert np.allclose(freqs_new, freqs.to("Hz").value)
 
 
-def test_read_write_healpix(tmp_path, healpix_data):
-
-    healpix_filename = os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
+def test_read_write_healpix(tmp_path, healpix_data, healpix_disk):
 
     test_filename = os.path.join(tmp_path, "tempfile.hdf5")
 
-    sky = SkyModel()
-    sky.read_healpix_hdf5(healpix_filename)
+    sky = healpix_disk
     sky.write_healpix_hdf5(test_filename)
 
-    sky2 = SkyModel()
-    sky2.read_healpix_hdf5(test_filename)
+    sky2 = SkyModel.from_healpix_hdf5(test_filename)
 
     assert sky == sky2
 
 
-def test_read_write_healpix_cut_sky(tmp_path, healpix_data):
-
-    healpix_filename = os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
+def test_read_write_healpix_cut_sky(tmp_path, healpix_data, healpix_disk):
 
     test_filename = os.path.join(tmp_path, "tempfile.hdf5")
 
-    sky = SkyModel()
-    sky.read_healpix_hdf5(healpix_filename)
+    sky = healpix_disk
     sky.select(component_inds=np.arange(10))
     sky.check()
 
     sky.write_healpix_hdf5(test_filename)
 
-    sky2 = SkyModel()
-    sky2.read_healpix_hdf5(test_filename)
+    sky2 = SkyModel.from_healpix_hdf5(test_filename)
 
     assert sky == sky2
 
 
-def test_read_write_healpix_nover_history(tmp_path, healpix_data):
-
-    healpix_filename = os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
-
+def test_read_write_healpix_nover_history(tmp_path, healpix_data, healpix_disk):
     test_filename = os.path.join(tmp_path, "tempfile.hdf5")
 
-    sky = SkyModel()
-    sky.read_healpix_hdf5(healpix_filename)
+    sky = healpix_disk
     sky.history = None
     sky.write_healpix_hdf5(test_filename)
 
-    sky2 = SkyModel()
-    sky2.read_healpix_hdf5(test_filename)
+    sky2 = SkyModel.from_healpix_hdf5(test_filename)
 
     assert sky == sky2
 
 
 def test_write_healpix_error(tmp_path):
-    skyobj = SkyModel()
-    skyobj.read_gleam_catalog(GLEAM_vot)
+    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot)
     test_filename = os.path.join(tmp_path, "tempfile.hdf5")
 
     with pytest.raises(
@@ -1186,9 +1155,8 @@ def test_healpix_import_err(zenith_skymodel):
                 nside=8, hpx_inds=[0], stokes=[1.0, 0.0, 0.0, 0.0], spectral_type="flat"
             )
 
-        skyobj = SkyModel()
         with pytest.raises(ImportError, match=errstr):
-            skyobj.read_healpix_hdf5(os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5"))
+            SkyModel.from_healpix_hdf5(os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5"))
 
         with pytest.raises(ImportError, match=errstr):
             skymodel.write_healpix_hdf5("filename.hdf5", hpmap, inds, freqs)
@@ -1225,7 +1193,7 @@ def test_healpix_positions(tmp_path, time_location):
         match="For healpix component types, the stokes parameter must have a "
         "unit that can be converted to",
     ):
-        skyobj = SkyModel(
+        SkyModel(
             nside=nside,
             hpx_inds=range(Npix),
             stokes=stokes * units.m,
@@ -1281,8 +1249,7 @@ def test_healpix_positions(tmp_path, time_location):
     src_m = np.cos(src_az.rad) * np.sin(src_za.rad)
     src_n = np.cos(src_za.rad)
 
-    sky2 = SkyModel()
-    sky2.read_healpix_hdf5(filename)
+    sky2 = SkyModel.from_healpix_hdf5(filename)
 
     time.location = array_location
 
@@ -1301,13 +1268,9 @@ def test_healpix_positions(tmp_path, time_location):
 @pytest.mark.filterwarnings("ignore:The reference_frequency is aliased as `frequency`")
 @pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index", "full"])
 def test_array_to_skymodel_loop(spec_type):
-    if spec_type == "full":
-        spectral_type = "subband"
-    else:
-        spectral_type = spec_type
+    spectral_type = "subband" if spec_type == "full" else spec_type
 
-    sky = SkyModel()
-    sky.read_gleam_catalog(GLEAM_vot, spectral_type=spectral_type)
+    sky = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type=spectral_type)
     if spec_type == "full":
         sky.spectral_type = "full"
 
@@ -1329,9 +1292,7 @@ def test_array_to_skymodel_loop(spec_type):
 
         # again with flat & freq_array
         sky.freq_array = np.atleast_1d(np.unique(reference_frequency))
-        arr = sky.to_recarray()
-        sky2 = SkyModel()
-        sky2.from_recarray(arr)
+        sky2 = SkyModel.from_recarray(sky.to_recarray())
 
         assert sky == sky2
 
@@ -1339,8 +1300,7 @@ def test_array_to_skymodel_loop(spec_type):
 def test_param_flux_cuts():
     # Check that min/max flux limits in test params work.
 
-    skyobj = SkyModel()
-    skyobj.read_gleam_catalog(GLEAM_vot)
+    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot)
 
     skyobj2 = skyobj.source_cuts(
         min_flux=0.2 * units.Jy, max_flux=1.5 * units.Jy, inplace=False
@@ -1362,8 +1322,7 @@ def test_param_flux_cuts():
 def test_select(spec_type, time_location):
     time, array_location = time_location
 
-    skyobj = SkyModel()
-    skyobj.read_gleam_catalog(GLEAM_vot)
+    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot)
 
     skyobj.beam_amp = np.ones((4, skyobj.Nfreqs, skyobj.Ncomponents))
     skyobj.extended_model_group = np.arange(skyobj.Ncomponents)
@@ -1377,8 +1336,7 @@ def test_select(spec_type, time_location):
 
 
 def test_select_none():
-    skyobj = SkyModel()
-    skyobj.read_gleam_catalog(GLEAM_vot)
+    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot)
 
     skyobj2 = skyobj.select(component_inds=None, inplace=False)
     assert skyobj2 == skyobj
@@ -1508,8 +1466,7 @@ def test_source_cut_error(
     ras = Longitude(np.random.uniform(0, 360.0, Nsrcs), units.deg)
     decs = Latitude(np.linspace(-90, 90, Nsrcs), units.deg)
     stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
-    stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
-    if spec_type == "flat" or spec_type == "spectral_index":
+    if spec_type in ["flat", "spectral_index"]:
         stokes[0, :, :] = np.linspace(minflux, maxflux, Nsrcs) * units.Jy
     else:
         stokes = np.zeros((4, 2, Nsrcs)) * units.Jy
@@ -1525,10 +1482,10 @@ def test_source_cut_error(
         **init_kwargs,
     )
 
-    minI_cut = 1.0
-    maxI_cut = 2.3
-
     with pytest.raises(error_category, match=error_message):
+        minI_cut = 1.0
+        maxI_cut = 2.3
+
         skyobj.source_cuts(
             latitude_deg=30.0, min_flux=minI_cut, max_flux=maxI_cut, **cut_kwargs,
         )
@@ -1689,8 +1646,7 @@ def test_get_matching_fields_errors(name_to_match, name_list, error_message):
 
 @pytest.mark.parametrize("spec_type", ["flat", "subband"])
 def test_read_gleam(spec_type):
-    skyobj = SkyModel()
-    skyobj.read_gleam_catalog(GLEAM_vot, spectral_type=spec_type)
+    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type=spec_type)
 
     assert skyobj.Ncomponents == 50
     if spec_type == "subband":
@@ -1738,8 +1694,7 @@ def test_read_gleam_errors():
 def test_read_votable():
     votable_file = os.path.join(SKY_DATA_PATH, "simple_test.vot")
 
-    skyobj = SkyModel()
-    skyobj.read_votable_catalog(
+    skyobj = SkyModel.from_votable_catalog(
         votable_file, "VIII_1000_single", "source_id", "RAJ2000", "DEJ2000", "Si"
     )
 
@@ -1816,11 +1771,10 @@ def test_read_votable_errors():
                     "Fint158", "Fint166", "Fint174", "Fint181", "Fint189",
                     "Fint197", "Fint204", "Fint212", "Fint220", "Fint227"]
     # fmt: on
-    skyobj = SkyModel()
     with pytest.raises(
         ValueError, match="freq_array must be provided for multiple flux columns."
     ):
-        skyobj.read_votable_catalog(
+        SkyModel.from_votable_catalog(
             GLEAM_vot,
             "GLEAM",
             "GLEAM",
@@ -1833,7 +1787,7 @@ def test_read_votable_errors():
     with pytest.raises(
         ValueError, match="reference_frequency must be an astropy Quantity."
     ):
-        skyobj.read_votable_catalog(
+        SkyModel.from_votable_catalog(
             GLEAM_vot,
             "GLEAM",
             "GLEAM",
@@ -1844,7 +1798,7 @@ def test_read_votable_errors():
         )
 
     with pytest.raises(ValueError, match="All flux columns must have compatible units"):
-        skyobj.read_votable_catalog(
+        SkyModel.from_votable_catalog(
             GLEAM_vot,
             "GLEAM",
             "GLEAM",
@@ -1858,8 +1812,7 @@ def test_read_votable_errors():
 def test_fhd_catalog_reader():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
 
-    skyobj = SkyModel()
-    skyobj.read_fhd_catalog(catfile, expand_extended=False)
+    skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
 
     catalog = scipy.io.readsav(catfile)["catalog"]
     assert skyobj.Ncomponents == len(catalog)
@@ -1872,12 +1825,11 @@ def test_fhd_catalog_reader():
 
     assert skyobj == skyobj2
 
-    skyobj3 = SkyModel()
     with pytest.warns(
         DeprecationWarning,
         match="This method is deprecated, use `read_fhd_catalog` instead.",
     ):
-        skyobj3.read_idl_catalog(catfile, expand_extended=False)
+        skyobj3 = SkyModel.from_idl_catalog(catfile, expand_extended=False)
 
     assert skyobj == skyobj3
 
@@ -1885,12 +1837,10 @@ def test_fhd_catalog_reader():
 def test_fhd_catalog_reader_source_cuts():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
 
-    skyobj = SkyModel()
-    skyobj.read_fhd_catalog(catfile, expand_extended=False)
+    skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
     skyobj.source_cuts(latitude_deg=30.0)
 
-    skyobj2 = SkyModel()
-    skyobj2.read_fhd_catalog(
+    skyobj2 = SkyModel.from_fhd_catalog(
         catfile, expand_extended=False, source_select_kwds={"latitude_deg": 30.0}
     )
 
@@ -1912,8 +1862,7 @@ def test_fhd_catalog_reader_extended_sources():
 
 def test_point_catalog_reader():
     catfile = os.path.join(SKY_DATA_PATH, "pointsource_catalog.txt")
-    skyobj = SkyModel()
-    skyobj.read_text_catalog(catfile)
+    skyobj = SkyModel.from_text_catalog(catfile)
 
     with open(catfile, "r") as fileobj:
         header = fileobj.readline()
@@ -1982,8 +1931,7 @@ def test_catalog_file_writer(tmp_path):
     fname = os.path.join(tmp_path, "temp_cat.txt")
 
     zenith_source.write_text_catalog(fname)
-    zenith_loop = SkyModel()
-    zenith_loop.read_text_catalog(fname)
+    zenith_loop = SkyModel.from_text_catalog(fname)
     assert np.all(zenith_loop == zenith_source)
     os.remove(fname)
 
@@ -1992,13 +1940,9 @@ def test_catalog_file_writer(tmp_path):
 @pytest.mark.filterwarnings("ignore:The reference_frequency is aliased as `frequency`")
 @pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index", "full"])
 def test_text_catalog_loop(tmp_path, spec_type):
-    if spec_type == "full":
-        spectral_type = "subband"
-    else:
-        spectral_type = spec_type
+    spectral_type = "subband" if spec_type == "full" else spec_type
 
-    skyobj = SkyModel()
-    skyobj.read_gleam_catalog(GLEAM_vot, spectral_type=spectral_type)
+    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type=spectral_type)
     if spec_type == "full":
         skyobj.spectral_type = "full"
 
@@ -2009,8 +1953,7 @@ def test_text_catalog_loop(tmp_path, spec_type):
         match="This function is deprecated, use `SkyModel.write_text_catalog` instead.",
     ):
         skymodel.write_catalog_to_file(fname, skyobj)
-    skyobj2 = SkyModel()
-    skyobj2.read_text_catalog(fname)
+    skyobj2 = SkyModel.from_text_catalog(fname)
 
     assert skyobj == skyobj2
 
@@ -2019,8 +1962,7 @@ def test_text_catalog_loop(tmp_path, spec_type):
         reference_frequency = skyobj.reference_frequency
         skyobj.reference_frequency = None
         arr = skyobj.to_recarray()
-        skyobj2 = SkyModel()
-        skyobj2.from_recarray(arr)
+        skyobj2 = SkyModel.from_recarray(arr)
 
         assert skyobj == skyobj2
 
@@ -2036,32 +1978,27 @@ def test_text_catalog_loop(tmp_path, spec_type):
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 @pytest.mark.parametrize("freq_mult", [1e-6, 1e-3, 1e3])
 def test_text_catalog_loop_other_freqs(tmp_path, freq_mult):
-    skyobj = SkyModel()
-    skyobj.read_gleam_catalog(GLEAM_vot)
+    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot)
     skyobj.freq_array = np.atleast_1d(np.unique(skyobj.reference_frequency) * freq_mult)
     skyobj.reference_frequency = None
 
     fname = os.path.join(tmp_path, "temp_cat.txt")
     skyobj.write_text_catalog(fname)
-    skyobj2 = SkyModel()
-    skyobj2.read_text_catalog(fname)
+    skyobj2 = SkyModel.from_text_catalog(fname)
     os.remove(fname)
 
     assert skyobj == skyobj2
 
 
-def test_write_text_catalog_error(tmp_path):
+def test_write_text_catalog_error(tmp_path, healpix_disk):
     pytest.importorskip("astropy_healpix")
-    healpix_filename = os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
 
     fname = os.path.join(tmp_path, "temp_cat.txt")
 
-    skyobj = SkyModel()
-    skyobj.read_healpix_hdf5(healpix_filename)
     with pytest.raises(
         ValueError, match="component_type must be 'point' to use this method."
     ):
-        skyobj.write_text_catalog(fname)
+        healpix_disk.write_text_catalog(fname)
 
 
 @pytest.mark.filterwarnings("ignore:The reference_frequency is aliased as `frequency`")
@@ -2069,14 +2006,12 @@ def test_write_text_catalog_error(tmp_path):
 @pytest.mark.parametrize("spec_type", ["flat", "subband"])
 def test_read_text_source_cuts(tmp_path, spec_type):
 
-    skyobj = SkyModel()
-    skyobj.read_gleam_catalog(GLEAM_vot, spectral_type=spec_type)
+    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type=spec_type)
     fname = os.path.join(tmp_path, "temp_cat.txt")
     skyobj.write_text_catalog(fname)
 
     source_select_kwds = {"min_flux": 0.5}
-    skyobj2 = SkyModel()
-    skyobj2.read_text_catalog(fname, source_select_kwds=source_select_kwds)
+    skyobj2 = SkyModel.from_text_catalog(fname, source_select_kwds=source_select_kwds)
 
     assert skyobj2.Ncomponents < skyobj.Ncomponents
 
@@ -2084,16 +2019,14 @@ def test_read_text_source_cuts(tmp_path, spec_type):
 def test_pyuvsim_mock_catalog_read():
     mock_cat_file = os.path.join(SKY_DATA_PATH, "mock_hera_text_2458098.27471.txt")
 
-    mock_sky = SkyModel()
-    mock_sky.read_text_catalog(mock_cat_file)
+    mock_sky = SkyModel.from_text_catalog(mock_cat_file)
     expected_names = ["src" + str(val) for val in np.arange(mock_sky.Ncomponents)]
     assert mock_sky.name.tolist() == expected_names
 
 
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 def test_read_text_errors(tmp_path):
-    skyobj = SkyModel()
-    skyobj.read_gleam_catalog(GLEAM_vot, spectral_type="subband")
+    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type="subband")
 
     fname = os.path.join(tmp_path, "temp_cat.txt")
     skyobj.write_text_catalog(fname)
@@ -2102,12 +2035,11 @@ def test_read_text_errors(tmp_path):
             line = line.replace("Flux_subband_76_MHz [Jy]", "Frequency [Hz]")
             print(line, end="")
 
-    skyobj2 = SkyModel()
     with pytest.raises(
         ValueError,
         match="If frequency column is present, only one flux column allowed.",
     ):
-        skyobj2.read_text_catalog(fname)
+        SkyModel.from_text_catalog(fname)
 
     skyobj.write_text_catalog(fname)
     with fileinput.input(files=fname, inplace=True) as infile:
@@ -2119,7 +2051,7 @@ def test_read_text_errors(tmp_path):
         ValueError,
         match="Multiple flux fields, but they do not all contain a frequency.",
     ):
-        skyobj2.read_text_catalog(fname)
+        SkyModel.from_text_catalog(fname)
 
     skyobj.write_text_catalog(fname)
     with fileinput.input(files=fname, inplace=True) as infile:
@@ -2128,7 +2060,7 @@ def test_read_text_errors(tmp_path):
             print(line, end="")
 
     with pytest.raises(ValueError, match="Header does not match expectations."):
-        skyobj2.read_text_catalog(fname)
+        SkyModel.from_text_catalog(fname)
 
     os.remove(fname)
 
