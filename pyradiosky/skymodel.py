@@ -1659,8 +1659,6 @@ class SkyModel(UVBase):
             spectral_index=spectral_index,
         )
 
-        # TODO: not sure if the following is really necessary if we're newly creating
-        # the full object
         if ids[0].startswith("nside"):
             self.nside = int(ids[0][len("nside") : ids[0].find("_")])
             self.hpx_inds = np.array([int(name[name.find("_") + 1 :]) for name in ids])
@@ -2128,7 +2126,10 @@ class SkyModel(UVBase):
             source_select_kwds=source_select_kwds,
         )
 
-        # TODO: checks not run here?
+        if run_check:
+            self.check(
+                check_extra=check_extra, run_check_acceptability=run_check_acceptability
+            )
         return
 
     @classmethod

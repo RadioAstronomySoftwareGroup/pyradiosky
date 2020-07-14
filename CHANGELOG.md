@@ -3,8 +3,9 @@
 ## [Unreleased]
 
 ### Added
-- A `from_xxx` classmethod for every `read_xxx` method, to enable instantiation from
-  different formats directly.
+- Classmethods `from_recarray`, `from_healpix_hdf5`, `from_votable_catalog`,
+  `from_text_catalog`, `from_gleam_catalog` and `from_idl_catalog` to enable
+  instantiation from different formats directly.
 
 ## [0.1.0] - 2020-6-29
 
