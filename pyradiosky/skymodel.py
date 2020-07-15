@@ -639,7 +639,9 @@ class SkyModel(UVBase):
         equal = super(SkyModel, self).__eq__(other, check_extra=check_extra)
 
         # Issue deprecation warning if ra/decs aren't close to future_angle_tol levels
-        if not np.allclose(self.ra, other.ra, rtol=0, atol=self.future_angle_tol):
+        if not units.quantity.allclose(
+            self.ra, other.ra, rtol=0, atol=self.future_angle_tol
+        ):
             warnings.warn(
                 "The _ra parameters are not within the future tolerance. "
                 f"Left is {self.ra}, right is {other.ra}. "
@@ -647,7 +649,9 @@ class SkyModel(UVBase):
                 category=DeprecationWarning,
             )
 
-        if not np.allclose(self.dec, other.dec, rtol=0, atol=self.future_angle_tol):
+        if not units.quantity.allclose(
+            self.dec, other.dec, rtol=0, atol=self.future_angle_tol
+        ):
             warnings.warn(
                 "The _dec parameters are not within the future tolerance. "
                 f"Left is {self.dec}, right is {other.dec}. "
