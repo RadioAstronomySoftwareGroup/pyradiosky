@@ -235,7 +235,7 @@ class SkyModel(UVBase):
             required=False,
         )
 
-        desc = "Healpix nside, only reqired for HEALPix maps."
+        desc = "Healpix nside, only required for HEALPix maps."
         self._nside = UVParameter(
             "nside", description=desc, expected_type=np.int, required=False,
         )
@@ -1726,6 +1726,7 @@ class SkyModel(UVBase):
         Notes
         -----
         Currently, this function only converts a HEALPix map with a frequency axis.
+
         """
         self = cls()
         self.read_healpix_hdf5(
@@ -1735,6 +1736,149 @@ class SkyModel(UVBase):
             run_check_acceptability=run_check_acceptability,
         )
         return self
+
+    def read_hdf5(
+        self,
+        hdf5_filename,
+        run_check=True,
+        check_extra=True,
+        run_check_acceptability=True,
+    ):
+        """
+        Read general hdf5 file format into this object.
+
+        Parameters
+        ----------
+        hdf5_filename : str
+            Path and name of the hdf5 file to read.
+        run_check : bool
+            Option to check for the existence and proper shapes of parameters
+            after downselecting data on this object (the default is True,
+            meaning the check will be run).
+        check_extra : bool
+            Option to check optional parameters as well as required ones (the
+            default is True, meaning the optional parameters will be checked).
+        run_check_acceptability : bool
+            Option to check acceptable range of the values of parameters after
+            downselecting data on this object (the default is True, meaning the
+            acceptable range check will be done).
+        """
+        with h5py.File(hdf5_filename, "r") as fileobj:
+
+            for key in fileobj.keys():
+                dset = fileobj[key]
+                parname = "_" + key
+                param = getattr(self, parname)
+                param.required = dset.attrs["required"]
+                data = dset[()]
+
+                if "unit" in dset.attrs:
+                    data *= units.Unit(dset.attrs["unit"])
+
+                angtype = dset.attrs.get("angtype", None)
+
+                if angtype == "latitude":
+                    data = Latitude(data)
+                elif angtype == "longitude":
+                    data = Longitude(data)
+
+                if (
+                    isinstance(data, np.ndarray) and data.dtype == "O"
+                ) and param.expected_type == str:
+                    data = data.astype(str)
+
+                if np.isscalar(data) and hasattr(data, "item"):
+                    data = data.item()
+
+                param.value = data
+
+                setattr(self, parname, param)
+
+        if run_check:
+            self.check(
+                check_extra=check_extra, run_check_acceptability=run_check_acceptability
+            )
+
+    def write_hdf5(
+        self,
+        hdf5_filename,
+        run_check=True,
+        check_extra=True,
+        run_check_acceptability=True,
+    ):
+        """
+        Write to general hdf5 file format into this object.
+
+        Parameters
+        ----------
+        hdf5_filename : str
+            Path and name of the hdf5 file to write to.
+        run_check : bool
+            Option to check for the existence and proper shapes of parameters
+            after downselecting data on this object (the default is True,
+            meaning the check will be run).
+        check_extra : bool
+            Option to check optional parameters as well as required ones (the
+            default is True, meaning the optional parameters will be checked).
+        run_check_acceptability : bool
+            Option to check acceptable range of the values of parameters after
+            downselecting data on this object (the default is True, meaning the
+            acceptable range check will be done).
+        """
+        if run_check:
+            self.check(
+                check_extra=check_extra, run_check_acceptability=run_check_acceptability
+            )
+
+        with h5py.File(hdf5_filename, "w") as fileobj:
+
+            for par in self:
+                param = getattr(self, par)
+                val = param.value
+                name = param.name
+
+                # Skip if parameter is unset.
+                if val is None:
+                    continue
+
+                # Extra attributes for astropy Quantity-derived classes.
+                unit = None
+                angtype = None
+                if isinstance(val, units.Quantity):
+                    if isinstance(val, Latitude):
+                        angtype = "latitude"
+                    elif isinstance(val, Longitude):
+                        angtype = "longitude"
+                    unit = val.unit.name
+                    val = val.value
+
+                try:
+                    dtype = val.dtype
+                except AttributeError:
+                    dtype = np.dtype(type(val))
+
+                # Strings and arrays of strings require special handling.
+                if dtype.kind == "U":
+                    dtype = h5py.special_dtype(vlen=str)
+                    if not np.isscalar(val):
+                        val = val.astype(dtype)
+
+                if np.isscalar(val):
+                    fileobj.create_dataset(name, data=val, dtype=dtype)
+                else:
+                    fileobj.create_dataset(
+                        name,
+                        data=val,
+                        dtype=dtype,
+                        compression="gzip",
+                        compression_opts=9,
+                    )
+
+                fileobj[name].attrs["required"] = param.required
+                if unit is not None:
+                    fileobj[name].attrs["unit"] = unit
+                if angtype is not None:
+                    fileobj[name].attrs["angtype"] = angtype
 
     def read_healpix_hdf5(
         self,

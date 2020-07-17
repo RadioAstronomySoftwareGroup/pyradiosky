@@ -2149,3 +2149,16 @@ def test_atfreq_tol(tmpdir, mock_point_skies):
     sky2 = SkyModel.from_text_catalog(ofile)
     new = sky.at_frequencies(sky2.freq_array, inplace=False, atol=1 * units.Hz)
     assert new == sky2
+
+
+@pytest.mark.parametrize("stype", ["full", "subband", "spectral_index", "flat"])
+def test_hdf5_file_loop(mock_point_skies, stype, tmpdir):
+    sky = mock_point_skies(stype)
+    opath = str(tmpdir.join("testfile.hdf5"))
+
+    sky.write_hdf5(opath)
+
+    sky2 = SkyModel()
+    sky2.read_hdf5(opath)
+
+    assert sky2 == sky
