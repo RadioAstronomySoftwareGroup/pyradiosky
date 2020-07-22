@@ -1275,8 +1275,7 @@ def test_array_to_skymodel_loop(spec_type):
         sky.spectral_type = "full"
 
     arr = sky.to_recarray()
-    sky2 = SkyModel()
-    sky2.from_recarray(arr)
+    sky2 = SkyModel.from_recarray(arr)
 
     assert sky == sky2
 
@@ -1285,8 +1284,7 @@ def test_array_to_skymodel_loop(spec_type):
         reference_frequency = sky.reference_frequency
         sky.reference_frequency = None
         arr = sky.to_recarray()
-        sky2 = SkyModel()
-        sky2.from_recarray(arr)
+        sky2 = SkyModel.from_recarray(arr)
 
         assert sky == sky2
 
