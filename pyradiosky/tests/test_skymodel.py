@@ -181,6 +181,7 @@ def mock_point_skies():
 
 @pytest.fixture(scope="function")
 def healpix_disk():
+    pytest.importorskip("astropy_healpix")
     return SkyModel.from_healpix_hdf5(os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5"))
 
 
@@ -1988,8 +1989,6 @@ def test_text_catalog_loop_other_freqs(tmp_path, freq_mult):
 
 
 def test_write_text_catalog_error(tmp_path, healpix_disk):
-    pytest.importorskip("astropy_healpix")
-
     fname = os.path.join(tmp_path, "temp_cat.txt")
 
     with pytest.raises(
