@@ -2949,10 +2949,7 @@ def array_to_skymodel(catalog_table):
         category=DeprecationWarning,
     )
 
-    skyobj = SkyModel()
-    skyobj.from_recarray(catalog_table)
-
-    return skyobj
+    return SkyModel.from_recarray(catalog_table)
 
 
 def source_cuts(
@@ -3006,8 +3003,7 @@ def source_cuts(
         category=DeprecationWarning,
     )
 
-    skyobj = SkyModel()
-    skyobj.from_recarray(catalog_table)
+    skyobj = SkyModel.from_recarray(catalog_table)
     skyobj.source_cuts(
         latitude_deg=latitude_deg,
         horizon_buffer=horizon_buffer,

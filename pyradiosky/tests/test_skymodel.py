@@ -1967,8 +1967,7 @@ def test_text_catalog_loop(tmp_path, spec_type):
         # again with flat & freq_array
         skyobj.freq_array = np.atleast_1d(np.unique(reference_frequency))
         arr = skyobj.to_recarray()
-        skyobj2 = SkyModel()
-        skyobj2.from_recarray(arr)
+        skyobj2 = SkyModel.from_recarray(arr)
 
         assert skyobj == skyobj2
 
