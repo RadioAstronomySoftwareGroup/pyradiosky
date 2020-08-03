@@ -2501,24 +2501,6 @@ class SkyModel(UVBase):
 
         return
 
-    @classmethod
-    def from_idl_catalog(cls, filename_sav, **kwargs):
-        """Create a :class:`SkyModel` from a IDL catalog.
-
-        Parameters
-        ----------
-        kwargs :
-            All parameters are sent through to :meth:`read_idl_catalog`.
-
-        Returns
-        -------
-        sky_model : :class:`SkyModel`
-            The object instantiated using the IDL catalog.
-        """
-        self = cls()
-        self.read_idl_catalog(filename_sav, **kwargs)
-        return self
-
     def read_idl_catalog(
         self,
         filename_sav,
