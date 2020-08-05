@@ -2615,7 +2615,7 @@ class SkyModel(UVBase):
         source_freqs = catalog["freq"]
         spectral_index = catalog["alpha"]
         Nsrcs = len(catalog)
-        extended_model_group = np.full(Nsrcs, -1, dtype=int)
+        extended_model_group = np.full(Nsrcs, '', dtype=str)
         if "BEAM" in catalog.dtype.names:
             use_beam_amps = True
             beam_amp = np.zeros((4, Nsrcs))
@@ -2634,11 +2634,21 @@ class SkyModel(UVBase):
                 beam_amp[2, src] = catalog["beam"][src]["XY"][0]
                 beam_amp[3, src] = catalog["beam"][src]["YX"][0]
 
+        if len(np.unique(ids)) != len(ids):
+            warnings.warn(
+                "WARNING: Source IDs are not unique. "
+                "Defining unique IDs."
+            )
+            unique_ids, counts = np.unique(ids, return_counts=True)
+            for repeat_id in unique_ids[np.where(counts > 1)[0]]:
+                fix_id_inds = np.where(ids == repeat_id)[0]
+                for append_val, id_ind in enumerate(fix_id_inds):
+                    ids[id_ind] = '{}{}'.format(ids[id_ind], append_val + 1)
+
         if expand_extended:
             ext_inds = np.where(
                 [catalog["extend"][ind] is not None for ind in range(Nsrcs)]
             )[0]
-            source_group_id = 1
             if len(ext_inds) > 0:  # Add components and preserve ordering
                 source_inds = np.array(range(Nsrcs))
                 for ext in ext_inds:
@@ -2656,13 +2666,16 @@ class SkyModel(UVBase):
                     # Add component information
                     src = catalog[ext]["extend"]
                     Ncomps = len(src)
-                    ids = np.insert(ids, use_index, np.full(Ncomps, source_id))
+                    comp_ids = np.array([
+                        '{}-{}'.format(source_id, comp_ind)
+                        for comp_ind in range(1, Ncomps + 1)
+                    ])
+                    ids = np.insert(ids, use_index, comp_ids)
                     extended_model_group = np.insert(
                         extended_model_group,
                         use_index,
-                        np.full(Ncomps, source_group_id),
+                        np.full(Ncomps, source_id),
                     )
-                    source_group_id += 1
                     ra = np.insert(ra, use_index, src["ra"])
                     dec = np.insert(dec, use_index, src["dec"])
                     stokes_ext = Quantity(np.zeros((4, Ncomps)), "Jy")
