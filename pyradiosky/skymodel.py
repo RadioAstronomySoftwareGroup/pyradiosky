@@ -324,10 +324,10 @@ class SkyModel(UVBase):
             "extended_model_group",
             description=(
                 "Identifier that groups components of an extended "
-                "source model. Set to -1 for point sources."
+                "source model. Set to an empty string for point sources."
             ),
             form=("Ncomponents",),
-            expected_type=int,
+            expected_type=str,
             required=False,
         )
 
