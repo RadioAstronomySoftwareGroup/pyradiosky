@@ -1829,7 +1829,7 @@ def test_fhd_catalog_reader():
         match="This method is deprecated, use `read_fhd_catalog` instead.",
     ):
         skyobj3 = SkyModel()
-        skyobj3.from_idl_catalog(catfile, expand_extended=False)
+        skyobj3.read_idl_catalog(catfile, expand_extended=False)
 
     assert skyobj == skyobj3
 
