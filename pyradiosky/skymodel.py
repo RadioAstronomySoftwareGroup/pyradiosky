@@ -150,9 +150,6 @@ class SkyModel(UVBase):
         nside parameter for HEALPix maps.
     hpx_inds : array_like of int
         Indices for HEALPix maps, only used if nside is set.
-    pos_tol : float
-        position tolerance in degrees, defaults to minimum float in numpy
-        position tolerance in degrees
     extended_model_group : array_like of int
         Identifier that groups components of an extended source model.
         -1 for point sources, shape (Ncomponents,).
@@ -175,7 +172,6 @@ class SkyModel(UVBase):
         spectral_index=None,
         nside=None,
         hpx_inds=None,
-        pos_tol=np.finfo(float).eps,
         extended_model_group=None,
         beam_amp=None,
         history=None,
@@ -510,6 +506,12 @@ class SkyModel(UVBase):
 
             if self.Ncomponents == 1:
                 self.stokes = self.stokes.reshape(4, self.Nfreqs, 1)
+
+            if extended_model_group is not None:
+                self.extended_model_group = extended_model_group
+
+            if beam_amp is not None:
+                self.beam_amp = beam_amp
 
             # Indices along the component axis, such that the source is polarized at any frequency.
             self._polarized = np.where(
@@ -2428,6 +2430,7 @@ class SkyModel(UVBase):
                     source_freqs = np.delete(source_freqs, ext)
                     spectral_index = np.delete(spectral_index, ext)
                     source_inds = np.delete(source_inds, ext)
+                    extended_model_group = np.delete(extended_model_group, ext)
                     # Add component information
                     src = catalog[ext]["extend"]
                     Ncomps = len(src)
