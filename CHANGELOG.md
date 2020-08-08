@@ -7,6 +7,10 @@
   `from_text_catalog`, `from_gleam_catalog` and `from_idl_catalog` to enable
   instantiation from different formats directly.
 
+### Fixed
+- A bug in `Skymodel.__init__` that caused extended_model_group and beam_amps
+    to not be added to the object.
+
 ## [0.1.0] - 2020-6-29
 
 ### Added
