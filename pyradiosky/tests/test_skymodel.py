@@ -2141,7 +2141,7 @@ def test_stokes_eval(mock_point_skies, inplace, stype):
 def test_atfreq_tol(tmpdir, mock_point_skies):
     # Test that the at_frequencies method still recognizes the equivalence of
     # frequencies after losing precision by writing to text file.
-    # (Issue #94)
+    # (Issue #82)
 
     sky = mock_point_skies("full")
     ofile = str(tmpdir.join("full_point.txt"))
