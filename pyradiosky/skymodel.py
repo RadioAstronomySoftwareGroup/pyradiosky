@@ -180,6 +180,9 @@ class SkyModel(UVBase):
         angle_tol = Angle(1, units.arcsec)
         self.future_angle_tol = Angle(1e-3, units.arcsec)
 
+        # Frequency tolerance: 1 Hz
+        self.freq_tol = 1 * units.Hz
+
         self._Ncomponents = UVParameter(
             "Ncomponents", description="Number of components", expected_type=int
         )
@@ -253,6 +256,7 @@ class SkyModel(UVBase):
             form=("Nfreqs",),
             expected_type=Quantity,
             required=False,
+            tols=self.freq_tol,
         )
 
         desc = "Reference frequency in Hz, only required if spectral_type is 'spectral_index'."
@@ -262,6 +266,7 @@ class SkyModel(UVBase):
             form=("Ncomponents",),
             expected_type=Quantity,
             required=False,
+            tols=self.freq_tol,
         )
 
         desc = "Component flux per frequency and Stokes parameter"
@@ -873,7 +878,7 @@ class SkyModel(UVBase):
             )
 
     def at_frequencies(
-        self, freqs, inplace=True, freq_interp_kind="cubic", run_check=True,
+        self, freqs, inplace=True, freq_interp_kind="cubic", run_check=True, atol=None
     ):
         """
         Evaluate the stokes array at the specified frequencies.
@@ -898,8 +903,13 @@ class SkyModel(UVBase):
         run_check: bool
             Run check on new SkyModel.
             Default True.
+        atol: Quantity
+            Tolerance for frequency comparison. Defaults to 1 Hz.
         """
         sky = self if inplace else self.copy()
+
+        if atol is None:
+            atol = self.freq_tol
 
         if self.spectral_type == "spectral_index":
             sky.stokes = (
@@ -910,9 +920,13 @@ class SkyModel(UVBase):
             sky.reference_frequency = None
         elif self.spectral_type == "full":
             # Find a subset of the current array.
-            matches = np.isin(
-                self.freq_array.to("Hz"), freqs.to("Hz"), assume_unique=True
+            ar0 = self.freq_array.to_value("Hz")
+            ar1 = freqs.to_value("Hz")
+            tol = atol.to_value("Hz")
+            matches = np.fromiter(
+                (np.isclose(freq, ar1, atol=tol).any() for freq in ar0), dtype=bool
             )
+
             if np.sum(matches) != freqs.size:
                 raise ValueError(
                     "Some requested frequencies are not "
@@ -2275,7 +2289,6 @@ class SkyModel(UVBase):
         catalog_table = np.genfromtxt(
             catalog_csv, autostrip=True, skip_header=1, dtype=None, encoding="utf-8"
         )
-
         catalog_table = np.atleast_1d(catalog_table)
 
         col_names = catalog_table.dtype.names

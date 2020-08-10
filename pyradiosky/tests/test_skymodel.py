@@ -150,6 +150,7 @@ def mock_point_skies():
         stokes = spectrum.repeat(4, 0).repeat(Ncomp, 2)
         if stype in ["full", "subband"]:
             stokes = spectrum.repeat(4, 0).repeat(Ncomp, 2)
+            stokes[1:, :, :] = 0.0  # Set unpolarized
             return SkyModel(
                 name=names,
                 ra=ras,
@@ -2135,3 +2136,16 @@ def test_stokes_eval(mock_point_skies, inplace, stype):
             # Check for error if interpolating outside the defined range.
             with pytest.raises(ValueError, match="A value in x_new is above"):
                 sky.at_frequencies(fine_freqs + 10 * units.Hz, inplace=inplace)
+
+
+def test_atfreq_tol(tmpdir, mock_point_skies):
+    # Test that the at_frequencies method still recognizes the equivalence of
+    # frequencies after losing precision by writing to text file.
+    # (Issue #82)
+
+    sky = mock_point_skies("full")
+    ofile = str(tmpdir.join("full_point.txt"))
+    sky.write_text_catalog(ofile)
+    sky2 = SkyModel.from_text_catalog(ofile)
+    new = sky.at_frequencies(sky2.freq_array, inplace=False, atol=1 * units.Hz)
+    assert new == sky2
