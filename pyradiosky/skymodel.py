@@ -2691,23 +2691,22 @@ class SkyModel(UVBase):
                             beam_amp_ext[1, comp] = src["beam"][comp]["YY"][0]
                             beam_amp_ext[2, comp] = src["beam"][comp]["XY"][0]
                             beam_amp_ext[3, comp] = src["beam"][comp]["YX"][0]
-                    stokes = np.concatenate(
-                        (  # np.insert doesn't work with arrays
-                            np.concatenate((stokes[:, :use_index], stokes_ext), axis=1),
-                            stokes[:, use_index:],
-                        ),
-                        axis=1,
+                    # np.insert doesn't work with arrays
+                    stokes_new = Quantity(
+                        np.zeros((4, Ncomps + np.shape(stokes)[1])), "Jy"
                     )
+                    stokes_new[:, :use_index] = stokes[:, :use_index]
+                    stokes_new[:, use_index:use_index + Ncomps] = stokes_ext
+                    stokes_new[:, use_index + Ncomps:] = stokes[:, use_index:]
+                    stokes = stokes_new
                     if use_beam_amps:
-                        beam_amp = np.concatenate(
-                            (
-                                np.concatenate(
-                                    (beam_amp[:, :use_index], beam_amp_ext), axis=1
-                                ),
-                                beam_amp[:, use_index:],
-                            ),
-                            axis=1,
-                        )
+                        beam_amp_new = np.zeros((
+                            4, Ncomps + np.shape(stokes)[1]
+                        ))
+                        beam_amp_new[:, :use_index] = beam_amp[:, :use_index]
+                        beam_amp_new[:, use_index:use_index + Ncomps] = beam_amp_ext
+                        beam_amp_new[:, use_index + Ncomps:] = beam_amp[:, use_index:]
+                        beam_amp = beam_amp_new
                     source_freqs = np.insert(source_freqs, use_index, src["freq"])
                     spectral_index = np.insert(spectral_index, use_index, src["alpha"])
                     source_inds = np.insert(
