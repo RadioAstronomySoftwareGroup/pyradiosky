@@ -987,6 +987,7 @@ def test_healpix_to_sky(healpix_data, healpix_disk):
         hpmap = fileobj["data"][0, ...]  # Remove Nskies axis.
         indices = fileobj["indices"][()]
         freqs = fileobj["freqs"][()]
+        history = np.string_(fileobj["history"][()]).tobytes().decode("utf8")
 
     hmap_orig = np.arange(healpix_data["npix"])
     hmap_orig[healpix_data["ipix_disc"]] = healpix_data["npix"] - 1
@@ -999,6 +1000,8 @@ def test_healpix_to_sky(healpix_data, healpix_disk):
     ):
         sky = skymodel.healpix_to_sky(hpmap, indices, freqs)
         assert isinstance(sky.stokes, Quantity)
+
+    sky.history = history + sky.pyradiosky_version_str
 
     assert healpix_disk == sky
     assert units.quantity.allclose(healpix_disk.stokes[0], hmap_orig)
@@ -1029,7 +1032,7 @@ def test_healpix_recarray_loop(healpix_data, healpix_disk):
     skyobj = healpix_disk
     skyarr = skyobj.to_recarray()
 
-    skyobj2 = SkyModel.from_recarray(skyarr)
+    skyobj2 = SkyModel.from_recarray(skyarr, history=skyobj.history)
     assert skyobj.component_type == "healpix"
     assert skyobj2.component_type == "healpix"
 
@@ -1119,7 +1122,7 @@ def test_read_write_healpix_nover_history(tmp_path, healpix_data, healpix_disk):
     test_filename = os.path.join(tmp_path, "tempfile.hdf5")
 
     sky = healpix_disk
-    sky.history = None
+    sky.history = sky.pyradiosky_version_str
     sky.write_healpix_hdf5(test_filename)
 
     sky2 = SkyModel.from_healpix_hdf5(test_filename)
@@ -2138,6 +2141,7 @@ def test_stokes_eval(mock_point_skies, inplace, stype):
                 sky.at_frequencies(fine_freqs + 10 * units.Hz, inplace=inplace)
 
 
+@pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 def test_atfreq_tol(tmpdir, mock_point_skies):
     # Test that the at_frequencies method still recognizes the equivalence of
     # frequencies after losing precision by writing to text file.
@@ -2158,7 +2162,6 @@ def test_hdf5_file_loop(mock_point_skies, stype, tmpdir):
 
     sky.write_hdf5(opath)
 
-    sky2 = SkyModel()
-    sky2.read_hdf5(opath)
+    sky2 = SkyModel.from_hdf5(opath)
 
     assert sky2 == sky

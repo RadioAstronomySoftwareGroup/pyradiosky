@@ -157,6 +157,8 @@ class SkyModel(UVBase):
         Beam amplitude at the source position, shape (4, Nfreqs, Ncomponents).
         4 element vector corresponds to [XX, YY, XY, YX] instrumental
         polarizations.
+    history : str
+        History to add to object.
 
     """
 
@@ -174,7 +176,7 @@ class SkyModel(UVBase):
         hpx_inds=None,
         extended_model_group=None,
         beam_amp=None,
-        history=None,
+        history="",
     ):
         # standard angle tolerance: 1 mas in radians.
         angle_tol = Angle(1, units.arcsec)
@@ -324,6 +326,10 @@ class SkyModel(UVBase):
             form=("Ncomponents",),
             expected_type=int,
             required=False,
+        )
+
+        self._history = UVParameter(
+            "history", description="String of history.", form="str", expected_type=str,
         )
 
         desc = "Time for local position calculations."
@@ -527,6 +533,11 @@ class SkyModel(UVBase):
             self.coherency_radec = skyutils.stokes_to_coherency(self.stokes)
 
             self.history = history
+            if not uvutils._check_history_version(
+                self.history, self.pyradiosky_version_str
+            ):
+                self.history += self.pyradiosky_version_str
+
             self.check()
 
     def _set_spectral_type_params(self, spectral_type):
@@ -1581,6 +1592,7 @@ class SkyModel(UVBase):
     def from_recarray(
         cls,
         recarray_in,
+        history="",
         run_check=True,
         check_extra=True,
         run_check_acceptability=True,
@@ -1592,6 +1604,8 @@ class SkyModel(UVBase):
         ----------
         recarray_in : recarray
             recarray to turn into a SkyModel object.
+        history : str
+            History to add to object.
         run_check : bool
             Option to check for the existence and proper shapes of parameters
             after downselecting data on this object (the default is True,
@@ -1673,6 +1687,7 @@ class SkyModel(UVBase):
             freq_array=freq_array,
             reference_frequency=reference_frequency,
             spectral_index=spectral_index,
+            history=history,
         )
 
         if ids[0].startswith("nside"):
@@ -1696,47 +1711,6 @@ class SkyModel(UVBase):
 
         return self
 
-    @classmethod
-    def from_healpix_hdf5(
-        cls,
-        hdf5_filename,
-        run_check=True,
-        check_extra=True,
-        run_check_acceptability=True,
-    ):
-        """
-        Create a new :class:`SkyModel` from a hdf5 healpix file.
-
-        Parameters
-        ----------
-        hdf5_filename : str
-            Path and name of the hdf5 file to read.
-        run_check : bool
-            Option to check for the existence and proper shapes of parameters
-            after downselecting data on this object (the default is True,
-            meaning the check will be run).
-        check_extra : bool
-            Option to check optional parameters as well as required ones (the
-            default is True, meaning the optional parameters will be checked).
-        run_check_acceptability : bool
-            Option to check acceptable range of the values of parameters after
-            downselecting data on this object (the default is True, meaning the
-            acceptable range check will be done).
-
-        Notes
-        -----
-        Currently, this function only converts a HEALPix map with a frequency axis.
-
-        """
-        self = cls()
-        self.read_healpix_hdf5(
-            hdf5_filename,
-            run_check=run_check,
-            check_extra=check_extra,
-            run_check_acceptability=run_check_acceptability,
-        )
-        return self
-
     def read_hdf5(
         self,
         hdf5_filename,
@@ -1745,7 +1719,7 @@ class SkyModel(UVBase):
         run_check_acceptability=True,
     ):
         """
-        Read general hdf5 file format into this object.
+        Read our standard hdf5 file format into this object.
 
         Parameters
         ----------
@@ -1762,57 +1736,131 @@ class SkyModel(UVBase):
             Option to check acceptable range of the values of parameters after
             downselecting data on this object (the default is True, meaning the
             acceptable range check will be done).
+
         """
         with h5py.File(hdf5_filename, "r") as fileobj:
 
-            for key in fileobj.keys():
-                dset = fileobj[key]
-                parname = "_" + key
-                param = getattr(self, parname)
-                param.required = dset.attrs["required"]
-                data = dset[()]
+            # extract header information
+            header = fileobj["/Header"]
+            header_params = [
+                "_Ncomponents",
+                "_Nfreqs",
+                "_component_type",
+                "_spectral_type",
+                "_ra",
+                "_dec",
+                "_history",
+                "_name",
+                "_nside",
+                "_hpx_inds",
+                "_freq_array",
+                "_reference_frequency",
+                "_spectral_index",
+                "_beam_amp",
+                "_extended_model_group",
+            ]
+
+            optional_params = [
+                "_name",
+                "_nside",
+                "_hpx_inds",
+                "_freq_array",
+                "_reference_frequency",
+                "_spectral_index",
+                "_beam_amp",
+                "_extended_model_group",
+            ]
+            init_params = {}
+
+            for par in header_params:
+                param = getattr(self, par)
+                parname = param.name
+
+                # skip optional params if not present
+                if par in optional_params:
+                    if parname not in header:
+                        continue
+
+                dset = header[parname]
+                value = dset[()]
 
                 if "unit" in dset.attrs:
-                    data *= units.Unit(dset.attrs["unit"])
+                    value *= units.Unit(dset.attrs["unit"])
 
                 angtype = dset.attrs.get("angtype", None)
 
                 if angtype == "latitude":
-                    data = Latitude(data)
+                    value = Latitude(value)
                 elif angtype == "longitude":
-                    data = Longitude(data)
+                    value = Longitude(value)
 
-                if (
-                    isinstance(data, np.ndarray) and data.dtype == "O"
-                ) and param.expected_type == str:
-                    data = data.astype(str)
+                if param.expected_type == str:
+                    if isinstance(value, np.ndarray):
+                        value = np.array([n.tobytes().decode("utf8") for n in value[:]])
+                    else:
+                        value = value.tobytes().decode("utf8")
 
-                if np.isscalar(data) and hasattr(data, "item"):
-                    data = data.item()
+                init_params[parname] = value
 
-                param.value = data
+            # check that the parameters not passed to the init make sense
+            if init_params["component_type"] == "healpix":
+                if "nside" not in init_params.keys():
+                    raise ValueError(
+                        f"Component type is {init_params['component_type']} but 'nside' is missing in file."
+                    )
+                if "hpx_inds" not in init_params.keys():
+                    raise ValueError(
+                        f"Component type is {init_params['component_type']} but 'hpx_inds' is missing in file."
+                    )
+                if init_params["Ncomponents"] != init_params["hpx_inds"].size:
+                    raise ValueError(
+                        "Ncomponents is not equal to the size of 'hpx_inds'."
+                    )
+            else:
+                if "name" not in init_params.keys():
+                    raise ValueError(
+                        f"Component type is {init_params['component_type']} but 'name' is missing in file."
+                    )
+                if init_params["Ncomponents"] != init_params["name"].size:
+                    raise ValueError("Ncomponents is not equal to the size of 'name'.")
 
-                setattr(self, parname, param)
+            if "freq_array" in init_params.keys():
+                if init_params["Nfreqs"] != init_params["freq_array"].size:
+                    raise ValueError("Nfreqs is not equal to the size of 'freq_array'.")
+
+            # remove parameters not needed in __init__
+            init_params.pop("component_type")
+            init_params.pop("Ncomponents")
+            init_params.pop("Nfreqs")
+
+            # get stokes array
+            dgrp = fileobj["/Data"]
+            init_params["stokes"] = dgrp["stokes"] * units.Unit(
+                dgrp["stokes"].attrs["unit"]
+            )
+
+        self.__init__(**init_params)
 
         if run_check:
             self.check(
                 check_extra=check_extra, run_check_acceptability=run_check_acceptability
             )
 
-    def write_hdf5(
-        self,
+    @classmethod
+    def from_hdf5(
+        cls,
         hdf5_filename,
         run_check=True,
         check_extra=True,
         run_check_acceptability=True,
     ):
         """
-        Write to general hdf5 file format into this object.
+        Create a new :class:`SkyModel` from our standard hdf5 file format.
 
         Parameters
         ----------
         hdf5_filename : str
-            Path and name of the hdf5 file to write to.
+            Path and name of the hdf5 file to read.
         run_check : bool
             Option to check for the existence and proper shapes of parameters
             after downselecting data on this object (the default is True,
@@ -1824,61 +1872,16 @@ class SkyModel(UVBase):
             Option to check acceptable range of the values of parameters after
             downselecting data on this object (the default is True, meaning the
             acceptable range check will be done).
+
         """
-        if run_check:
-            self.check(
-                check_extra=check_extra, run_check_acceptability=run_check_acceptability
-            )
-
-        with h5py.File(hdf5_filename, "w") as fileobj:
-
-            for par in self:
-                param = getattr(self, par)
-                val = param.value
-                name = param.name
-
-                # Skip if parameter is unset.
-                if val is None:
-                    continue
-
-                # Extra attributes for astropy Quantity-derived classes.
-                unit = None
-                angtype = None
-                if isinstance(val, units.Quantity):
-                    if isinstance(val, Latitude):
-                        angtype = "latitude"
-                    elif isinstance(val, Longitude):
-                        angtype = "longitude"
-                    unit = val.unit.name
-                    val = val.value
-
-                try:
-                    dtype = val.dtype
-                except AttributeError:
-                    dtype = np.dtype(type(val))
-
-                # Strings and arrays of strings require special handling.
-                if dtype.kind == "U":
-                    dtype = h5py.special_dtype(vlen=str)
-                    if not np.isscalar(val):
-                        val = val.astype(dtype)
-
-                if np.isscalar(val):
-                    fileobj.create_dataset(name, data=val, dtype=dtype)
-                else:
-                    fileobj.create_dataset(
-                        name,
-                        data=val,
-                        dtype=dtype,
-                        compression="gzip",
-                        compression_opts=9,
-                    )
-
-                fileobj[name].attrs["required"] = param.required
-                if unit is not None:
-                    fileobj[name].attrs["unit"] = unit
-                if angtype is not None:
-                    fileobj[name].attrs["angtype"] = angtype
+        self = cls()
+        self.read_hdf5(
+            hdf5_filename,
+            run_check=run_check,
+            check_extra=check_extra,
+            run_check_acceptability=run_check_acceptability,
+        )
+        return self
 
     def read_healpix_hdf5(
         self,
@@ -1951,13 +1954,6 @@ class SkyModel(UVBase):
         )
         assert self.component_type == "healpix"
 
-        if history is None:
-            self.history = self.pyradiosky_version_str
-        elif not uvutils._check_history_version(
-            self.history, self.pyradiosky_version_str
-        ):
-            self.history += self.pyradiosky_version_str
-
         if run_check:
             self.check(
                 check_extra=check_extra, run_check_acceptability=run_check_acceptability
@@ -1965,21 +1961,44 @@ class SkyModel(UVBase):
         return
 
     @classmethod
-    def from_votable_catalog(cls, votable_file, *args, **kwargs):
-        """Create a :class:`SkyModel` from a votable catalog.
+    def from_healpix_hdf5(
+        cls,
+        hdf5_filename,
+        run_check=True,
+        check_extra=True,
+        run_check_acceptability=True,
+    ):
+        """
+        Create a new :class:`SkyModel` from a hdf5 healpix file.
 
         Parameters
         ----------
-        kwargs :
-            All parameters are sent through to :meth:`read_votable_catalog`.
+        hdf5_filename : str
+            Path and name of the hdf5 file to read.
+        run_check : bool
+            Option to check for the existence and proper shapes of parameters
+            after downselecting data on this object (the default is True,
+            meaning the check will be run).
+        check_extra : bool
+            Option to check optional parameters as well as required ones (the
+            default is True, meaning the optional parameters will be checked).
+        run_check_acceptability : bool
+            Option to check acceptable range of the values of parameters after
+            downselecting data on this object (the default is True, meaning the
+            acceptable range check will be done).
 
-        Returns
-        -------
-        sky_model : :class:`SkyModel`
-            The object instantiated using the votable catalog.
+        Notes
+        -----
+        Currently, this function only converts a HEALPix map with a frequency axis.
+
         """
         self = cls()
-        self.read_votable_catalog(votable_file, *args, **kwargs)
+        self.read_healpix_hdf5(
+            hdf5_filename,
+            run_check=run_check,
+            check_extra=check_extra,
+            run_check_acceptability=run_check_acceptability,
+        )
         return self
 
     def read_votable_catalog(
@@ -1994,6 +2013,7 @@ class SkyModel(UVBase):
         freq_array=None,
         spectral_index_column=None,
         source_select_kwds=None,
+        history="",
         run_check=True,
         check_extra=True,
         run_check_acceptability=True,
@@ -2036,6 +2056,8 @@ class SkyModel(UVBase):
               :func:`~skymodel.SkyModel.source_cuts` docstring)
             * `min_flux`: Minimum stokes I flux to select [Jy]
             * `max_flux`: Maximum stokes I flux to select [Jy]
+        history : str
+            History to add to object.
         run_check : bool
             Option to check for the existence and proper shapes of parameters
             after downselecting data on this object (the default is True,
@@ -2165,6 +2187,7 @@ class SkyModel(UVBase):
             freq_array=freq_array,
             reference_frequency=reference_frequency,
             spectral_index=spectral_index,
+            history=history,
         )
 
         if source_select_kwds is not None:
@@ -2178,21 +2201,21 @@ class SkyModel(UVBase):
         return
 
     @classmethod
-    def from_gleam_catalog(cls, gleam_file, **kwargs):
-        """Create a :class:`SkyModel` from a GLEAM catalog.
+    def from_votable_catalog(cls, votable_file, *args, **kwargs):
+        """Create a :class:`SkyModel` from a votable catalog.
 
         Parameters
         ----------
         kwargs :
-            All parameters are sent through to :meth:`read_gleam_catalog`.
+            All parameters are sent through to :meth:`read_votable_catalog`.
 
         Returns
         -------
         sky_model : :class:`SkyModel`
-            The object instantiated using the GLEAM catalog.
+            The object instantiated using the votable catalog.
         """
         self = cls()
-        self.read_gleam_catalog(gleam_file, **kwargs)
+        self.read_votable_catalog(votable_file, *args, **kwargs)
         return self
 
     def read_gleam_catalog(
@@ -2293,21 +2316,21 @@ class SkyModel(UVBase):
         return
 
     @classmethod
-    def from_text_catalog(cls, catalog_csv, **kwargs):
-        """Create a :class:`SkyModel` from a text catalog.
+    def from_gleam_catalog(cls, gleam_file, **kwargs):
+        """Create a :class:`SkyModel` from a GLEAM catalog.
 
         Parameters
         ----------
         kwargs :
-            All parameters are sent through to :meth:`read_text_catalog`.
+            All parameters are sent through to :meth:`read_gleam_catalog`.
 
         Returns
         -------
         sky_model : :class:`SkyModel`
-            The object instantiated using the text catalog.
+            The object instantiated using the GLEAM catalog.
         """
         self = cls()
-        self.read_text_catalog(catalog_csv, **kwargs)
+        self.read_gleam_catalog(gleam_file, **kwargs)
         return self
 
     def read_text_catalog(
@@ -2479,21 +2502,21 @@ class SkyModel(UVBase):
         return
 
     @classmethod
-    def from_fhd_catalog(cls, filename_sav, **kwargs):
-        """Create a :class:`SkyModel` from an FHD catalog.
+    def from_text_catalog(cls, catalog_csv, **kwargs):
+        """Create a :class:`SkyModel` from a text catalog.
 
         Parameters
         ----------
         kwargs :
-            All parameters are sent through to :meth:`read_fhd_catalog`.
+            All parameters are sent through to :meth:`read_text_catalog`.
 
         Returns
         -------
         sky_model : :class:`SkyModel`
-            The object instantiated using the FHD catalog.
+            The object instantiated using the text catalog.
         """
         self = cls()
-        self.read_fhd_catalog(filename_sav, **kwargs)
+        self.read_text_catalog(catalog_csv, **kwargs)
         return self
 
     def read_fhd_catalog(
@@ -2661,6 +2684,24 @@ class SkyModel(UVBase):
 
         return
 
+    @classmethod
+    def from_fhd_catalog(cls, filename_sav, **kwargs):
+        """Create a :class:`SkyModel` from an FHD catalog.
+
+        Parameters
+        ----------
+        kwargs :
+            All parameters are sent through to :meth:`read_fhd_catalog`.
+
+        Returns
+        -------
+        sky_model : :class:`SkyModel`
+            The object instantiated using the FHD catalog.
+        """
+        self = cls()
+        self.read_fhd_catalog(filename_sav, **kwargs)
+        return self
+
     def read_idl_catalog(
         self,
         filename_sav,
@@ -2721,6 +2762,123 @@ class SkyModel(UVBase):
             check_extra=check_extra,
             run_check_acceptability=run_check_acceptability,
         )
+
+    def write_hdf5(
+        self,
+        hdf5_filename,
+        chunks=True,
+        data_compression=None,
+        run_check=True,
+        check_extra=True,
+        run_check_acceptability=True,
+    ):
+        """
+        Write this object to our standard hdf5 file format.
+
+        Parameters
+        ----------
+        hdf5_filename : str
+            Path and name of the hdf5 file to write to.
+        chunks : tuple or bool
+            h5py.create_dataset chunks keyword. Tuple for chunk shape,
+            True for auto-chunking, None for no chunking. Default is True.
+        data_compression : str
+            HDF5 filter to apply when writing the stokes data. Default is None
+            (no filter/compression). Dataset must be chunked.
+        run_check : bool
+            Option to check for the existence and proper shapes of parameters
+            after downselecting data on this object (the default is True,
+            meaning the check will be run).
+        check_extra : bool
+            Option to check optional parameters as well as required ones (the
+            default is True, meaning the optional parameters will be checked).
+        run_check_acceptability : bool
+            Option to check acceptable range of the values of parameters after
+            downselecting data on this object (the default is True, meaning the
+            acceptable range check will be done).
+        """
+        if run_check:
+            self.check(
+                check_extra=check_extra, run_check_acceptability=run_check_acceptability
+            )
+
+        history = self.history
+        if history is None:
+            history = self.pyradiosky_version_str
+        else:
+            if not uvutils._check_history_version(history, self.pyradiosky_version_str):
+                history += self.pyradiosky_version_str
+
+        with h5py.File(hdf5_filename, "w") as fileobj:
+            # create header
+            header = fileobj.create_group("Header")
+            # write out UVParameters
+            header_params = [
+                "_Ncomponents",
+                "_Nfreqs",
+                "_component_type",
+                "_spectral_type",
+                "_ra",
+                "_dec",
+                "_history",
+                "_name",
+                "_nside",
+                "_hpx_inds",
+                "_freq_array",
+                "_reference_frequency",
+                "_spectral_index",
+                "_beam_amp",
+                "_extended_model_group",
+            ]
+            for par in header_params:
+                param = getattr(self, par)
+                val = param.value
+                parname = param.name
+
+                # Skip if parameter is unset.
+                if val is None:
+                    continue
+
+                # Extra attributes for astropy Quantity-derived classes.
+                unit = None
+                angtype = None
+                if isinstance(val, units.Quantity):
+                    if isinstance(val, Latitude):
+                        angtype = "latitude"
+                    elif isinstance(val, Longitude):
+                        angtype = "longitude"
+                    unit = val.unit.name
+                    val = val.value
+
+                try:
+                    dtype = val.dtype
+                except AttributeError:
+                    dtype = np.dtype(type(val))
+
+                if dtype.kind == "U":
+                    if isinstance(val, (list, np.ndarray)):
+                        header[parname] = np.asarray(val, dtype="bytes")
+                    else:
+                        header[parname] = np.string_(val)
+                else:
+                    header[parname] = val
+
+                if unit is not None:
+                    header[parname].attrs["unit"] = unit
+                if angtype is not None:
+                    header[parname].attrs["angtype"] = angtype
+
+                # Strings and arrays of strings require special handling.
+
+            # write out the stokes array
+            dgrp = fileobj.create_group("Data")
+            dgrp.create_dataset(
+                "stokes",
+                data=self.stokes,
+                compression=data_compression,
+                dtype=self.stokes.dtype,
+            )
+            dgrp["stokes"].attrs["unit"] = self.stokes.unit.name
 
     def write_healpix_hdf5(self, filename):
         """
@@ -2899,19 +3057,19 @@ def write_healpix_hdf5(filename, hpmap, indices, freqs, nside=None, history=None
 
     Parameters
     ----------
-    filename: str
+    filename : str
         Name of file to write to.
-    hpmap: array_like of float
+    hpmap : array_like of float
         Pixel values in Kelvin. Shape (Nfreqs, Npix)
-    indices: array_like of int
+    indices : array_like of int
         HEALPix pixel indices corresponding with axis 1 of hpmap.
-    freqs: array_like of floats
+    freqs : array_like of floats
         Frequencies in Hz corresponding with axis 0 of hpmap.
-    nside: int
+    nside : int
         nside parameter of the map. Optional if the hpmap covers
         the full sphere (i.e., has no missing pixels), since the nside
         can be inferred from the map size.
-    history: str
+    history : str
         Optional history string to include in the file.
 
     """
