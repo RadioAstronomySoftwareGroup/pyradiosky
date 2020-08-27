@@ -2180,7 +2180,7 @@ def test_hdf5_file_loop(mock_point_skies, stype, tmpdir):
     assert sky2 == sky
 
 
-@pytest.mark.parametrize("history", ["keep", None, "test"])
+@pytest.mark.parametrize("history", [None, "test"])
 def test_hdf5_file_loop_healpix(healpix_disk, history, tmpdir):
     sky = healpix_disk
 
@@ -2188,8 +2188,7 @@ def test_hdf5_file_loop_healpix(healpix_disk, history, tmpdir):
     if history is None:
         sky.history = None
         run_check = False
-    elif history != "keep":
-        history += sky.pyradiosky_version_str
+    else:
         sky.history = history
 
     testfile = str(tmpdir.join("testfile.hdf5"))
