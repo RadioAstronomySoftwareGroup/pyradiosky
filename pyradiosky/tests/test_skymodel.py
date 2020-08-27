@@ -2171,10 +2171,86 @@ def test_atfreq_tol(tmpdir, mock_point_skies):
 @pytest.mark.parametrize("stype", ["full", "subband", "spectral_index", "flat"])
 def test_hdf5_file_loop(mock_point_skies, stype, tmpdir):
     sky = mock_point_skies(stype)
-    opath = str(tmpdir.join("testfile.hdf5"))
+    testfile = str(tmpdir.join("testfile.hdf5"))
 
-    sky.write_hdf5(opath)
+    sky.write_hdf5(testfile)
 
-    sky2 = SkyModel.from_hdf5(opath)
+    sky2 = SkyModel.from_hdf5(testfile)
 
     assert sky2 == sky
+
+
+@pytest.mark.parametrize("history", ["keep", None, "test"])
+def test_hdf5_file_loop_healpix(healpix_disk, history, tmpdir):
+    sky = healpix_disk
+
+    run_check = True
+    if history is None:
+        sky.history = None
+        run_check = False
+    elif history != "keep":
+        history += sky.pyradiosky_version_str
+        sky.history = history
+
+    testfile = str(tmpdir.join("testfile.hdf5"))
+    sky.write_hdf5(testfile, run_check=run_check)
+
+    sky2 = SkyModel.from_hdf5(testfile)
+
+    assert sky2 == sky
+
+
+@pytest.mark.parametrize(
+    "param,value,errormsg",
+    [
+        ("name", None, "Component type is point but 'name' is missing in file."),
+        ("Ncomponents", 5, "Ncomponents is not equal to the size of 'name'."),
+        ("Nfreqs", 10, "Nfreqs is not equal to the size of 'freq_array'."),
+    ],
+)
+def test_hdf5_read_errors(mock_point_skies, param, value, errormsg, tmpdir):
+    sky = mock_point_skies("full")
+
+    testfile = str(tmpdir.join("testfile.hdf5"))
+    sky.write_hdf5(testfile)
+
+    with h5py.File(testfile, "r+") as fileobj:
+        param_loc = "/Header/" + param
+        if value is None:
+            del fileobj[param_loc]
+        else:
+            data = fileobj[param_loc]
+            data[...] = value
+
+    with pytest.raises(ValueError, match=errormsg):
+        SkyModel.from_hdf5(testfile)
+
+
+@pytest.mark.parametrize(
+    "param,value,errormsg",
+    [
+        ("nside", None, "Component type is healpix but 'nside' is missing in file."),
+        (
+            "hpx_inds",
+            None,
+            "Component type is healpix but 'hpx_inds' is missing in file.",
+        ),
+        ("Ncomponents", 10, "Ncomponents is not equal to the size of 'hpx_inds'."),
+    ],
+)
+def test_hdf5_read_errors_healpix(healpix_disk, param, value, errormsg, tmpdir):
+    sky = healpix_disk
+
+    testfile = str(tmpdir.join("testfile.hdf5"))
+    sky.write_hdf5(testfile)
+
+    with h5py.File(testfile, "r+") as fileobj:
+        param_loc = "/Header/" + param
+        if value is None:
+            del fileobj[param_loc]
+        else:
+            data = fileobj[param_loc]
+            data[...] = value
+
+    with pytest.raises(ValueError, match=errormsg):
+        SkyModel.from_hdf5(testfile)

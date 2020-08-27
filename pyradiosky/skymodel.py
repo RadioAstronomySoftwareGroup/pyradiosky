@@ -1811,6 +1811,9 @@ class SkyModel(UVBase):
                     else:
                         value = value.tobytes().decode("utf8")
 
+                if parname == "nside":
+                    value = int(value)
+
                 init_params[parname] = value
 
             # check that the parameters not passed to the init make sense
@@ -2813,12 +2816,13 @@ class SkyModel(UVBase):
                 check_extra=check_extra, run_check_acceptability=run_check_acceptability
             )
 
-        history = self.history
-        if history is None:
-            history = self.pyradiosky_version_str
+        if self.history is None:
+            self.history = self.pyradiosky_version_str
         else:
-            if not uvutils._check_history_version(history, self.pyradiosky_version_str):
-                history += self.pyradiosky_version_str
+            if not uvutils._check_history_version(
+                self.history, self.pyradiosky_version_str
+            ):
+                self.history += self.pyradiosky_version_str
 
         with h5py.File(hdf5_filename, "w") as fileobj:
             # create header
