@@ -239,7 +239,10 @@ class SkyModel(UVBase):
 
         desc = "Healpix nside, only required for HEALPix maps."
         self._nside = UVParameter(
-            "nside", description=desc, expected_type=np.int, required=False,
+            "nside",
+            description=desc,
+            expected_type=np.int,
+            required=False,
         )
 
         desc = "Healpix index, only reqired for HEALPix maps."
@@ -329,7 +332,10 @@ class SkyModel(UVBase):
         )
 
         self._history = UVParameter(
-            "history", description="String of history.", form="str", expected_type=str,
+            "history",
+            description="String of history.",
+            form="str",
+            expected_type=str,
         )
 
         desc = "Time for local position calculations."
@@ -438,7 +444,8 @@ class SkyModel(UVBase):
         args_set_req = np.array(args_set_req, dtype=bool)
 
         arg_set_opt = np.array(
-            [freq_array is not None, reference_frequency is not None], dtype=bool,
+            [freq_array is not None, reference_frequency is not None],
+            dtype=bool,
         )
 
         if np.any(np.concatenate((args_set_req, arg_set_opt))):
@@ -829,7 +836,11 @@ class SkyModel(UVBase):
             )
 
     def point_to_healpix(
-        self, to_k=True, run_check=True, check_extra=True, run_check_acceptability=True,
+        self,
+        to_k=True,
+        run_check=True,
+        check_extra=True,
+        run_check_acceptability=True,
     ):
         """
         Convert a point component_type object to a healpix component_type.
@@ -3443,7 +3454,9 @@ def read_gleam_catalog(
 
     skyobj = SkyModel()
     skyobj.read_gleam_catalog(
-        gleam_file, spectral_type=spectral_type, source_select_kwds=source_select_kwds,
+        gleam_file,
+        spectral_type=spectral_type,
+        source_select_kwds=source_select_kwds,
     )
 
     if return_table:
@@ -3503,7 +3516,8 @@ def read_text_catalog(catalog_csv, source_select_kwds=None, return_table=False):
 
     skyobj = SkyModel()
     skyobj.read_text_catalog(
-        catalog_csv, source_select_kwds=source_select_kwds,
+        catalog_csv,
+        source_select_kwds=source_select_kwds,
     )
 
     if return_table:
@@ -3539,7 +3553,8 @@ def read_idl_catalog(filename_sav, expand_extended=True):
 
     skyobj = SkyModel()
     skyobj.read_fhd_catalog(
-        filename_sav, expand_extended=expand_extended,
+        filename_sav,
+        expand_extended=expand_extended,
     )
 
     return skyobj
