@@ -174,7 +174,11 @@ def mock_point_skies():
         elif stype == "flat":
             stokes = stokes[:, :1, :]
             return SkyModel(
-                name=names, ra=ras, dec=decs, stokes=stokes, spectral_type=stype,
+                name=names,
+                ra=ras,
+                dec=decs,
+                stokes=stokes,
+                spectral_type=stype,
             )
 
     yield _func
@@ -1135,7 +1139,8 @@ def test_write_healpix_error(tmp_path):
     test_filename = os.path.join(tmp_path, "tempfile.hdf5")
 
     with pytest.raises(
-        ValueError, match="component_type must be 'healpix' to use this method.",
+        ValueError,
+        match="component_type must be 'healpix' to use this method.",
     ):
         skyobj.write_healpix_hdf5(test_filename)
 
@@ -1406,7 +1411,10 @@ def test_flux_cuts(spec_type, init_kwargs, cut_kwargs):
     minI_cut = 1.0
     maxI_cut = 2.3
     skyobj.source_cuts(
-        latitude_deg=30.0, min_flux=minI_cut, max_flux=maxI_cut, **cut_kwargs,
+        latitude_deg=30.0,
+        min_flux=minI_cut,
+        max_flux=maxI_cut,
+        **cut_kwargs,
     )
 
     cut_sourcelist = skyobj.to_recarray()
@@ -1490,7 +1498,10 @@ def test_source_cut_error(
         maxI_cut = 2.3
 
         skyobj.source_cuts(
-            latitude_deg=30.0, min_flux=minI_cut, max_flux=maxI_cut, **cut_kwargs,
+            latitude_deg=30.0,
+            min_flux=minI_cut,
+            max_flux=maxI_cut,
+            **cut_kwargs,
         )
 
 
@@ -1684,7 +1695,9 @@ def test_read_gleam(spec_type):
     source_select_kwds = {"min_flux": 10.0}
     with pytest.raises(ValueError, match="Select would result in an empty object."):
         skyobj.read_gleam_catalog(
-            GLEAM_vot, spectral_type=spec_type, source_select_kwds=source_select_kwds,
+            GLEAM_vot,
+            spectral_type=spec_type,
+            source_select_kwds=source_select_kwds,
         )
 
 
