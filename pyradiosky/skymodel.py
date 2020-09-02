@@ -1750,6 +1750,14 @@ class SkyModel(UVBase):
 
         """
         with h5py.File(hdf5_filename, "r") as fileobj:
+            if "/Header" not in fileobj:
+                raise ValueError(
+                    "This is an old 'healvis' style healpix HDF5 file. To read it, "
+                    "use the `read_healpix_hdf5` method. Support for this file format "
+                    "is deprecated and will be removed in version 0.3.0."
+                )
+
+        with h5py.File(hdf5_filename, "r") as fileobj:
 
             # extract header information
             header = fileobj["/Header"]
@@ -1907,6 +1915,9 @@ class SkyModel(UVBase):
         """
         Read hdf5 healpix files into this object.
 
+        Deprecated. Support for this file format will be removed in version 0.3.0.
+        Use `read_hdf5` to read the newer hdf5 type files.
+
         Parameters
         ----------
         hdf5_filename : str
@@ -1926,13 +1937,28 @@ class SkyModel(UVBase):
         Notes
         -----
         Currently, this function only converts a HEALPix map with a frequency axis.
+
         """
+        with h5py.File(hdf5_filename, "r") as fileobj:
+            if "/Header" in fileobj:
+                raise ValueError(
+                    "This is  new style HDF5 file. To read it, use the "
+                    "`read_hdf5` method."
+                )
+
         try:
             import astropy_healpix
         except ImportError as e:
             raise ImportError(
                 "The astropy-healpix module must be installed to use HEALPix methods"
             ) from e
+
+        warnings.warn(
+            "This method reads an old 'healvis' style healpix HDF5 file. Support for "
+            "this file format is deprecated and will be removed in version 0.3.0. Use "
+            "the `read_hdf5` method to read the newer hdf5 type files.",
+            category=DeprecationWarning,
+        )
 
         with h5py.File(hdf5_filename, "r") as fileobj:
             hpmap = fileobj["data"][0, ...]  # Remove Nskies axis.
@@ -2798,7 +2824,8 @@ class SkyModel(UVBase):
             True for auto-chunking, None for no chunking. Default is True.
         data_compression : str
             HDF5 filter to apply when writing the stokes data. Default is None
-            (no filter/compression). Dataset must be chunked.
+            (no filter/compression). One reasonable option to reduce file size
+            is "gzip". Dataset must be chunked.
         run_check : bool
             Option to check for the existence and proper shapes of parameters
             after downselecting data on this object (the default is True,
