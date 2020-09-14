@@ -3866,7 +3866,11 @@ class SkyModel(UVBase):
             acceptable range check will be done).
 
         """
-        parsed_vo = votable.parse(votable_file)
+        if from_fits is True:
+            t = Table(votable_file)
+            parsed_vo = votable.from_table(t)
+        else:
+            parsed_vo = votable.parse(votable_file)
 
         tables = list(parsed_vo.iter_tables())
         table_ids = [table._ID for table in tables]
@@ -4059,6 +4063,7 @@ class SkyModel(UVBase):
         with_error=False,
         run_check=True,
         check_extra=True,
+        from_fits=False,
         run_check_acceptability=True,
     ):
         """
