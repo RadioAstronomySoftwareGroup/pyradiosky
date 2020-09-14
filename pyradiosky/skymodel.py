@@ -17,6 +17,7 @@ from astropy.io import votable
 from pyuvdata.uvbase import UVBase
 from pyuvdata.parameter import UVParameter
 import pyuvdata.utils as uvutils
+from astropy.table import Table
 
 try:
     from pyuvdata.uvbeam.cst_beam import CSTBeam
@@ -2113,7 +2114,11 @@ class SkyModel(UVBase):
             acceptable range check will be done).
 
         """
-        parsed_vo = votable.parse(votable_file)
+        if from_fits is True:
+            t = Table(votable_file)
+            parsed_vo = votable.from_table(t)
+        else:
+            parsed_vo = votable.parse(votable_file)
 
         tables = list(parsed_vo.iter_tables())
         table_ids = [table._ID for table in tables]
@@ -2267,6 +2272,7 @@ class SkyModel(UVBase):
         source_select_kwds=None,
         run_check=True,
         check_extra=True,
+        from_fits=False,
         run_check_acceptability=True,
     ):
         """
