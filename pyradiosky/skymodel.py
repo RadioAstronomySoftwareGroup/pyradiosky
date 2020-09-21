@@ -1813,7 +1813,7 @@ class SkyModel(UVBase):
                 elif angtype == "longitude":
                     value = Longitude(value)
 
-                if param.expected_type == str:
+                if param.expected_type is str:
                     if isinstance(value, np.ndarray):
                         value = np.array([n.tobytes().decode("utf8") for n in value[:]])
                     else:
@@ -2806,7 +2806,6 @@ class SkyModel(UVBase):
     def write_hdf5(
         self,
         hdf5_filename,
-        chunks=True,
         data_compression=None,
         run_check=True,
         check_extra=True,
@@ -2819,9 +2818,6 @@ class SkyModel(UVBase):
         ----------
         hdf5_filename : str
             Path and name of the hdf5 file to write to.
-        chunks : tuple or bool
-            h5py.create_dataset chunks keyword. Tuple for chunk shape,
-            True for auto-chunking, None for no chunking. Default is True.
         data_compression : str
             HDF5 filter to apply when writing the stokes data. Default is None
             (no filter/compression). One reasonable option to reduce file size
@@ -2897,6 +2893,7 @@ class SkyModel(UVBase):
                 except AttributeError:
                     dtype = np.dtype(type(val))
 
+                # Strings and arrays of strings require special handling.
                 if dtype.kind == "U":
                     if isinstance(val, (list, np.ndarray)):
                         header[parname] = np.asarray(val, dtype="bytes")
@@ -2910,8 +2907,6 @@ class SkyModel(UVBase):
                 if angtype is not None:
                     header[parname].attrs["angtype"] = angtype
 
-                # Strings and arrays of strings require special handling.
-
             # write out the stokes array
             dgrp = fileobj.create_group("Data")
             dgrp.create_dataset(
@@ -2919,6 +2914,7 @@ class SkyModel(UVBase):
                 data=self.stokes,
                 compression=data_compression,
                 dtype=self.stokes.dtype,
+                chunks=True,
             )
             dgrp["stokes"].attrs["unit"] = self.stokes.unit.name
 
