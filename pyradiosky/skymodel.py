@@ -1942,7 +1942,7 @@ class SkyModel(UVBase):
         with h5py.File(hdf5_filename, "r") as fileobj:
             if "/Header" in fileobj:
                 raise ValueError(
-                    "This is  new skyh5 file. To read it, use the `read_skyh5` method."
+                    "This is a skyh5 file. To read it, use the `read_skyh5` method."
                 )
 
         try:

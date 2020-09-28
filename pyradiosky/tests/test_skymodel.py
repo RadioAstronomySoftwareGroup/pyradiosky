@@ -193,7 +193,7 @@ def healpix_disk_old():
 @pytest.fixture(scope="function")
 def healpix_disk_new():
     pytest.importorskip("astropy_healpix")
-    return SkyModel.from_hdf5(os.path.join(SKY_DATA_PATH, "healpix_disk_new.hdf5"))
+    return SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "healpix_disk.skyh5"))
 
 
 def test_set_spectral_params(zenith_skymodel):
@@ -980,7 +980,7 @@ def test_read_healpix_hdf5_old(healpix_data):
 
     with pytest.warns(
         DeprecationWarning,
-        match="This function is deprecated, use `SkyModel.read_healpix_hdf5` instead.",
+        match="This function is deprecated, use `SkyModel.read_skyh5` or `SkyModel.read_healpix_hdf5` instead.",
     ):
         hpmap, inds, freqs = skymodel.read_healpix_hdf5(
             os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
@@ -1008,7 +1008,7 @@ def test_healpix_to_sky(healpix_data, healpix_disk_old):
     hmap_orig = hmap_orig * units.K
     with pytest.warns(
         DeprecationWarning,
-        match="This function is deprecated, use `SkyModel.read_healpix_hdf5` instead.",
+        match="This function is deprecated, use `SkyModel.read_skyh5` or `SkyModel.read_healpix_hdf5` instead.",
     ):
         sky = skymodel.healpix_to_sky(hpmap, indices, freqs)
         assert isinstance(sky.stokes, Quantity)
@@ -1053,6 +1053,7 @@ def test_healpix_recarray_loop(healpix_data, healpix_disk_new):
 
 
 @pytest.mark.filterwarnings("ignore:This method reads an old 'healvis' style healpix")
+@pytest.mark.filterwarnings("ignore:This method writes an old 'healvis' style healpix")
 def test_read_write_healpix_oldfunction(tmp_path, healpix_data):
 
     healpix_filename = os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
@@ -1066,7 +1067,7 @@ def test_read_write_healpix_oldfunction(tmp_path, healpix_data):
 
     with pytest.warns(
         DeprecationWarning,
-        match="This function is deprecated, use `SkyModel.write_healpix_hdf5` instead.",
+        match="This function is deprecated, use `SkyModel.write_skyh5` instead.",
     ):
         with pytest.raises(
             ValueError, match="Need to provide nside if giving a subset of the map."
@@ -1077,7 +1078,7 @@ def test_read_write_healpix_oldfunction(tmp_path, healpix_data):
 
     with pytest.warns(
         DeprecationWarning,
-        match="This function is deprecated, use `SkyModel.write_healpix_hdf5` instead.",
+        match="This function is deprecated, use `SkyModel.write_skyh5` instead.",
     ):
         with pytest.raises(ValueError, match="Invalid map shape"):
             skymodel.write_healpix_hdf5(
@@ -1090,13 +1091,13 @@ def test_read_write_healpix_oldfunction(tmp_path, healpix_data):
 
     with pytest.warns(
         DeprecationWarning,
-        match="This function is deprecated, use `SkyModel.write_healpix_hdf5` instead.",
+        match="This function is deprecated, use `SkyModel.write_skyh5` instead.",
     ):
         skymodel.write_healpix_hdf5(filename, hpmap, indices, freqs.to("Hz").value)
 
     with pytest.warns(
         DeprecationWarning,
-        match="This function is deprecated, use `SkyModel.read_healpix_hdf5` instead.",
+        match="This function is deprecated, use `SkyModel.read_skyh5` or `SkyModel.read_healpix_hdf5` instead.",
     ):
         hpmap_new, inds_new, freqs_new = skymodel.read_healpix_hdf5(filename)
 
@@ -1106,12 +1107,18 @@ def test_read_write_healpix_oldfunction(tmp_path, healpix_data):
 
 
 @pytest.mark.filterwarnings("ignore:This method reads an old 'healvis' style healpix")
+@pytest.mark.filterwarnings("ignore:This method writes an old 'healvis' style healpix")
 def test_read_write_healpix_old(tmp_path, healpix_data, healpix_disk_old):
 
     test_filename = os.path.join(tmp_path, "tempfile.hdf5")
 
     sky = healpix_disk_old
-    sky.write_healpix_hdf5(test_filename)
+    with pytest.warns(
+        DeprecationWarning,
+        match="This method writes an old 'healvis' style healpix HDF5 file. Support for "
+        "this file format is deprecated and will be removed in version 0.3.0.",
+    ):
+        sky.write_healpix_hdf5(test_filename)
 
     with pytest.warns(
         DeprecationWarning,
@@ -1132,7 +1139,12 @@ def test_read_write_healpix_old_cut_sky(tmp_path, healpix_data, healpix_disk_old
     sky.select(component_inds=np.arange(10))
     sky.check()
 
-    sky.write_healpix_hdf5(test_filename)
+    with pytest.warns(
+        DeprecationWarning,
+        match="This method writes an old 'healvis' style healpix HDF5 file. Support for "
+        "this file format is deprecated and will be removed in version 0.3.0.",
+    ):
+        sky.write_healpix_hdf5(test_filename)
 
     with pytest.warns(
         DeprecationWarning,
@@ -1150,7 +1162,12 @@ def test_read_write_healpix_old_nover_history(tmp_path, healpix_data, healpix_di
 
     sky = healpix_disk_old
     sky.history = sky.pyradiosky_version_str
-    sky.write_healpix_hdf5(test_filename)
+    with pytest.warns(
+        DeprecationWarning,
+        match="This method writes an old 'healvis' style healpix HDF5 file. Support for "
+        "this file format is deprecated and will be removed in version 0.3.0.",
+    ):
+        sky.write_healpix_hdf5(test_filename)
 
     with pytest.warns(
         DeprecationWarning,
@@ -1162,6 +1179,7 @@ def test_read_write_healpix_old_nover_history(tmp_path, healpix_data, healpix_di
     assert sky == sky2
 
 
+@pytest.mark.filterwarnings("ignore:This method writes an old 'healvis' style healpix")
 def test_write_healpix_error(tmp_path):
     skyobj = SkyModel.from_gleam_catalog(GLEAM_vot)
     test_filename = os.path.join(tmp_path, "tempfile.hdf5")
@@ -1268,7 +1286,12 @@ def test_healpix_positions(tmp_path, time_location):
         )
 
     filename = os.path.join(tmp_path, "healpix_single.hdf5")
-    skyobj.write_healpix_hdf5(filename)
+    with pytest.warns(
+        DeprecationWarning,
+        match="This method writes an old 'healvis' style healpix HDF5 file. Support "
+        "for this file format is deprecated and will be removed in version 0.3.0.",
+    ):
+        skyobj.write_healpix_hdf5(filename)
 
     time, array_location = time_location
 
@@ -2206,9 +2229,9 @@ def test_hdf5_file_loop(mock_point_skies, stype, tmpdir):
     sky = mock_point_skies(stype)
     testfile = str(tmpdir.join("testfile.hdf5"))
 
-    sky.write_hdf5(testfile)
+    sky.write_skyh5(testfile)
 
-    sky2 = SkyModel.from_hdf5(testfile)
+    sky2 = SkyModel.from_skyh5(testfile)
 
     assert sky2 == sky
 
@@ -2225,9 +2248,9 @@ def test_hdf5_file_loop_healpix(healpix_disk_new, history, tmpdir):
         sky.history = history
 
     testfile = str(tmpdir.join("testfile.hdf5"))
-    sky.write_hdf5(testfile, run_check=run_check)
+    sky.write_skyh5(testfile, run_check=run_check)
 
-    sky2 = SkyModel.from_hdf5(testfile)
+    sky2 = SkyModel.from_skyh5(testfile)
 
     assert sky2 == sky
 
@@ -2239,9 +2262,9 @@ def test_hdf5_file_loop_healpix_cut_sky(healpix_disk_new, tmpdir):
     sky.check()
 
     testfile = str(tmpdir.join("testfile.hdf5"))
-    sky.write_hdf5(testfile)
+    sky.write_skyh5(testfile)
 
-    sky2 = SkyModel.from_hdf5(testfile)
+    sky2 = SkyModel.from_skyh5(testfile)
 
     assert sky2 == sky
 
@@ -2258,7 +2281,7 @@ def test_hdf5_read_errors(mock_point_skies, param, value, errormsg, tmpdir):
     sky = mock_point_skies("full")
 
     testfile = str(tmpdir.join("testfile.hdf5"))
-    sky.write_hdf5(testfile)
+    sky.write_skyh5(testfile)
 
     with h5py.File(testfile, "r+") as fileobj:
         param_loc = "/Header/" + param
@@ -2269,7 +2292,7 @@ def test_hdf5_read_errors(mock_point_skies, param, value, errormsg, tmpdir):
             data[...] = value
 
     with pytest.raises(ValueError, match=errormsg):
-        SkyModel.from_hdf5(testfile)
+        SkyModel.from_skyh5(testfile)
 
 
 @pytest.mark.parametrize(
@@ -2288,7 +2311,7 @@ def test_hdf5_read_errors_healpix(healpix_disk_new, param, value, errormsg, tmpd
     sky = healpix_disk_new
 
     testfile = str(tmpdir.join("testfile.hdf5"))
-    sky.write_hdf5(testfile)
+    sky.write_skyh5(testfile)
 
     with h5py.File(testfile, "r+") as fileobj:
         param_loc = "/Header/" + param
@@ -2299,16 +2322,16 @@ def test_hdf5_read_errors_healpix(healpix_disk_new, param, value, errormsg, tmpd
             data[...] = value
 
     with pytest.raises(ValueError, match=errormsg):
-        SkyModel.from_hdf5(testfile)
+        SkyModel.from_skyh5(testfile)
 
 
 def test_hdf5_read_errors_oldstyle_healpix():
     with pytest.raises(
         ValueError, match="This is an old 'healvis' style healpix HDF5 file"
     ):
-        SkyModel.from_hdf5(os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5"))
+        SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5"))
 
 
 def test_healpix_hdf5_read_errors_newstyle_healpix():
-    with pytest.raises(ValueError, match="This is  new style HDF5 file"):
-        SkyModel.from_healpix_hdf5(os.path.join(SKY_DATA_PATH, "healpix_disk_new.hdf5"))
+    with pytest.raises(ValueError, match="This is a skyh5 file"):
+        SkyModel.from_healpix_hdf5(os.path.join(SKY_DATA_PATH, "healpix_disk.skyh5"))
