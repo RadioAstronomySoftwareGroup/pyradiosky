@@ -1722,20 +1722,20 @@ class SkyModel(UVBase):
 
         return self
 
-    def read_hdf5(
+    def read_skyh5(
         self,
-        hdf5_filename,
+        filename,
         run_check=True,
         check_extra=True,
         run_check_acceptability=True,
     ):
         """
-        Read our standard hdf5 file format into this object.
+        Read a skyh5 file (our flavor of hdf5) into this object.
 
         Parameters
         ----------
-        hdf5_filename : str
-            Path and name of the hdf5 file to read.
+        filename : str
+            Path and name of the skyh5 file to read.
         run_check : bool
             Option to check for the existence and proper shapes of parameters
             after downselecting data on this object (the default is True,
@@ -1749,7 +1749,7 @@ class SkyModel(UVBase):
             acceptable range check will be done).
 
         """
-        with h5py.File(hdf5_filename, "r") as fileobj:
+        with h5py.File(filename, "r") as fileobj:
             if "/Header" not in fileobj:
                 raise ValueError(
                     "This is an old 'healvis' style healpix HDF5 file. To read it, "
@@ -1757,7 +1757,7 @@ class SkyModel(UVBase):
                     "is deprecated and will be removed in version 0.3.0."
                 )
 
-        with h5py.File(hdf5_filename, "r") as fileobj:
+        with h5py.File(filename, "r") as fileobj:
 
             # extract header information
             header = fileobj["/Header"]
@@ -1869,20 +1869,20 @@ class SkyModel(UVBase):
             )
 
     @classmethod
-    def from_hdf5(
+    def from_skyh5(
         cls,
-        hdf5_filename,
+        filename,
         run_check=True,
         check_extra=True,
         run_check_acceptability=True,
     ):
         """
-        Create a new :class:`SkyModel` from our standard hdf5 file format.
+        Create a new :class:`SkyModel` from skyh5 file (our flavor of hdf5).
 
         Parameters
         ----------
-        hdf5_filename : str
-            Path and name of the hdf5 file to read.
+        filename : str
+            Path and name of the skyh5 file to read.
         run_check : bool
             Option to check for the existence and proper shapes of parameters
             after downselecting data on this object (the default is True,
@@ -1897,8 +1897,8 @@ class SkyModel(UVBase):
 
         """
         self = cls()
-        self.read_hdf5(
-            hdf5_filename,
+        self.read_skyh5(
+            filename,
             run_check=run_check,
             check_extra=check_extra,
             run_check_acceptability=run_check_acceptability,
@@ -1916,7 +1916,7 @@ class SkyModel(UVBase):
         Read hdf5 healpix files into this object.
 
         Deprecated. Support for this file format will be removed in version 0.3.0.
-        Use `read_hdf5` to read the newer hdf5 type files.
+        Use `read_skyh5` to read our newer skyh5 file type.
 
         Parameters
         ----------
@@ -1942,8 +1942,7 @@ class SkyModel(UVBase):
         with h5py.File(hdf5_filename, "r") as fileobj:
             if "/Header" in fileobj:
                 raise ValueError(
-                    "This is  new style HDF5 file. To read it, use the "
-                    "`read_hdf5` method."
+                    "This is  new skyh5 file. To read it, use the `read_skyh5` method."
                 )
 
         try:
@@ -1956,7 +1955,7 @@ class SkyModel(UVBase):
         warnings.warn(
             "This method reads an old 'healvis' style healpix HDF5 file. Support for "
             "this file format is deprecated and will be removed in version 0.3.0. Use "
-            "the `read_hdf5` method to read the newer hdf5 type files.",
+            "the `read_skyh5` method to read the newer skyh5 file type.",
             category=DeprecationWarning,
         )
 
@@ -2010,6 +2009,9 @@ class SkyModel(UVBase):
     ):
         """
         Create a new :class:`SkyModel` from a hdf5 healpix file.
+
+        Deprecated. Support for this file format will be removed in version 0.3.0.
+        Use `from_skyh5` to create a new :class:`SkyModel` from our newer skyh5 file type.
 
         Parameters
         ----------
@@ -2803,25 +2805,25 @@ class SkyModel(UVBase):
             run_check_acceptability=run_check_acceptability,
         )
 
-    def write_hdf5(
+    def write_skyh5(
         self,
-        hdf5_filename,
+        filename,
         data_compression=None,
         run_check=True,
         check_extra=True,
         run_check_acceptability=True,
     ):
         """
-        Write this object to our standard hdf5 file format.
+        Write this object to a skyh5 file (our flavor of hdf5).
 
         Parameters
         ----------
-        hdf5_filename : str
-            Path and name of the hdf5 file to write to.
+        filename : str
+            Path and name of the file to write to.
         data_compression : str
             HDF5 filter to apply when writing the stokes data. Default is None
             (no filter/compression). One reasonable option to reduce file size
-            is "gzip". Dataset must be chunked.
+            is "gzip".
         run_check : bool
             Option to check for the existence and proper shapes of parameters
             after downselecting data on this object (the default is True,
@@ -2847,7 +2849,7 @@ class SkyModel(UVBase):
             ):
                 self.history += self.pyradiosky_version_str
 
-        with h5py.File(hdf5_filename, "w") as fileobj:
+        with h5py.File(filename, "w") as fileobj:
             # create header
             header = fileobj.create_group("Header")
             # write out UVParameters
@@ -2922,12 +2924,22 @@ class SkyModel(UVBase):
         """
         Write a set of HEALPix maps to an HDF5 file.
 
+        Deprecated. Support for this file format will be removed in version 0.3.0.
+        Use `write_skyh5` to read our newer skyh5 file type.
+
         Parameters
         ----------
         filename: str
             Name of file to write to.
 
         """
+        warnings.warn(
+            "This method writes an old 'healvis' style healpix HDF5 file. Support for "
+            "this file format is deprecated and will be removed in version 0.3.0. Use "
+            "the `write_skyh5` method to write the newer skyh5 file type.",
+            category=DeprecationWarning,
+        )
+
         if self.component_type != "healpix":
             raise ValueError("component_type must be 'healpix' to use this method.")
 
@@ -3056,7 +3068,7 @@ def read_healpix_hdf5(hdf5_filename):
     """
     Read hdf5 healpix files using h5py and get a healpix map, indices and frequencies.
 
-    Deprecated. Use `_read_healpix_hdf5` instead.
+    Deprecated. Use `read_skyh5` or `read_healpix_hdf5` instead.
 
     Parameters
     ----------
@@ -3074,7 +3086,8 @@ def read_healpix_hdf5(hdf5_filename):
         Frequencies in Hz. Shape (Nfreqs)
     """
     warnings.warn(
-        "This function is deprecated, use `SkyModel.read_healpix_hdf5` instead. "
+        "This function is deprecated, use `SkyModel.read_skyh5` or "
+        "`SkyModel.read_healpix_hdf5` instead. "
         "This function will be removed in version 0.2.0.",
         category=DeprecationWarning,
     )
@@ -3091,7 +3104,7 @@ def write_healpix_hdf5(filename, hpmap, indices, freqs, nside=None, history=None
     """
     Write a set of HEALPix maps to an HDF5 file.
 
-    Deprecated. Use `SkyModel.write_healpix_hdf5` instead.
+    Deprecated. Use `SkyModel.write_skyh5` instead.
 
     Parameters
     ----------
@@ -3119,7 +3132,7 @@ def write_healpix_hdf5(filename, hpmap, indices, freqs, nside=None, history=None
         ) from e
 
     warnings.warn(
-        "This function is deprecated, use `SkyModel.write_healpix_hdf5` instead. "
+        "This function is deprecated, use `SkyModel.write_skyh5` instead. "
         "This function will be removed in version 0.2.0.",
         category=DeprecationWarning,
     )
@@ -3180,7 +3193,7 @@ def healpix_to_sky(hpmap, indices, freqs):
     """
     Convert a healpix map in K to a set of point source components in Jy.
 
-    Deprecated. Use SkyModel.read_healpix_hdf5 instead.
+    Deprecated. Use `read_skyh5` or `read_healpix_hdf5` instead.
 
     Parameters
     ----------
@@ -3209,7 +3222,8 @@ def healpix_to_sky(hpmap, indices, freqs):
         ) from e
 
     warnings.warn(
-        "This function is deprecated, use `SkyModel.read_healpix_hdf5` instead. "
+        "This function is deprecated, use `SkyModel.read_skyh5` or "
+        "`SkyModel.read_healpix_hdf5` instead. "
         "This function will be removed in version 0.2.0.",
         category=DeprecationWarning,
     )
