@@ -2112,6 +2112,8 @@ class SkyModel(UVBase):
             Option to check acceptable range of the values of parameters after
             downselecting data on this object (the default is True, meaning the
             acceptable range check will be done).
+        from_fits : bool, optional
+            A True value indicates that the votable is contained within a .fits file.
 
         """
         if from_fits is True:
