@@ -13,6 +13,7 @@ from astropy.time import Time
 
 def write_index_rst(readme_file=None, write_file=None):
     t = Time.now()
+    t.format = "iso"
     t.out_subfmt = "date"
     out = (
         ".. pyradiosky documentation index file, created by\n"
