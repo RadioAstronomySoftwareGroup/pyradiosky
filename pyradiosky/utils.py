@@ -229,7 +229,7 @@ def download_gleam(path=".", filename="gleam.vot", overwrite=False, row_limit=No
         Vizier.ROW_LIMIT = -1
     else:
         Vizier.ROW_LIMIT = row_limit
-    Vizier.columns = [
+    desired_columns = [
         "GLEAM",
         "RAJ2000",
         "DEJ2000",
@@ -257,8 +257,18 @@ def download_gleam(path=".", filename="gleam.vot", overwrite=False, row_limit=No
         "Fint220",
         "Fint227",
     ]
+    # There is a bug that causes astroquery to only download the first 14-16 specified
+    # columns if you pass it a long list of columns.
+    # The workaround is to download all columns and then remove the ones we don't need.
+    # This is not ideal because it substantially increases the download time, but seems
+    # to be required for now.
+    Vizier.columns = ["all"]
     catname = "VIII/100/gleamegc"
     table = Vizier.get_catalogs(catname)[0]
+
+    columns_to_remove = list(set(table.colnames) - set(desired_columns))
+    table.remove_columns(columns_to_remove)
+
     table.write(opath, format="votable", overwrite=overwrite)
 
     print("GLEAM catalog downloaded and saved to " + opath)

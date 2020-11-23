@@ -1,4 +1,4 @@
-#!/bin/env python
+#! /usr/bin/env python
 # Copyright (c) 2019 Radio Astronomy Software Group
 # Licensed under the 3-clause BSD License
 
