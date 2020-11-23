@@ -126,10 +126,7 @@ def test_rotate_points_3d():
             assert np.isclose(calc_theta_altaz, theta_altaz)
 
         if ti == zero_indx:
-            print("calc_phi_altaz", calc_phi_altaz)
-            print("phi_altaz", phi_altaz)
-            print("diff", calc_phi_altaz - phi_altaz)
-            assert np.isclose(calc_phi_altaz, phi_altaz, atol=1e-4)
+            assert np.isclose(calc_phi_altaz, phi_altaz, atol=2e-4)
         else:
             assert np.isclose(calc_phi_altaz, phi_altaz)
 
