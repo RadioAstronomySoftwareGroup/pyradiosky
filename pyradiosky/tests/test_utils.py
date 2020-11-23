@@ -79,7 +79,8 @@ def test_stokes_tofrom_coherency():
     )
 
 
-def test_download_gleam(tmp_path):
+@pytest.mark.parametrize("stype", ["subband", "spectral_index", "flat"])
+def test_download_gleam(tmp_path, stype):
     pytest.importorskip("astroquery")
 
     fname = "gleam_cat.vot"
@@ -88,19 +89,19 @@ def test_download_gleam(tmp_path):
     skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=10)
 
     sky = SkyModel()
-    sky.read_gleam_catalog(filename)
+    sky.read_gleam_catalog(filename, spectral_type=stype)
     assert sky.Ncomponents == 10
 
     # check there's not an error if the file exists and overwrite is False
     # and that the file is not replaced
     skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=5)
-    sky.read_gleam_catalog(filename)
+    sky.read_gleam_catalog(filename, spectral_type=stype)
     assert sky.Ncomponents == 10
 
     # check that the file is replaced if overwrite is True
     skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=5, overwrite=True)
     sky2 = SkyModel()
-    sky2.read_gleam_catalog(filename)
+    sky2.read_gleam_catalog(filename, spectral_type=stype)
     assert sky2.Ncomponents == 5
 
 
