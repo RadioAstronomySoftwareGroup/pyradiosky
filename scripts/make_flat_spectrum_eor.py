@@ -6,6 +6,7 @@
 import numpy as np
 from astropy.cosmology import Planck15
 from astropy import units
+import argparse
 
 from pyradiosky import SkyModel
 
@@ -111,25 +112,73 @@ def flat_spectrum_skymodel(
 if __name__ == "__main__":
     # When run as a script, construct a noiselike skymodel for the MWA frequency channels.
 
-    var = 9.0
-    nside = 32
-
-    fname = "noise_sky.hdf5"
-    start_freq = 167075000.0
-    end_freq = 197715000.0
-    Nfreqs = 384
-    channel_width = 80e3
-
-    freq_array = np.linspace(
-        start_freq, end_freq + channel_width, Nfreqs, endpoint=False
+    parser = argparse.ArgumentParser(
+        description="A command-line script to generate a SkyModel containing a "
+        "flat spectrum noise-like EoR signal."
     )
+    parser.add_argument(
+        "-v",
+        "--variance",
+        type=float,
+        required=True,
+        help="Variance of the signal, in Kelvin^2, at the reference channel.",
+    )
+    parser.add_argument(
+        "--nside",
+        type=int,
+        required=True,
+        help="HEALPix NSIDE parameter. Must be a power of 2.",
+    )
+    parser.add_argument(
+        "--ref_chan",
+        type=int,
+        required=True,
+        help="Frequency channel to set as reference, if using freqs.",
+    )
+    parser.add_argument(
+        "-s",
+        "--start_freq",
+        type=float,
+        required=True,
+        help="Start frequency (in Hz)",
+    )
+    parser.add_argument(
+        "-e",
+        "--end_freq",
+        type=float,
+        required=True,
+        help="End frequency (in Hz)",
+    )
+    parser.add_argument(
+        "-N",
+        "--nfreqs",
+        type=int,
+        required=True,
+        help="Number of frequencies",
+    )
+    parser.add_argument(
+        "--fname", type=str, help="Output file name", default="noise_sky.hdf5"
+    )
+
+    args = parser.parse_args()
+
+    var = args.variance
+    nside = args.nside
+
+    fname = args.fname
+    start_freq = args.start_freq
+    end_freq = args.end_freq
+    Nfreqs = args.nfreqs
+
+    freq_array = np.linspace(start_freq, end_freq, Nfreqs)
 
     print(
         f"Generating sky model with MWA frequencies, nside {nside},"
-        f" and variance {var} K^2 at the zeroth channel."
+        f" and variance {var} K^2 at channel {args.ref_chan}."
     )
 
     sky = flat_spectrum_skymodel(var, nside, freqs=freq_array)
     sky.check()
+    print(sky.history)
     print(f"Saving to {fname}.")
     sky.write_healpix_hdf5(fname)
