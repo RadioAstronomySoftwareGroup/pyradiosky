@@ -2263,7 +2263,7 @@ class SkyModel(UVBase):
     def read_gleam_catalog(
         self,
         gleam_file,
-        spectral_type="flat",
+        spectral_type="subband",
         source_select_kwds=None,
         run_check=True,
         check_extra=True,
@@ -3458,7 +3458,7 @@ def read_votable_catalog(
 
 
 def read_gleam_catalog(
-    gleam_file, spectral_type="flat", source_select_kwds=None, return_table=False
+    gleam_file, spectral_type="subband", source_select_kwds=None, return_table=False
 ):
     """
     Create a SkyModel object from the GLEAM votable catalog.
