@@ -2116,7 +2116,7 @@ def test_text_catalog_loop(tmp_path, spec_type):
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 @pytest.mark.parametrize("freq_mult", [1e-6, 1e-3, 1e3])
 def test_text_catalog_loop_other_freqs(tmp_path, freq_mult):
-    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot)
+    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type="flat")
     skyobj.freq_array = np.atleast_1d(np.unique(skyobj.reference_frequency) * freq_mult)
     skyobj.reference_frequency = None
 

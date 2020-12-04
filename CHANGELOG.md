@@ -8,6 +8,7 @@
   instantiation from different formats directly.
 
 ### Changed
+- Changed default `spectral_type` for `read_gleam_catalog` to `subband` rather than `flat`.
 - Changed `extended_model_group` in `read_fhd_catalog` to match the parent source name.
 
 ### Fixed
