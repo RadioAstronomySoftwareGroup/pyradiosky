@@ -8,6 +8,8 @@
   instantiation from different formats directly.
 
 ### Fixed
+- A bug in the `download_gleam` utility method that caused missing columns for the
+    `subband` spectral type
 - Enabled subselecting to a given tolerance in at_frequencies (for `full` spectral type).
 - A bug in `Skymodel.__init__` that caused extended_model_group and beam_amps
     to not be added to the object.
