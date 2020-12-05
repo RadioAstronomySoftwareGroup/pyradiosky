@@ -2615,7 +2615,7 @@ class SkyModel(UVBase):
         source_freqs = catalog["freq"]
         spectral_index = catalog["alpha"]
         Nsrcs = len(catalog)
-        extended_model_group = np.full(Nsrcs, '', dtype=str)
+        extended_model_group = np.full(Nsrcs, "", dtype=str)
         if "BEAM" in catalog.dtype.names:
             use_beam_amps = True
             beam_amp = np.zeros((4, Nsrcs))
@@ -2635,15 +2635,12 @@ class SkyModel(UVBase):
                 beam_amp[3, src] = catalog["beam"][src]["YX"][0]
 
         if len(np.unique(ids)) != len(ids):
-            warnings.warn(
-                "WARNING: Source IDs are not unique. "
-                "Defining unique IDs."
-            )
+            warnings.warn("WARNING: Source IDs are not unique. Defining unique IDs.")
             unique_ids, counts = np.unique(ids, return_counts=True)
             for repeat_id in unique_ids[np.where(counts > 1)[0]]:
                 fix_id_inds = np.where(ids == repeat_id)[0]
                 for append_val, id_ind in enumerate(fix_id_inds):
-                    ids[id_ind] = '{}{}'.format(ids[id_ind], append_val + 1)
+                    ids[id_ind] = "{}{}".format(ids[id_ind], append_val + 1)
 
         if expand_extended:
             ext_inds = np.where(
@@ -2666,10 +2663,12 @@ class SkyModel(UVBase):
                     # Add component information
                     src = catalog[ext]["extend"]
                     Ncomps = len(src)
-                    comp_ids = np.array([
-                        '{}-{}'.format(source_id, comp_ind)
-                        for comp_ind in range(1, Ncomps + 1)
-                    ])
+                    comp_ids = np.array(
+                        [
+                            "{}-{}".format(source_id, comp_ind)
+                            for comp_ind in range(1, Ncomps + 1)
+                        ]
+                    )
                     ids = np.insert(ids, use_index, comp_ids)
                     extended_model_group = np.insert(
                         extended_model_group,
@@ -2696,16 +2695,14 @@ class SkyModel(UVBase):
                         np.zeros((4, Ncomps + np.shape(stokes)[1])), "Jy"
                     )
                     stokes_new[:, :use_index] = stokes[:, :use_index]
-                    stokes_new[:, use_index:use_index + Ncomps] = stokes_ext
-                    stokes_new[:, use_index + Ncomps:] = stokes[:, use_index:]
+                    stokes_new[:, use_index : use_index + Ncomps] = stokes_ext
+                    stokes_new[:, use_index + Ncomps :] = stokes[:, use_index:]
                     stokes = stokes_new
                     if use_beam_amps:
-                        beam_amp_new = np.zeros((
-                            4, Ncomps + np.shape(stokes)[1]
-                        ))
+                        beam_amp_new = np.zeros((4, Ncomps + np.shape(stokes)[1]))
                         beam_amp_new[:, :use_index] = beam_amp[:, :use_index]
-                        beam_amp_new[:, use_index:use_index + Ncomps] = beam_amp_ext
-                        beam_amp_new[:, use_index + Ncomps:] = beam_amp[:, use_index:]
+                        beam_amp_new[:, use_index : use_index + Ncomps] = beam_amp_ext
+                        beam_amp_new[:, use_index + Ncomps :] = beam_amp[:, use_index:]
                         beam_amp = beam_amp_new
                     source_freqs = np.insert(source_freqs, use_index, src["freq"])
                     spectral_index = np.insert(spectral_index, use_index, src["alpha"])
