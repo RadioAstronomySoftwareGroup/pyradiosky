@@ -1383,7 +1383,7 @@ def test_select(spec_type, time_location):
     skyobj = SkyModel.from_gleam_catalog(GLEAM_vot)
 
     skyobj.beam_amp = np.ones((4, skyobj.Nfreqs, skyobj.Ncomponents))
-    skyobj.extended_model_group = np.arange(skyobj.Ncomponents)
+    skyobj.extended_model_group = np.empty(skyobj.Ncomponents, dtype=str)
     skyobj.update_positions(time, array_location)
 
     skyobj2 = skyobj.select(component_inds=np.arange(10), inplace=False)
