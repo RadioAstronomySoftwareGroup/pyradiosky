@@ -150,9 +150,9 @@ class SkyModel(UVBase):
         nside parameter for HEALPix maps.
     hpx_inds : array_like of int
         Indices for HEALPix maps, only used if nside is set.
-    extended_model_group : array_like of int
+    extended_model_group : array_like of str
         Identifier that groups components of an extended source model.
-        -1 for point sources, shape (Ncomponents,).
+        Empty string for point sources, shape (Ncomponents,).
     beam_amp : array_like of float
         Beam amplitude at the source position, shape (4, Nfreqs, Ncomponents).
         4 element vector corresponds to [XX, YY, XY, YX] instrumental
