@@ -1918,8 +1918,7 @@ def test_fhd_catalog_reader_extended_sources():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
     skyobj = SkyModel()
     with pytest.warns(
-        UserWarning,
-        match="WARNING: Source IDs are not unique. Defining unique IDs."
+        UserWarning, match="WARNING: Source IDs are not unique. Defining unique IDs."
     ):
         skyobj.read_fhd_catalog(catfile, expand_extended=True)
 
@@ -1935,13 +1934,12 @@ def test_fhd_catalog_reader_labeling_extended_sources():
     catfile = os.path.join(SKY_DATA_PATH, "extended_source_test.sav")
     skyobj = SkyModel()
     with pytest.warns(
-        UserWarning,
-        match="WARNING: Source IDs are not unique. Defining unique IDs."
+        UserWarning, match="WARNING: Source IDs are not unique. Defining unique IDs."
     ):
         skyobj.read_fhd_catalog(catfile, expand_extended=True)
 
-    assert skyobj.extended_model_group == ['0-1', '0-1', '0-1', '0-2', '0-2']
-    assert skyobj.name == ['0-1_1', '0-1_2', '0-1_3', '0-2_1', '0-2_2']
+    assert skyobj.extended_model_group == ["0-1", "0-1", "0-1", "0-2", "0-2"]
+    assert skyobj.name == ["0-1_1", "0-1_2", "0-1_3", "0-2_1", "0-2_2"]
 
 
 def test_point_catalog_reader():
