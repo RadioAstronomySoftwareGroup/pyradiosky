@@ -2640,7 +2640,7 @@ class SkyModel(UVBase):
             for repeat_id in unique_ids[np.where(counts > 1)[0]]:
                 fix_id_inds = np.where(ids == repeat_id)[0]
                 for append_val, id_ind in enumerate(fix_id_inds):
-                    ids[id_ind] = "{}{}".format(ids[id_ind], append_val + 1)
+                    ids[id_ind] = "{}-{}".format(ids[id_ind], append_val + 1)
 
         if expand_extended:
             ext_inds = np.where(
@@ -2665,7 +2665,7 @@ class SkyModel(UVBase):
                     Ncomps = len(src)
                     comp_ids = np.array(
                         [
-                            "{}-{}".format(source_id, comp_ind)
+                            "{}_{}".format(source_id, comp_ind)
                             for comp_ind in range(1, Ncomps + 1)
                         ]
                     )
