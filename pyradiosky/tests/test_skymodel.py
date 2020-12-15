@@ -1938,8 +1938,11 @@ def test_fhd_catalog_reader_labeling_extended_sources():
     ):
         skyobj.read_fhd_catalog(catfile, expand_extended=True)
 
-    assert skyobj.extended_model_group == ["0-1", "0-1", "0-1", "0-2", "0-2"]
-    assert skyobj.name == ["0-1_1", "0-1_2", "0-1_3", "0-2_1", "0-2_2"]
+    expected_ext_model_group = ["0-1", "0-1", "0-1", "0-2", "0-2"]
+    expected_name = ["0-1_1", "0-1_2", "0-1_3", "0-2_1", "0-2_2"]
+    for comp in range(len(expected_ext_model_group)):
+        assert skyobj.extended_model_group[comp] == expected_ext_model_group[comp]
+        assert skyobj.name[comp] == expected_name[comp]
 
 
 def test_point_catalog_reader():
