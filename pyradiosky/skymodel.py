@@ -2615,7 +2615,7 @@ class SkyModel(UVBase):
         source_freqs = catalog["freq"]
         spectral_index = catalog["alpha"]
         Nsrcs = len(catalog)
-        extended_model_group = np.full(Nsrcs, "", dtype=str)
+        extended_model_group = np.full(Nsrcs, "", dtype="<U10")
         if "BEAM" in catalog.dtype.names:
             use_beam_amps = True
             beam_amp = np.zeros((4, Nsrcs))
@@ -2638,7 +2638,7 @@ class SkyModel(UVBase):
             warnings.warn("WARNING: Source IDs are not unique. Defining unique IDs.")
             unique_ids, counts = np.unique(ids, return_counts=True)
             for repeat_id in unique_ids[np.where(counts > 1)[0]]:
-                fix_id_inds = np.where(ids == repeat_id)[0]
+                fix_id_inds = np.where(np.array(ids) == repeat_id)[0]
                 for append_val, id_ind in enumerate(fix_id_inds):
                     ids[id_ind] = "{}-{}".format(ids[id_ind], append_val + 1)
 
@@ -2647,21 +2647,21 @@ class SkyModel(UVBase):
                 [catalog["extend"][ind] is not None for ind in range(Nsrcs)]
             )[0]
             if len(ext_inds) > 0:  # Add components and preserve ordering
-                source_inds = np.array(range(Nsrcs))
-                for ext in ext_inds:
-                    use_index = np.where(source_inds == ext)[0][0]
-                    source_id = ids[use_index]
+                ext_source_ids = ids[ext_inds]
+                for source_ind, source_id in enumerate(ext_source_ids):
+                    print(source_id)
+                    use_index = np.where(ids == source_id)[0][0]
+                    catalog_index = ext_inds[source_ind]
                     # Remove top-level source information
-                    ids = np.delete(ids, ext)
-                    ra = np.delete(ra, ext)
-                    dec = np.delete(dec, ext)
-                    stokes = np.delete(stokes, ext, axis=1)
-                    source_freqs = np.delete(source_freqs, ext)
-                    spectral_index = np.delete(spectral_index, ext)
-                    source_inds = np.delete(source_inds, ext)
-                    extended_model_group = np.delete(extended_model_group, ext)
+                    ids = np.delete(ids, use_index)
+                    ra = np.delete(ra, use_index)
+                    dec = np.delete(dec, use_index)
+                    stokes = np.delete(stokes, use_index, axis=1)
+                    source_freqs = np.delete(source_freqs, use_index)
+                    spectral_index = np.delete(spectral_index, use_index)
+                    extended_model_group = np.delete(extended_model_group, use_index)
                     # Add component information
-                    src = catalog[ext]["extend"]
+                    src = catalog[catalog_index]["extend"]
                     Ncomps = len(src)
                     comp_ids = np.array(
                         [
@@ -2671,9 +2671,7 @@ class SkyModel(UVBase):
                     )
                     ids = np.insert(ids, use_index, comp_ids)
                     extended_model_group = np.insert(
-                        extended_model_group,
-                        use_index,
-                        np.full(Ncomps, source_id),
+                        extended_model_group, use_index, np.full(Ncomps, source_id)
                     )
                     ra = np.insert(ra, use_index, src["ra"])
                     dec = np.insert(dec, use_index, src["dec"])
@@ -2706,9 +2704,6 @@ class SkyModel(UVBase):
                         beam_amp = beam_amp_new
                     source_freqs = np.insert(source_freqs, use_index, src["freq"])
                     spectral_index = np.insert(spectral_index, use_index, src["alpha"])
-                    source_inds = np.insert(
-                        source_inds, use_index, np.full(Ncomps, ext)
-                    )
 
         ra = Longitude(ra, units.deg)
         dec = Latitude(dec, units.deg)
