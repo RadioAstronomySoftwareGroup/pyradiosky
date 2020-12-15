@@ -118,3 +118,19 @@ def test_astroquery_missing_error(tmp_path):
             match="The astroquery module required to use the download_gleam function.",
         ):
             skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=10)
+
+
+def test_jy_to_ksr():
+    Nfreqs = 200
+    freqs = np.linspace(100, 200, Nfreqs) * units.MHz
+
+    def jy2ksr_nonastropy(freq_arr):
+        c_cmps = 29979245800.0  # cm/s
+        k_boltz = 1.380658e-16  # erg/K
+        lam = c_cmps / freq_arr.to_value("Hz")  # cm
+        return 1e-23 * lam ** 2 / (2 * k_boltz)
+
+    conv0 = skyutils.jy_to_ksr(freqs)
+    conv1 = jy2ksr_nonastropy(freqs) * units.K * units.sr / units.Jy
+
+    assert np.allclose(conv0, conv1)
