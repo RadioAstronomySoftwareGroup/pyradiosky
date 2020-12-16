@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@master
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.0.0
