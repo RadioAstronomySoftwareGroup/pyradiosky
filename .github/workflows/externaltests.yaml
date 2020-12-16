@@ -5,6 +5,10 @@ jobs:
   pyuvsim:
     name: pyuvsim
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Adding -l {0} helps ensure conda can be found properly.
+        shell: bash -l {0}
     env:
       ENV_NAME: pyuvsim
       PYTHON: 3.7
@@ -13,23 +17,27 @@ jobs:
       - uses: actions/checkout@master
         with:
          fetch-depth: 1
-      - name: Get Miniconda Linux
-        run: |
-          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O $HOME/miniconda.sh;
-          bash $HOME/miniconda.sh -b -p $HOME/miniconda
 
-      - name: Setup paths
-        shell: bash
-        run: |
-          echo "$HOME/miniconda/bin" >> $GITHUB_PATH
-          echo "$HOME/miniconda/envs/test/bin" >> $GITHUB_PATH
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.0.0
+        with:
+          auto-update-conda: true
+          miniconda-version: "latest"
+          python-version: ${{ env.PYTHON }}
+          environment-file: ci/${{ env.ENV_NAME }}.yml
+          activate-environment: ${{ env.ENV_NAME }}
 
-      - name: Setup Environment
-        run: ./ci/install_conda.sh
+      - name: Conda Info
+        run: |
+          conda info -a
+          conda list
+          PYVER=`python -c "import sys; print('{:d}.{:d}'.format(sys.version_info.major, sys.version_info.minor))"`
+          if [[ $PYVER != ${{ env.PYTHON }} ]]; then
+            exit 1;
+          fi
 
       - name: run pyuvsim tests
         run: |
-          source activate $ENV_NAME
           pip install --no-deps .
           cd ../
           git clone https://github.com/RadioAstronomySoftwareGroup/pyuvsim.git
