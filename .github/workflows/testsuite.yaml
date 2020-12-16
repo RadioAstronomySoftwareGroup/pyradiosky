@@ -5,6 +5,10 @@ jobs:
   linter:
     name: Linter
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Adding -l {0} helps ensure conda can be found properly.
+        shell: bash -l {0}
     env:
       ENV_NAME: linting
       PYTHON: 3.7
@@ -13,23 +17,26 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Get Miniconda Linux
-        run: |
-          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O $HOME/miniconda.sh;
-          bash $HOME/miniconda.sh -b -p $HOME/miniconda
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.0.0
+        with:
+          auto-update-conda: true
+          miniconda-version: "latest"
+          python-version: ${{ env.PYTHON }}
+          environment-file: ci/${{ env.ENV_NAME }}.yml
+          activate-environment: ${{ env.ENV_NAME }}
 
-      - name: Setup paths
-        shell: bash
+      - name: Conda Info
         run: |
-          echo "$HOME/miniconda/bin" >> $GITHUB_PATH
-          echo "$HOME/miniconda/envs/test/bin" >> $GITHUB_PATH
-
-      - name: Setup Environment
-        run: ./ci/install_conda.sh
+          conda info -a
+          conda list
+          PYVER=`python -c "import sys; print('{:d}.{:d}'.format(sys.version_info.major, sys.version_info.minor))"`
+          if [[ $PYVER != ${{ env.PYTHON }} ]]; then
+            exit 1;
+          fi
 
       - name: Linting
         run: |
-          source activate $ENV_NAME
           pre-commit install
           pre-commit run -a
 
@@ -39,48 +46,46 @@ jobs:
       PYTHON: ${{ matrix.python-version }}
       OS: ${{ matrix.os }}
     name: Testing
-    #    needs: [linter]
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        # Adding -l {0} helps ensure conda can be found properly.
+        shell: bash -l {0}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        python-version: [3.6, 3.7, 3.8]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: [3.7, 3.8, 3.9]
     steps:
       - uses: actions/checkout@master
         with:
           fetch-depth: 1
 
-      - name: Get Miniconda MacOSX
-        if: matrix.os == 'macos-latest'
-        run: |
-          wget https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O $HOME/miniconda.sh;
-          bash $HOME/miniconda.sh -b -p $HOME/miniconda
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.0.0
+        with:
+          auto-update-conda: true
+          miniconda-version: "latest"
+          python-version: ${{ env.PYTHON }}
+          environment-file: ci/${{ env.ENV_NAME }}.yml
+          activate-environment: ${{ env.ENV_NAME }}
 
-      - name: Get Miniconda Linux
-        if: matrix.os == 'ubuntu-latest'
+      - name: Conda Info
         run: |
-          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O $HOME/miniconda.sh;
-          bash $HOME/miniconda.sh -b -p $HOME/miniconda
-
-      - name: Setup paths
-        shell: bash
-        run: |
-          echo "$HOME/miniconda/bin" >> $GITHUB_PATH
-          echo "$HOME/miniconda/envs/test/bin" >> $GITHUB_PATH
-
-      - name: Setup Environment
-        run: ./ci/install_conda.sh
+          conda info -a
+          conda list
+          PYVER=`python -c "import sys; print('{:d}.{:d}'.format(sys.version_info.major, sys.version_info.minor))"`
+          if [[ $PYVER != ${{ env.PYTHON }} ]]; then
+            exit 1;
+          fi
 
       - name: Install
         run: |
-          source activate $ENV_NAME
           pip install .
 
       - name: Run Tests
         run: |
-          source activate $ENV_NAME
-          python -m pytest -v --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml --junitxml=test-reports/xunit.xml
+          python -m pytest --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml --junitxml=test-reports/xunit.xml
 
       - uses: codecov/codecov-action@master
         if: matrix.os == 'ubuntu-latest' && success()
@@ -94,33 +99,39 @@ jobs:
       PYTHON: 3.7
     name: Min Deps Testing
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Adding -l {0} helps ensure conda can be found properly.
+        shell: bash -l {0}
     steps:
       - uses: actions/checkout@master
         with:
          fetch-depth: 1
 
-      - name: Get Miniconda Linux
-        run: |
-          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O $HOME/miniconda.sh;
-          bash $HOME/miniconda.sh -b -p $HOME/miniconda
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.0.0
+        with:
+          auto-update-conda: true
+          miniconda-version: "latest"
+          python-version: ${{ env.PYTHON }}
+          environment-file: ci/${{ env.ENV_NAME }}.yml
+          activate-environment: ${{ env.ENV_NAME }}
 
-      - name: Setup paths
-        shell: bash
+      - name: Conda Info
         run: |
-          echo "$HOME/miniconda/bin" >> $GITHUB_PATH
-          echo "$HOME/miniconda/envs/test/bin" >> $GITHUB_PATH
-
-      - name: Setup Environment
-        run: ./ci/install_conda.sh
+          conda info -a
+          conda list
+          PYVER=`python -c "import sys; print('{:d}.{:d}'.format(sys.version_info.major, sys.version_info.minor))"`
+          if [[ $PYVER != ${{ env.PYTHON }} ]]; then
+            exit 1;
+          fi
 
       - name: Install
         run: |
-          source activate ${ENV_NAME}
           pip install .
 
       - name: Run Tests
         run: |
-          source activate $ENV_NAME
           python -m pytest -v --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml --junitxml=test-reports/xunit.xml
 
       - uses: codecov/codecov-action@master
