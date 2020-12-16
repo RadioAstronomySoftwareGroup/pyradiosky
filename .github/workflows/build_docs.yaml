@@ -18,17 +18,13 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: debug
-        run: |
-          pwd
-
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.0.0
         with:
           auto-update-conda: true
           miniconda-version: "latest"
           python-version: ${{ env.PYTHON }}
-          environment-file: ci/${{ env.ENV_NAME }}.yml
+          environment-file: ci/${{ env.ENV_NAME }}.yaml
           activate-environment: ${{ env.ENV_NAME }}
 
       - name: Conda Info
