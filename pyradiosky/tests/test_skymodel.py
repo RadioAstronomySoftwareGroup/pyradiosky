@@ -281,10 +281,7 @@ def test_skymodel_init_errors(zenith_skycoord):
     # Check error cases
     with pytest.raises(
         ValueError,
-        match=(
-            "UVParameter _ra is not the appropriate type. Is: float64. "
-            "Should be: <class 'astropy.coordinates.angles.Longitude'>"
-        ),
+        match=("UVParameter _ra is not the appropriate type."),
     ):
         SkyModel(
             name="icrs_zen",
@@ -296,10 +293,7 @@ def test_skymodel_init_errors(zenith_skycoord):
 
     with pytest.raises(
         ValueError,
-        match=(
-            "UVParameter _dec is not the appropriate type. Is: float64. "
-            "Should be: <class 'astropy.coordinates.angles.Latitude'>"
-        ),
+        match=("UVParameter _dec is not the appropriate type."),
     ):
         SkyModel(
             name="icrs_zen",
