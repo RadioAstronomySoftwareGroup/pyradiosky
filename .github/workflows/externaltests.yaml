@@ -24,7 +24,7 @@ jobs:
           auto-update-conda: true
           miniconda-version: "latest"
           python-version: ${{ env.PYTHON }}
-          environment-file: ci/${{ env.ENV_NAME }}.yml
+          environment-file: ci/${{ env.ENV_NAME }}.yaml
           activate-environment: ${{ env.ENV_NAME }}
 
       - name: Conda Info
