@@ -10,3 +10,6 @@ dependencies:
   - pep517
   - pyuvdata>=2.1.3
   - setuptools_scm
+  - pip
+  - pip:
+     - pep517
