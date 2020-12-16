@@ -53,9 +53,9 @@ Required:
 
 * astropy>=4.0
 * h5py
-* numpy>=1.15
+* numpy
 * scipy>1.0.1
-* pyuvdata
+* pyuvdata>=2.1.3
 * setuptools_scm
 
 Optional:

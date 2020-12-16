@@ -13,7 +13,7 @@ dependencies:
   - psutil
   - pytest
   - pytest-runner
-  - pyuvdata
+  - pyuvdata>=2.1.3
   - pyyaml
   - scipy
   - setuptools_scm
