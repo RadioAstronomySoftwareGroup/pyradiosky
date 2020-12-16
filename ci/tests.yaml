@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - astropy>=4.0,<4.2
+  - astropy>=4.0
   - astropy-healpix
   - astroquery
   - h5py
@@ -13,7 +13,7 @@ dependencies:
   - coverage
   - pytest-cov
   - setuptools_scm
-  - pyuvdata>=2.0.1
+  - pyuvdata>=2.1.3
   - pip
   - pip:
       - lunarsky
