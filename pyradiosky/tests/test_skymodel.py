@@ -1819,7 +1819,7 @@ def test_read_deprecated_votable():
     with pytest.warns(
         DeprecationWarning,
         match=(
-            f"File {votable_file} contains tables with no name or ID, "
+            "contains tables with no name or ID, "
             "Support for such files is deprecated."
         ),
     ):
