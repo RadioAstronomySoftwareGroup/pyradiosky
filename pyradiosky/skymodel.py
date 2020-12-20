@@ -612,13 +612,6 @@ class SkyModel(UVBase):
             "above_horizon",
         ]
 
-    @property
-    def time_position_specific_params(self):
-        """Iterate defined parameters which are time & position specific."""
-        for key in self._time_position_params:
-            if hasattr(self, key):
-                yield getattr(self, key)
-
     def clear_time_position_specific_params(self):
         """Set  parameters which are time & position specific to None."""
         for param_name in self._time_position_params:
