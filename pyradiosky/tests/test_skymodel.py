@@ -1272,6 +1272,242 @@ def test_polarized_source_smooth_visibilities():
         assert np.all(imag_stokes == 0)
 
 
+@pytest.mark.parametrize(
+    "comp_type, spec_type",
+    [
+        ("point", "subband"),
+        ("point", "spectral_index"),
+        ("point", "flat"),
+        ("healpix", "full"),
+    ],
+)
+def test_concat(comp_type, spec_type, healpix_disk_new):
+    if comp_type == "point":
+        skyobj_full = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type=spec_type)
+    else:
+        skyobj_full = healpix_disk_new
+
+    # Add on optional parameters
+    # TODO: do something better when we have an FHD test file with these
+    # convert to strings when PR to make that change is in
+    skyobj_full.extended_model_group = np.arange(skyobj_full.Ncomponents)
+    skyobj_full.beam_amp = np.ones((4, skyobj_full.Nfreqs, skyobj_full.Ncomponents))
+
+    skyobj1 = skyobj_full.select(
+        component_inds=np.arange(skyobj_full.Ncomponents // 2), inplace=False
+    )
+    skyobj2 = skyobj_full.select(
+        component_inds=np.arange(skyobj_full.Ncomponents // 2, skyobj_full.Ncomponents),
+        inplace=False,
+    )
+    skyobj_new = skyobj1.concat(skyobj2, inplace=False)
+
+    assert skyobj_new.history != skyobj_full.history
+    expected_history = (
+        skyobj_full.history
+        + " Combined skymodels along the component axis using pyradiosky."
+    )
+    assert skyobj_new.history == expected_history
+
+    skyobj_new.history = skyobj_full.history
+    assert skyobj_new == skyobj_full
+
+
+@pytest.mark.parametrize(
+    "param", ["reference_frequency", "extended_model_group", "beam_amp"]
+)
+def test_concat_optional_params(param):
+    skyobj_full = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type="flat")
+
+    if param == "extended_model_group":
+        # TODO: do something better when we have an FHD test file with these
+        # convert to strings when PR to make that change is in
+        skyobj_full.extended_model_group = np.arange(
+            skyobj_full.Ncomponents
+        )  # .astype(str)
+    elif param == "beam_amp":
+        skyobj_full.beam_amp = np.ones((4, skyobj_full.Nfreqs, skyobj_full.Ncomponents))
+
+    assert getattr(skyobj_full, param) is not None
+
+    skyobj1 = skyobj_full.select(
+        component_inds=np.arange(skyobj_full.Ncomponents // 2), inplace=False
+    )
+    setattr(skyobj1, param, None)
+    skyobj2 = skyobj_full.select(
+        component_inds=np.arange(skyobj_full.Ncomponents // 2, skyobj_full.Ncomponents),
+        inplace=False,
+    )
+    with uvtest.check_warnings(UserWarning, f"This object does not have {param}"):
+        skyobj_new = skyobj1.concat(skyobj2, inplace=False)
+    assert getattr(skyobj_new, param) is not None
+    skyobj_new.history = skyobj_full.history
+
+    assert getattr(skyobj_new, "_" + param) != getattr(skyobj_full, "_" + param)
+    if param in ["reference_frequency", "extended_model_group"]:
+        assert np.allclose(
+            getattr(skyobj_new, param)[
+                skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
+            ],
+            getattr(skyobj_full, param)[
+                skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
+            ],
+        )
+    else:
+        assert np.allclose(
+            getattr(skyobj_new, param)[
+                :, :, skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
+            ],
+            getattr(skyobj_full, param)[
+                :, :, skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
+            ],
+        )
+    if param == "reference_frequency":
+        assert np.isnan(
+            getattr(skyobj_new, param)[: skyobj_full.Ncomponents // 2].value
+        ).all()
+    elif param == "extended_model_group":
+        assert np.all(getattr(skyobj_new, param)[: skyobj_full.Ncomponents // 2] == 0)
+    else:
+        assert np.isnan(
+            getattr(skyobj_new, param)[:, :, : skyobj_full.Ncomponents // 2]
+        ).all()
+    setattr(skyobj_new, param, getattr(skyobj_full, param))
+    assert skyobj_new == skyobj_full
+
+    # now test other order
+    skyobj1 = skyobj_full.select(
+        component_inds=np.arange(skyobj_full.Ncomponents // 2), inplace=False
+    )
+    setattr(skyobj2, param, None)
+    with uvtest.check_warnings(UserWarning, f"This object has {param}"):
+        skyobj_new = skyobj1.concat(skyobj2, inplace=False)
+    assert getattr(skyobj_new, param) is not None
+    skyobj_new.history = skyobj_full.history
+
+    assert getattr(skyobj_new, "_" + param) != getattr(skyobj_full, "_" + param)
+    if param in ["reference_frequency", "extended_model_group"]:
+        assert np.allclose(
+            getattr(skyobj_new, param)[: skyobj_full.Ncomponents // 2],
+            getattr(skyobj_full, param)[: skyobj_full.Ncomponents // 2],
+        )
+    else:
+        assert np.allclose(
+            getattr(skyobj_new, param)[:, :, : skyobj_full.Ncomponents // 2],
+            getattr(skyobj_full, param)[:, :, : skyobj_full.Ncomponents // 2],
+        )
+
+    if param == "reference_frequency":
+        assert np.isnan(
+            getattr(skyobj_new, param)[
+                skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
+            ].value
+        ).all()
+    elif param == "extended_model_group":
+        assert np.all(
+            getattr(skyobj_new, param)[
+                skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
+            ]
+            == 0
+        )
+    else:
+        assert np.isnan(
+            getattr(skyobj_new, param)[
+                :, :, skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
+            ]
+        ).all()
+    setattr(skyobj_new, param, getattr(skyobj_full, param))
+    assert skyobj_new == skyobj_full
+
+
+@pytest.mark.parametrize("comp_type", ["point", "healpix"])
+def test_concat_overlap_errors(comp_type, healpix_disk_new):
+    if comp_type == "point":
+        skyobj_full = SkyModel.from_gleam_catalog(GLEAM_vot)
+    else:
+        skyobj_full = healpix_disk_new
+
+    skyobj1 = skyobj_full.select(
+        component_inds=np.arange(skyobj_full.Ncomponents // 2), inplace=False
+    )
+    skyobj2 = skyobj_full.select(
+        component_inds=np.arange(skyobj_full.Ncomponents // 3, skyobj_full.Ncomponents),
+        inplace=False,
+    )
+    if comp_type == "point":
+        message = "The two SkyModel objects contain components with the same name."
+    else:
+        message = "The two SkyModel objects contain overlapping Healpix pixels."
+    with pytest.raises(ValueError, match=message):
+        skyobj1.concat(skyobj2)
+
+
+def test_concat_compatibility_errors(healpix_disk_new, time_location):
+    skyobj_gleam_subband = SkyModel.from_gleam_catalog(
+        GLEAM_vot, spectral_type="subband"
+    )
+    skyobj_gleam_specindex = SkyModel.from_gleam_catalog(
+        GLEAM_vot, spectral_type="spectral_index"
+    )
+    skyobj_hpx_disk = healpix_disk_new
+
+    with pytest.raises(ValueError, match="UVParameter component_type does not match. "):
+        skyobj_gleam_subband.concat("Only SkyModel")
+
+    with pytest.raises(ValueError, match="UVParameter component_type does not match. "):
+        skyobj_gleam_subband.concat(skyobj_hpx_disk)
+    with pytest.raises(ValueError, match="UVParameter spectral_type does not match. "):
+        skyobj_gleam_subband.concat(skyobj_gleam_specindex)
+
+    skyobj1 = skyobj_gleam_subband.select(
+        component_inds=np.arange(skyobj_gleam_subband.Ncomponents // 2), inplace=False
+    )
+    skyobj2 = skyobj_gleam_subband.select(
+        component_inds=np.arange(
+            skyobj_gleam_subband.Ncomponents // 2, skyobj_gleam_subband.Ncomponents
+        ),
+        inplace=False,
+    )
+    skyobj2.freq_array = skyobj2.freq_array * 2.0
+    with pytest.raises(ValueError, match="UVParameter freq_array does not match. "):
+        skyobj1.concat(skyobj2)
+
+    skyobj1 = skyobj_hpx_disk.select(
+        component_inds=np.arange(skyobj_hpx_disk.Ncomponents // 2), inplace=False
+    )
+    skyobj2 = skyobj_hpx_disk.select(
+        component_inds=np.arange(
+            skyobj_hpx_disk.Ncomponents // 2, skyobj_hpx_disk.Ncomponents
+        ),
+        inplace=False,
+    )
+    skyobj2.nside = skyobj2.nside * 2
+    with pytest.raises(ValueError, match="UVParameter nside does not match. "):
+        skyobj1.concat(skyobj2)
+
+    skyobj_hpx_disk.update_positions(*time_location)
+    skyobj1 = skyobj_hpx_disk.select(
+        component_inds=np.arange(skyobj_hpx_disk.Ncomponents // 2), inplace=False
+    )
+    skyobj2 = skyobj_hpx_disk.select(
+        component_inds=np.arange(
+            skyobj_hpx_disk.Ncomponents // 2, skyobj_hpx_disk.Ncomponents
+        ),
+        inplace=False,
+    )
+    skyobj2.update_positions(
+        time_location[0] + TimeDelta(1.0, format="jd"), time_location[1]
+    )
+    with pytest.raises(ValueError, match="UVParameter time does not match. "):
+        skyobj1.concat(skyobj2, clear_time_position=False)
+
+    # check it works with clear_time_position
+    skyobj1.concat(skyobj2, clear_time_position=True)
+    skyobj_hpx_disk.clear_time_position_specific_params()
+    skyobj1.history = skyobj_hpx_disk.history
+    assert skyobj1 == skyobj_hpx_disk
+
+
 @pytest.mark.filterwarnings("ignore:This method reads an old 'healvis' style healpix")
 def test_read_healpix_hdf5_old(healpix_data):
     m = np.arange(healpix_data["npix"])
