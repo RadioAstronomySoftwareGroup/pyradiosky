@@ -213,7 +213,7 @@ class SkyModel(UVBase):
         )
         self._Nfreqs = UVParameter("Nfreqs", description=desc, expected_type=int)
 
-        desc = "Right ascension of components in ICRS coordinates."
+        desc = "Right ascension of components in ICRS coordinates. shape (Ncomponents,)"
         self._ra = UVParameter(
             "ra",
             description=desc,
@@ -222,7 +222,7 @@ class SkyModel(UVBase):
             tols=angle_tol,
         )
 
-        desc = "Declination of components in ICRS coordinates."
+        desc = "Declination of components in ICRS coordinates. shape (Ncomponents,)"
         self._dec = UVParameter(
             "dec",
             description=desc,
@@ -246,7 +246,7 @@ class SkyModel(UVBase):
             acceptable_vals=["healpix", "point"],
         )
 
-        desc = "Component name, not required for HEALPix maps."
+        desc = "Component name, not required for HEALPix maps. shape (Ncomponents,)"
         self._name = UVParameter(
             "name",
             description=desc,
@@ -263,7 +263,7 @@ class SkyModel(UVBase):
             required=False,
         )
 
-        desc = "Healpix index, only reqired for HEALPix maps."
+        desc = "Healpix index, only reqired for HEALPix maps. shape (Ncomponents,)"
         self._hpx_inds = UVParameter(
             "hpx_inds",
             description=desc,
@@ -282,7 +282,10 @@ class SkyModel(UVBase):
             tols=self.freq_tol,
         )
 
-        desc = "Reference frequency in Hz, only required if spectral_type is 'spectral_index'."
+        desc = (
+            "Reference frequency in Hz, only required if spectral_type is "
+            "'spectral_index'. shape (Ncomponents,)"
+        )
         self._reference_frequency = UVParameter(
             "reference_frequency",
             description=desc,
@@ -320,7 +323,7 @@ class SkyModel(UVBase):
         # The coherency is a 2x2 matrix giving electric field correlation in Jy
         self._coherency_radec = UVParameter(
             "coherency_radec",
-            description="Ra/Dec coherency per component",
+            description="Ra/Dec coherency per component. shape (2, 2, Nfreqs, Ncomponents,) ",
             form=(2, 2, "Nfreqs", "Ncomponents"),
             expected_type=Quantity,
         )
@@ -338,7 +341,8 @@ class SkyModel(UVBase):
 
         self._spectral_index = UVParameter(
             "spectral_index",
-            description="Spectral indexm only required if spectral_type is 'spectral_index'.",
+            description="Spectral index only required if spectral_type is "
+            "'spectral_index'. shape (Ncomponents,)",
             form=("Ncomponents",),
             expected_type=float,
             required=False,
@@ -348,7 +352,7 @@ class SkyModel(UVBase):
             "beam_amp",
             description=(
                 "Beam amplitude at the source position as a function "
-                "of instrument polarization and frequency."
+                "of instrument polarization and frequency. shape (4, Nfreqs, Ncomponents)"
             ),
             form=(4, "Nfreqs", "Ncomponents"),
             expected_type=float,
@@ -359,7 +363,7 @@ class SkyModel(UVBase):
             "extended_model_group",
             description=(
                 "Identifier that groups components of an extended "
-                "source model. Set to an empty string for point sources."
+                "source model. Set to an empty string for point sources. shape (Ncomponents,)"
             ),
             form=("Ncomponents",),
             expected_type=str,
@@ -388,7 +392,7 @@ class SkyModel(UVBase):
         if hasmoon:
             self._telescope_location.expected_type = (EarthLocation, MoonLocation)
 
-        desc = "Altitude and Azimuth of components in local coordinates."
+        desc = "Altitude and Azimuth of components in local coordinates. shape (2, Ncomponents)"
         self._alt_az = UVParameter(
             "alt_az",
             description=desc,
@@ -398,7 +402,7 @@ class SkyModel(UVBase):
             required=False,
         )
 
-        desc = "Position cosines of components in local coordinates."
+        desc = "Position cosines of components in local coordinates. shape (3, Ncomponents)"
         self._pos_lmn = UVParameter(
             "pos_lmn",
             description=desc,
@@ -411,7 +415,7 @@ class SkyModel(UVBase):
         desc = (
             "Boolean indicator of whether this source is above the horizon "
             "at the current time and location. "
-            "True indicates the source is above the horizon."
+            "True indicates the source is above the horizon. shape (Ncomponents,)"
         )
         self._above_horizon = UVParameter(
             "above_horizon",
@@ -695,6 +699,29 @@ class SkyModel(UVBase):
         )
 
         self._set_spectral_type_params(spectral_type)
+
+    @property
+    def _time_position_params(self):
+        """List of strings giving the time & position specific parameters."""
+        return [
+            "time",
+            "telescope_location",
+            "alt_az",
+            "pos_lmn",
+            "above_horizon",
+        ]
+
+    @property
+    def time_position_specific_params(self):
+        """Iterate defined parameters which are time & position specific."""
+        for key in self._time_position_params:
+            if hasattr(self, key):
+                yield getattr(self, key)
+
+    def clear_time_position_specific_params(self):
+        """Set  parameters which are time & position specific to None."""
+        for param_name in self._time_position_params:
+            setattr(self, param_name, None)
 
     def check(self, check_extra=True, run_check_acceptability=True):
         """
@@ -1379,6 +1406,260 @@ class SkyModel(UVBase):
                 )
 
         return coherency_local
+
+    def concat(
+        self,
+        other,
+        clear_time_position=True,
+        inplace=True,
+        run_check=True,
+        check_extra=True,
+        run_check_acceptability=True,
+    ):
+        """
+        Combine two SkyModel objects along source axis.
+
+        Parameters
+        ----------
+        other : SkyModel object
+            Another SkyModel object which will be concatenated with self.
+        inplace : bool
+            If True, overwrite self as we go, otherwise create a third object
+            as the sum of the two.
+        clear_time_position : bool
+            Option to clear time and position dependent parameters on both objects
+            before concatenation. If False, time and position dependent parameters
+            must match on both objects.
+        run_check : bool
+            Option to check for the existence and proper shapes of parameters
+            after combining objects.
+        check_extra : bool
+            Option to check optional parameters as well as required ones.
+        run_check_acceptability : bool
+            Option to check acceptable range of the values of parameters after
+            combining objects.
+
+        Raises
+        ------
+        ValueError
+            If other is not a SkyModel object, self and other are not compatible
+            or if data in self and other overlap. One way they can not be
+            compatible is if they have different spectral_types.
+
+        """
+        if inplace:
+            this = self
+        else:
+            this = self.copy()
+
+        # Check that both objects are SkyModel and valid
+        this.check(
+            check_extra=check_extra,
+            run_check_acceptability=run_check_acceptability,
+        )
+        if not issubclass(other.__class__, this.__class__):
+            if not issubclass(this.__class__, other.__class__):
+                raise ValueError(
+                    "Only SkyModel (or subclass) objects can be "
+                    "added to a SkyModel (or subclass) object"
+                )
+        other.check(
+            check_extra=check_extra,
+            run_check_acceptability=run_check_acceptability,
+        )
+
+        # Define parameters that must be the same to add objects
+        compatibility_params = [
+            "_component_type",
+            "_spectral_type",
+        ]
+
+        if this.spectral_type in ["subband", "full"]:
+            compatibility_params.append("_freq_array")
+
+        if this.component_type == "healpix":
+            compatibility_params.append("_nside")
+
+        time_pos_params = ["_" + name for name in this._time_position_params]
+        if clear_time_position:
+            # clear time & position specific parameters on both objects
+            this.clear_time_position_specific_params()
+            other.clear_time_position_specific_params()
+        else:
+            compatibility_params.extend(time_pos_params)
+
+        # check compatibility parameters
+        for param in compatibility_params:
+            params_match = getattr(this, param) == getattr(other, param)
+            if not params_match:
+                msg = (
+                    "UVParameter " + param[1:] + " does not match. "
+                    "Cannot combine objects."
+                )
+                if param in time_pos_params:
+                    msg += (
+                        " Set the clear_time_position keyword to True to set this and"
+                        " other time and position dependent metadata to None to allow"
+                        " the concatenation to proceed. Time and position dependent"
+                        " metadata can be set afterwards using the update_positions"
+                        " method."
+                    )
+                raise ValueError(msg)
+
+        # check for non-overlapping names or healpix inds
+        if this.component_type == "healpix":
+            if np.intersect1d(this.hpx_inds, other.hpx_inds).size > 0:
+                raise ValueError(
+                    "The two SkyModel objects contain overlapping Healpix pixels."
+                )
+            this.hpx_inds = np.concatenate((this.hpx_inds, other.hpx_inds))
+        else:
+            if np.intersect1d(this.name, other.name).size > 0:
+                raise ValueError(
+                    "The two SkyModel objects contain components with the same name."
+                )
+            this.name = np.concatenate((this.name, other.name))
+
+        this.ra = np.concatenate((this.ra, other.ra))
+        this.dec = np.concatenate((this.dec, other.dec))
+        this.stokes = np.concatenate((this.stokes, other.stokes), axis=2)
+        this.coherency_radec = np.concatenate(
+            (this.coherency_radec, other.coherency_radec), axis=3
+        )
+        if this.spectral_type == "spectral_index":
+            this.reference_frequency = np.concatenate(
+                (this.reference_frequency, other.reference_frequency)
+            )
+            this.spectral_index = np.concatenate(
+                (this.spectral_index, other.spectral_index)
+            )
+        elif this.spectral_type == "flat":
+            if (
+                this.reference_frequency is not None
+                and other.reference_frequency is not None
+            ):
+                this.reference_frequency = np.concatenate(
+                    (this.reference_frequency, other.reference_frequency)
+                )
+            elif this.reference_frequency is not None:
+                warnings.warn(
+                    "This object has reference_frequency values, other object does not. "
+                    "Filling missing values with NaNs."
+                )
+                this.reference_frequency = np.concatenate(
+                    (
+                        this.reference_frequency,
+                        np.full(
+                            other.Ncomponents,
+                            None,
+                            dtype=this.reference_frequency.dtype,
+                        ),
+                    )
+                )
+            elif other.reference_frequency is not None:
+                warnings.warn(
+                    "This object does not have reference_frequency values, other object does. "
+                    "Filling missing values with NaNs."
+                )
+                this.reference_frequency = np.concatenate(
+                    (
+                        np.full(
+                            this.Ncomponents,
+                            None,
+                            dtype=other.reference_frequency.dtype,
+                        ),
+                        other.reference_frequency,
+                    )
+                )
+
+        if (
+            this.extended_model_group is not None
+            and other.extended_model_group is not None
+        ):
+            this.extended_model_group = np.concatenate(
+                (this.extended_model_group, other.extended_model_group)
+            )
+        elif this.extended_model_group is not None:
+            # TODO convert to empty string (rather than zero) when PR to change to strings is in
+            warnings.warn(
+                "This object has extended_model_group values, other object does not. "
+                "Filling missing values with zeros."
+            )
+            this.extended_model_group = np.concatenate(
+                (
+                    this.extended_model_group,
+                    np.full(
+                        other.Ncomponents, 0, dtype=this.extended_model_group.dtype
+                    ),
+                )
+            )
+        elif other.extended_model_group is not None:
+            # TODO convert to empty string (rather than zero) when PR to change to strings is in
+            warnings.warn(
+                "This object does not have extended_model_group values, other object does. "
+                "Filling missing values with zeros."
+            )
+            this.extended_model_group = np.concatenate(
+                (
+                    np.full(
+                        this.Ncomponents, 0, dtype=other.extended_model_group.dtype
+                    ),
+                    other.extended_model_group,
+                )
+            )
+
+        if this.beam_amp is not None and other.beam_amp is not None:
+            this.beam_amp = np.concatenate((this.beam_amp, other.beam_amp), axis=2)
+        elif this.beam_amp is not None:
+            warnings.warn(
+                "This object has beam_amp values, other object does not. "
+                "Filling missing values with NaNs."
+            )
+            this.beam_amp = np.concatenate(
+                (
+                    this.beam_amp,
+                    np.full(
+                        (4, other.Nfreqs, other.Ncomponents),
+                        None,
+                        dtype=this.beam_amp.dtype,
+                    ),
+                ),
+                axis=2,
+            )
+        elif other.beam_amp is not None:
+            warnings.warn(
+                "This object does not have beam_amp values, other object does. "
+                "Filling missing values with NaNs."
+            )
+            this.beam_amp = np.concatenate(
+                (
+                    np.full(
+                        (4, other.Nfreqs, other.Ncomponents),
+                        None,
+                        dtype=other.beam_amp.dtype,
+                    ),
+                    other.beam_amp,
+                ),
+                axis=2,
+            )
+        this.Ncomponents = this.Ncomponents + other.Ncomponents
+
+        history_update_string = (
+            " Combined skymodels along the component axis using pyradiosky."
+        )
+        this.history += history_update_string
+
+        this.history = uvutils._combine_histories(this.history, other.history)
+
+        # Check final object is self-consistent
+        if run_check:
+            this.check(
+                check_extra=check_extra,
+                run_check_acceptability=run_check_acceptability,
+            )
+
+        if not inplace:
+            return this
 
     def select(
         self,
