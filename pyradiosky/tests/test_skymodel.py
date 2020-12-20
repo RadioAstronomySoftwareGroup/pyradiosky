@@ -1144,8 +1144,8 @@ def test_concat_compatibility_errors(healpix_disk_new, time_location):
     )
     skyobj_hpx_disk = healpix_disk_new
 
-    with pytest.raises(ValueError, match="UVParameter component_type does not match. "):
-        skyobj_gleam_subband.concat("Only SkyModel")
+    with pytest.raises(ValueError, match="Only SkyModel"):
+        skyobj_gleam_subband.concat("foo")
 
     with pytest.raises(ValueError, match="UVParameter component_type does not match. "):
         skyobj_gleam_subband.concat(skyobj_hpx_disk)
