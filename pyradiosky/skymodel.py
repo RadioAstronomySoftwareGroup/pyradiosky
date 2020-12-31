@@ -471,13 +471,48 @@ class SkyModel(UVBase):
             else:
                 self.name = np.atleast_1d(name)
                 self.Ncomponents = self.name.size
+                if isinstance(ra, (list)):
+                    # Cannot just try converting to Longitude because if the values are
+                    # Latitudes they are silently converted to Longitude rather than
+                    # throwing an error.
+                    for val in ra:
+                        if not isinstance(val, (Longitude)):
+                            raise ValueError(
+                                "All values in ra must be Longitude objects"
+                            )
+                    ra = Longitude(ra)
                 self.ra = np.atleast_1d(ra)
+                if isinstance(dec, (list)):
+                    # Cannot just try converting to Latitude because if the values are
+                    # Longitude they are silently converted to Longitude rather than
+                    # throwing an error.
+                    for val in dec:
+                        if not isinstance(val, (Latitude)):
+                            raise ValueError(
+                                "All values in dec must be Latitude objects"
+                            )
+                    dec = Latitude(dec)
                 self.dec = np.atleast_1d(dec)
 
             self._set_spectral_type_params(spectral_type)
 
             if freq_array is not None:
-                if not isinstance(freq_array, (Quantity,)):
+                if isinstance(freq_array, (list)):
+                    # try just converting the list to a Quantity. This will work if all
+                    # the elements are Quantities with compatible units or if all the
+                    # elements are just numeric (in which case the units will be "").
+                    warnings.warn(
+                        "freq_array is a list. Attempting to convert to a Quantity.",
+                    )
+                    try:
+                        freq_array = Quantity(freq_array)
+                    except (TypeError):
+                        raise ValueError(
+                            "If freq_array is supplied as a list, all the elements must be "
+                            "Quantity objects with compatible units."
+                        )
+                if not isinstance(freq_array, (Quantity,)) or freq_array.unit == "":
+                    # This catches arrays or lists that have all numeric types
                     warnings.warn(
                         "In version 0.2.0, the freq_array will be required to be an "
                         "astropy Quantity with units that are convertable to Hz. "
@@ -491,7 +526,25 @@ class SkyModel(UVBase):
                 self.Nfreqs = 1
 
             if reference_frequency is not None:
-                if not isinstance(reference_frequency, (Quantity,)):
+                if isinstance(reference_frequency, (list)):
+                    # try just converting the list to a Quantity. This will work if all
+                    # the elements are Quantities with compatible units or if all the
+                    # elements are just numeric (in which case the units will be "").
+                    warnings.warn(
+                        "reference_frequency is a list. Attempting to convert to a Quantity.",
+                    )
+                    try:
+                        reference_frequency = Quantity(reference_frequency)
+                    except (TypeError):
+                        raise ValueError(
+                            "If reference_frequency is supplied as a list, all the elements must be "
+                            "Quantity objects with compatible units."
+                        )
+                if (
+                    not isinstance(reference_frequency, (Quantity,))
+                    or reference_frequency.unit == ""
+                ):
+                    # This catches arrays or lists that have all numeric types
                     warnings.warn(
                         "In version 0.2.0, the reference_frequency will be required to be an "
                         "astropy Quantity with units that are convertable to Hz. "
@@ -513,7 +566,30 @@ class SkyModel(UVBase):
 
             if isinstance(stokes, Quantity):
                 self.stokes = stokes
-            else:
+            elif isinstance(stokes, list):
+                # try just converting the list to a Quantity. This will work if all
+                # the elements are Quantities with compatible units.
+                warnings.warn(
+                    "stokes is a list. Attempting to convert to a Quantity.",
+                )
+                try:
+                    # if some are Quantities and some are floats, this can strip
+                    # the units from the Quantities (I guess because it's a nested list?).
+                    # Check that next.
+                    stokes = Quantity(stokes)
+                except (TypeError):
+                    raise ValueError(
+                        "If stokes is supplied as a list, all the elements must be "
+                        "Quantity objects with compatible units."
+                    )
+                if stokes.unit == "":
+                    raise ValueError(
+                        "If stokes is supplied as a list, all the elements must be "
+                        "Quantity objects with compatible units."
+                    )
+                self.stokes = stokes
+            if self.stokes is None:
+                # this catches stokes supplied as a numpy array
                 warnings.warn(
                     "In version 0.2.0, stokes will be required to be an astropy "
                     f"Quantity with units that are convertable to one of {allowed_units}. "
