@@ -12,6 +12,7 @@
 - Changed `extended_model_group` in `read_fhd_catalog` to match the parent source name.
 
 ### Fixed
+- Improved handling of lists passed to `SkyModel.__init__`.
 - A bug in the `download_gleam` utility method that caused missing columns for the
     `subband` spectral type
 - Enabled subselecting to a given tolerance in at_frequencies (for `full` spectral type).
