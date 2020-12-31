@@ -4,6 +4,7 @@
 
 import os
 import fileinput
+import re
 
 import h5py
 import pytest
@@ -21,7 +22,7 @@ from astropy.coordinates import (
 )
 from astropy.time import Time, TimeDelta
 import scipy.io
-
+import pyuvdata.tests as uvtest
 
 from pyradiosky.data import DATA_PATH as SKY_DATA_PATH
 from pyradiosky import utils as skyutils
@@ -272,6 +273,243 @@ def test_source_zenith(time_location, zenith_skymodel):
     assert np.allclose(zenith_source_lmn, np.array([0, 0, 1]))
 
 
+@pytest.mark.parametrize(
+    "spec_type, param",
+    [
+        ("flat", "ra"),
+        ("flat", "dec"),
+        ("spectral_index", "reference_frequency"),
+        ("subband", "freq_array"),
+    ],
+)
+def test_init_lists(spec_type, param, zenith_skycoord):
+    icrs_coord = zenith_skycoord
+
+    ras = Longitude(
+        [zenith_skycoord.ra + Longitude(0.5 * ind * units.deg) for ind in range(5)]
+    )
+    decs = Latitude(np.zeros(5, dtype=np.float) + icrs_coord.dec.value * units.deg)
+    names = ["src_" + str(ind) for ind in range(5)]
+
+    if spec_type in ["subband", "full"]:
+        n_freqs = 3
+        freq_array = [100e6, 120e6, 140e6] * units.Hz
+    else:
+        n_freqs = 1
+        freq_array = None
+
+    stokes = np.zeros((4, n_freqs, 5), dtype=np.float) * units.Jy
+    stokes[0, :, :] = 1 * units.Jy
+
+    assert not isinstance(stokes, list)
+
+    if spec_type == "spectral_index":
+        ref_freqs = np.zeros(5, dtype=np.float) + 150e6 * units.Hz
+        spec_index = np.zeros(5, dtype=np.float) - 0.8
+    else:
+        ref_freqs = None
+        spec_index = None
+
+    ref_model = SkyModel(
+        name=names,
+        ra=ras,
+        dec=decs,
+        stokes=stokes,
+        reference_frequency=ref_freqs,
+        spectral_index=spec_index,
+        freq_array=freq_array,
+        spectral_type=spec_type,
+    )
+
+    if param == "ra":
+        ras = list(ras)
+    elif param == "dec":
+        decs = list(decs)
+    elif param == "reference_frequency":
+        ref_freqs = list(ref_freqs)
+    elif param == "freq_array":
+        freq_array = list(freq_array)
+
+    list_model = SkyModel(
+        name=names,
+        ra=ras,
+        dec=decs,
+        stokes=stokes,
+        reference_frequency=ref_freqs,
+        spectral_index=spec_index,
+        freq_array=freq_array,
+        spectral_type=spec_type,
+    )
+
+    assert ref_model == list_model
+
+
+@pytest.mark.parametrize(
+    "spec_type, param, msg",
+    [
+        ("flat", "ra", "All values in ra must be Longitude objects"),
+        ("flat", "ra_lat", "All values in ra must be Longitude objects"),
+        ("flat", "dec", "All values in dec must be Latitude objects"),
+        ("flat", "dec_lon", "All values in dec must be Latitude objects"),
+        (
+            "flat",
+            "stokes",
+            "If stokes is supplied as a list, all the elements must be Quantity objects with compatible units.",
+        ),
+        (
+            "flat",
+            "stokes_hz",
+            re.escape(
+                "'Hz' (frequency) and 'Jy' (spectral flux density) are not convertible"
+            ),
+        ),
+        (
+            "flat",
+            "stokes_obj",
+            "If stokes is supplied as a list, all the elements must be Quantity "
+            "objects with compatible units.",
+        ),
+        (
+            "spectral_index",
+            "reference_frequency",
+            "If reference_frequency is supplied as a list, all the elements must be Quantity objects with compatible units.",
+        ),
+        (
+            "spectral_index",
+            "reference_frequency_jy",
+            re.escape(
+                "'Jy' (spectral flux density) and 'Hz' (frequency) are not convertible"
+            ),
+        ),
+        (
+            "spectral_index",
+            "reference_frequency_obj",
+            "If reference_frequency is supplied as a list, all the elements must be Quantity objects with compatible units.",
+        ),
+        (
+            "subband",
+            "freq_array",
+            "If freq_array is supplied as a list, all the elements must be Quantity "
+            "objects with compatible units.",
+        ),
+        (
+            "subband",
+            "freq_array_ang",
+            re.escape("'deg' (angle) and 'Hz' (frequency) are not convertible"),
+        ),
+        (
+            "subband",
+            "freq_array_obj",
+            "If freq_array is supplied as a list, all the elements must be Quantity "
+            "objects with compatible units.",
+        ),
+    ],
+)
+def test_init_lists_errors(spec_type, param, msg, zenith_skycoord):
+    icrs_coord = zenith_skycoord
+
+    ras = Longitude(
+        [zenith_skycoord.ra + Longitude(0.5 * ind * units.deg) for ind in range(5)]
+    )
+    decs = Latitude(np.zeros(5, dtype=np.float) + icrs_coord.dec.value * units.deg)
+    names = ["src_" + str(ind) for ind in range(5)]
+
+    if spec_type in ["subband", "full"]:
+        n_freqs = 3
+        freq_array = [100e6, 120e6, 140e6] * units.Hz
+    else:
+        n_freqs = 1
+        freq_array = None
+
+    stokes = np.zeros((4, n_freqs, 5), dtype=np.float) * units.Jy
+    stokes[0, :, :] = 1.0 * units.Jy
+
+    if spec_type == "spectral_index":
+        ref_freqs = np.zeros(5, dtype=np.float) + 150e6 * units.Hz
+        spec_index = np.zeros(5, dtype=np.float) - 0.8
+    else:
+        ref_freqs = None
+        spec_index = None
+
+    list_warning = None
+    if "stokes" in param:
+        list_warning = "stokes is a list. Attempting to convert to a Quantity."
+        warn_type = UserWarning
+    elif "freq_array" in param:
+        list_warning = "freq_array is a list. Attempting to convert to a Quantity."
+        warn_type = UserWarning
+    elif "reference_frequency" in param:
+        list_warning = (
+            "reference_frequency is a list. Attempting to convert to a Quantity."
+        )
+        warn_type = UserWarning
+
+    if param == "ra":
+        ras = list(ras)
+        ras[1] = ras[1].value
+    elif param == "ra_lat":
+        ras = list(ras)
+        ras[1] = decs[1]
+    elif param == "dec":
+        decs = list(decs)
+        decs[1] = decs[1].value
+    elif param == "dec_lon":
+        decs = list(decs)
+        decs[1] = ras[1]
+    elif param == "reference_frequency":
+        ref_freqs = list(ref_freqs)
+        ref_freqs[1] = ref_freqs[1].value
+    elif param == "reference_frequency_jy":
+        ref_freqs = list(ref_freqs)
+        ref_freqs[1] = ref_freqs[1].value * units.Jy
+    elif param == "reference_frequency_obj":
+        ref_freqs = list(ref_freqs)
+        ref_freqs[1] = icrs_coord
+    elif param == "freq_array":
+        freq_array = list(freq_array)
+        freq_array[1] = freq_array[1].value
+    elif param == "freq_array_ang":
+        freq_array = list(freq_array)
+        freq_array[1] = ras[1]
+    elif param == "freq_array_obj":
+        freq_array = list(freq_array)
+        freq_array[1] = icrs_coord
+    elif param == "stokes":
+        stokes = list(stokes)
+        stokes[1] = stokes[1].value.tolist()
+    elif param == "stokes_hz":
+        stokes = list(stokes)
+        stokes[1] = stokes[1].value * units.Hz
+    elif param == "stokes_obj":
+        stokes = list(stokes)
+        stokes[1] = [icrs_coord] * 5
+
+    with pytest.raises(ValueError, match=msg):
+        if list_warning is not None:
+            with uvtest.check_warnings(warn_type, match=list_warning):
+                SkyModel(
+                    name=names,
+                    ra=ras,
+                    dec=decs,
+                    stokes=stokes,
+                    reference_frequency=ref_freqs,
+                    spectral_index=spec_index,
+                    freq_array=freq_array,
+                    spectral_type=spec_type,
+                )
+        else:
+            SkyModel(
+                name=names,
+                ra=ras,
+                dec=decs,
+                stokes=stokes,
+                reference_frequency=ref_freqs,
+                spectral_index=spec_index,
+                freq_array=freq_array,
+                spectral_type=spec_type,
+            )
+
+
 def test_skymodel_init_errors(zenith_skycoord):
     icrs_coord = zenith_skycoord
 
@@ -394,6 +632,7 @@ def test_skymodel_deprecated(time_location):
         )
     assert source_new == source_old
 
+    # test numpy array for reference_frequency
     with pytest.warns(
         DeprecationWarning,
         match="In version 0.2.0, the reference_frequency will be required to be an astropy Quantity",
@@ -408,6 +647,21 @@ def test_skymodel_deprecated(time_location):
         )
     assert source_new == source_old
 
+    # test list of floats for reference_frequency
+    with pytest.warns(
+        DeprecationWarning,
+        match="In version 0.2.0, the reference_frequency will be required to be an astropy Quantity",
+    ):
+        source_old = SkyModel(
+            name="Test",
+            ra=Longitude(12.0 * units.hr),
+            dec=Latitude(-30.0 * units.deg),
+            stokes=[1.0, 0.0, 0.0, 0.0] * units.Jy,
+            spectral_type="flat",
+            reference_frequency=[1e8],
+        )
+    assert source_new == source_old
+
     with pytest.warns(
         DeprecationWarning,
         match="In version 0.2.0, stokes will be required to be an astropy "
@@ -417,7 +671,7 @@ def test_skymodel_deprecated(time_location):
             name="Test",
             ra=Longitude(12.0 * units.hr),
             dec=Latitude(-30.0 * units.deg),
-            stokes=[1.0, 0.0, 0.0, 0.0],
+            stokes=np.asarray([1.0, 0.0, 0.0, 0.0]),
             spectral_type="flat",
             reference_frequency=np.array([1e8]) * units.Hz,
         )
@@ -492,6 +746,7 @@ def test_skymodel_deprecated(time_location):
         )
     assert source_new == source_old
 
+    # test numpy array for freq_array
     with pytest.warns(
         DeprecationWarning,
         match="In version 0.2.0, the freq_array will be required to be an astropy Quantity",
@@ -503,6 +758,21 @@ def test_skymodel_deprecated(time_location):
             stokes=stokes,
             spectral_type="subband",
             freq_array=np.array([1e8, 1.5e8]),
+        )
+    assert source_new == source_old
+
+    # test list of floats for freq_array
+    with pytest.warns(
+        DeprecationWarning,
+        match="In version 0.2.0, the freq_array will be required to be an astropy Quantity",
+    ):
+        source_old = SkyModel(
+            name="Test",
+            ra=Longitude(12.0 * units.hr),
+            dec=Latitude(-30.0 * units.deg),
+            stokes=stokes,
+            spectral_type="subband",
+            freq_array=[1e8, 1.5e8],
         )
     assert source_new == source_old
 
