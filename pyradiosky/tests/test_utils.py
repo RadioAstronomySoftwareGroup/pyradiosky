@@ -134,3 +134,19 @@ def test_jy_to_ksr():
     conv1 = jy2ksr_nonastropy(freqs) * units.K * units.sr / units.Jy
 
     assert np.allclose(conv0, conv1)
+    
+    
+def test_modified_gleam():
+    
+    #if file is not present in that directory
+    skyutils.modified_gleam('testgleam.dat')
+    
+    #if file is present in the directory
+    cat1 = skyutils.modified_gleam('gleamegc.dat')
+    cat2 = skyutils.modified_gleam('gleamegc.dat',fill_blank=True)
+    cat3 = skyutils.modified_gleam('gleamegc.dat',fill_blank=True, add_peeled_sources=True)
+    
+    assert len(cat2) > len(cat1)
+    
+    #9 is added peeled source
+    assert len(cat3) - len(cat2) == 9                      
