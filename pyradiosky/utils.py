@@ -2,7 +2,7 @@
 # Copyright (c) 2019 Radio Astronomy Software Group
 # Licensed under the 3-clause BSD License
 """Utility methods."""
-import os, sys
+import os
 import warnings
 import copy
 
