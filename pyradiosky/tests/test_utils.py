@@ -139,12 +139,13 @@ def test_jy_to_ksr():
 def test_modified_gleam():
     
     #if file is not present in that directory
-    skyutils.modified_gleam('testgleam.dat')
-    
+    with pytest.raises(ValueError, match="File not found"):
+        skyutils.modified_gleam('testgleam.dat')
+  
     #if file is present in the directory
-    cat1 = skyutils.modified_gleam('gleamegc.dat')
-    cat2 = skyutils.modified_gleam('gleamegc.dat',fill_blank=True)
-    cat3 = skyutils.modified_gleam('gleamegc.dat',fill_blank=True, add_peeled_sources=True)
+    cat1 = skyutils.modified_gleam('pyradiosky/data/cat_mock.dat')
+    cat2 = skyutils.modified_gleam('pyradiosky/data/cat_mock.dat',fill_blank=True, nside=8)
+    cat3 = skyutils.modified_gleam('pyradiosky/data/cat_mock.dat',fill_blank=True, nside=8, add_peeled_sources=True)
     
     assert len(cat2) > len(cat1)
     
