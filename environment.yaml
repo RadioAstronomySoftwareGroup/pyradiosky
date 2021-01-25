@@ -18,5 +18,6 @@ dependencies:
   - scipy
   - setuptools_scm
   - sphinx
+  - healpy
   - pip:
       - lunarsky
