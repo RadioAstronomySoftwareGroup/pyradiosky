@@ -1939,6 +1939,51 @@ def test_fhd_catalog_reader_extended_sources():
     assert skyobj.Ncomponents == len(catalog) - len(ext_inds) + sum(ext_Ncomps)
 
 
+def test_fhd_catalog_reader_beam_values():
+    catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog_with_beam_values.sav")
+    skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
+
+    catalog = scipy.io.readsav(catfile)["catalog"]
+    beam_vals = np.zeros((4, len(catalog)))
+    for src_ind in range(len(catalog)):
+        beam_vals[0, src_ind] = catalog[src_ind]["beam"]["XX"][0]
+        beam_vals[1, src_ind] = catalog[src_ind]["beam"]["YY"][0]
+        beam_vals[2, src_ind] = np.abs(catalog[src_ind]["beam"]["XY"][0])
+        beam_vals[3, src_ind] = np.abs(catalog[src_ind]["beam"]["YX"][0])
+    beam_vals = beam_vals[:, np.newaxis, :]
+
+    assert np.min(np.abs(skyobj.beam_amp - beam_vals)) == 0
+
+
+def test_fhd_catalog_reader_beam_values_extended():
+    catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog_with_beam_values.sav")
+    skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=True)
+
+    catalog = scipy.io.readsav(catfile)["catalog"]
+    comp_ind = 0
+    for src_ind in range(len(catalog)):
+        beam_vals = np.zeros(4)
+        beam_vals[0] = catalog[src_ind]["beam"]["XX"][0]
+        beam_vals[1] = catalog[src_ind]["beam"]["YY"][0]
+        beam_vals[2] = np.abs(catalog[src_ind]["beam"]["XY"][0])
+        beam_vals[3] = np.abs(catalog[src_ind]["beam"]["YX"][0])
+        assert np.min(np.abs(skyobj.beam_amp[:, :, comp_ind] - beam_vals)) == 0
+        if catalog["extend"][src_ind] is not None:
+            ext_Ncomps = len(catalog[src_ind]["extend"])
+            assert (
+                np.min(
+                    np.abs(
+                        skyobj.beam_amp[:, :, comp_ind : comp_ind + ext_Ncomps]
+                        - beam_vals[:, np.newaxis, np.newaxis]
+                    )
+                )
+                == 0
+            )
+            comp_ind += ext_Ncomps
+        else:
+            comp_ind += 1
+
+
 def test_fhd_catalog_reader_labeling_extended_sources():
     catfile = os.path.join(SKY_DATA_PATH, "extended_source_test.sav")
     skyobj = SkyModel()
