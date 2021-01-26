@@ -2631,8 +2631,8 @@ class SkyModel(UVBase):
             if use_beam_amps:
                 beam_amp[0, src] = catalog["beam"][src]["XX"][0]
                 beam_amp[1, src] = catalog["beam"][src]["YY"][0]
-                beam_amp[2, src] = catalog["beam"][src]["XY"][0]
-                beam_amp[3, src] = catalog["beam"][src]["YX"][0]
+                beam_amp[2, src] = np.abs(catalog["beam"][src]["XY"][0])
+                beam_amp[3, src] = np.abs(catalog["beam"][src]["YX"][0])
 
         if len(np.unique(ids)) != len(ids):
             warnings.warn("WARNING: Source IDs are not unique. Defining unique IDs.")
@@ -2649,7 +2649,6 @@ class SkyModel(UVBase):
             if len(ext_inds) > 0:  # Add components and preserve ordering
                 ext_source_ids = ids[ext_inds]
                 for source_ind, source_id in enumerate(ext_source_ids):
-                    print(source_id)
                     use_index = np.where(ids == source_id)[0][0]
                     catalog_index = ext_inds[source_ind]
                     # Remove top-level source information
@@ -2660,6 +2659,8 @@ class SkyModel(UVBase):
                     source_freqs = np.delete(source_freqs, use_index)
                     spectral_index = np.delete(spectral_index, use_index)
                     extended_model_group = np.delete(extended_model_group, use_index)
+                    if use_beam_amps:
+                        beam_amp = np.delete(beam_amp, use_index, axis=1)
                     # Add component information
                     src = catalog[catalog_index]["extend"]
                     Ncomps = len(src)
@@ -2686,8 +2687,8 @@ class SkyModel(UVBase):
                         if use_beam_amps:
                             beam_amp_ext[0, comp] = src["beam"][comp]["XX"][0]
                             beam_amp_ext[1, comp] = src["beam"][comp]["YY"][0]
-                            beam_amp_ext[2, comp] = src["beam"][comp]["XY"][0]
-                            beam_amp_ext[3, comp] = src["beam"][comp]["YX"][0]
+                            beam_amp_ext[2, comp] = np.abs(src["beam"][comp]["XY"][0])
+                            beam_amp_ext[3, comp] = np.abs(src["beam"][comp]["YX"][0])
                     # np.insert doesn't work with arrays
                     stokes_new = Quantity(
                         np.zeros((4, Ncomps + np.shape(stokes)[1])), "Jy"
@@ -2697,7 +2698,7 @@ class SkyModel(UVBase):
                     stokes_new[:, use_index + Ncomps :] = stokes[:, use_index:]
                     stokes = stokes_new
                     if use_beam_amps:
-                        beam_amp_new = np.zeros((4, Ncomps + np.shape(stokes)[1]))
+                        beam_amp_new = np.zeros((4, Ncomps + np.shape(beam_amp)[1]))
                         beam_amp_new[:, :use_index] = beam_amp[:, :use_index]
                         beam_amp_new[:, use_index : use_index + Ncomps] = beam_amp_ext
                         beam_amp_new[:, use_index + Ncomps :] = beam_amp[:, use_index:]
@@ -2708,6 +2709,8 @@ class SkyModel(UVBase):
         ra = Longitude(ra, units.deg)
         dec = Latitude(dec, units.deg)
         stokes = stokes[:, np.newaxis, :]  # Add frequency axis
+        if beam_amp is not None:
+            beam_amp = beam_amp[:, np.newaxis, :]  # Add frequency axis
         self.__init__(
             name=ids,
             ra=ra,
