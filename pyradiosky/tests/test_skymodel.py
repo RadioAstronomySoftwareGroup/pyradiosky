@@ -1878,7 +1878,10 @@ def test_read_votable_errors():
 def test_fhd_catalog_reader():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
 
-    skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
+    with pytest.warns(
+        UserWarning, match="WARNING: Source IDs are not unique. Defining unique IDs."
+    ):
+        skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
 
     catalog = scipy.io.readsav(catfile)["catalog"]
     assert skyobj.Ncomponents == len(catalog)
@@ -1904,12 +1907,18 @@ def test_fhd_catalog_reader():
 def test_fhd_catalog_reader_source_cuts():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
 
-    skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
+    with pytest.warns(
+        UserWarning, match="WARNING: Source IDs are not unique. Defining unique IDs."
+    ):
+        skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
     skyobj.source_cuts(latitude_deg=30.0)
 
-    skyobj2 = SkyModel.from_fhd_catalog(
-        catfile, expand_extended=False, source_select_kwds={"latitude_deg": 30.0}
-    )
+    with pytest.warns(
+        UserWarning, match="WARNING: Source IDs are not unique. Defining unique IDs."
+    ):
+        skyobj2 = SkyModel.from_fhd_catalog(
+            catfile, expand_extended=False, source_select_kwds={"latitude_deg": 30.0}
+        )
 
     assert skyobj == skyobj2
 
