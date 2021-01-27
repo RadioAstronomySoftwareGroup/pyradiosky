@@ -7,12 +7,17 @@
   `from_text_catalog`, `from_gleam_catalog` and `from_idl_catalog` to enable
   instantiation from different formats directly.
 
+### Changed
+- Changed `extended_model_group` in `read_fhd_catalog` to match the parent source name.
+
 ### Fixed
 - A bug in the `download_gleam` utility method that caused missing columns for the
     `subband` spectral type
 - Enabled subselecting to a given tolerance in at_frequencies (for `full` spectral type).
 - A bug in `Skymodel.__init__` that caused extended_model_group and beam_amps
     to not be added to the object.
+- Enabled proper handling of duplicated source IDs in `read_fhd_catalog`.
+- A bug in `read_fhd_catalog` did not order the `name` and `beam_amp` attributes correctly for extended sources.
 
 ## [0.1.0] - 2020-6-29
 
