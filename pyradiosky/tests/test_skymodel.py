@@ -1288,9 +1288,7 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
         skyobj_full = healpix_disk_new
 
     # Add on optional parameters
-    # TODO: do something better when we have an FHD test file with these
-    # convert to strings when PR to make that change is in
-    skyobj_full.extended_model_group = np.arange(skyobj_full.Ncomponents)
+    skyobj_full.extended_model_group = skyobj_full.name
     skyobj_full.beam_amp = np.ones((4, skyobj_full.Nfreqs, skyobj_full.Ncomponents))
 
     skyobj1 = skyobj_full.select(
@@ -1320,11 +1318,7 @@ def test_concat_optional_params(param):
     skyobj_full = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type="flat")
 
     if param == "extended_model_group":
-        # TODO: do something better when we have an FHD test file with these
-        # convert to strings when PR to make that change is in
-        skyobj_full.extended_model_group = np.arange(
-            skyobj_full.Ncomponents
-        )  # .astype(str)
+        skyobj_full.extended_model_group = skyobj_full.name
     elif param == "beam_amp":
         skyobj_full.beam_amp = np.ones((4, skyobj_full.Nfreqs, skyobj_full.Ncomponents))
 
@@ -1344,7 +1338,7 @@ def test_concat_optional_params(param):
     skyobj_new.history = skyobj_full.history
 
     assert getattr(skyobj_new, "_" + param) != getattr(skyobj_full, "_" + param)
-    if param in ["reference_frequency", "extended_model_group"]:
+    if param == "reference_frequency":
         assert np.allclose(
             getattr(skyobj_new, param)[
                 skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
@@ -1352,6 +1346,15 @@ def test_concat_optional_params(param):
             getattr(skyobj_full, param)[
                 skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
             ],
+        )
+    elif param == "extended_model_group":  # these are strings, so allclose doesn't work
+        assert (
+            getattr(skyobj_new, param)[
+                skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
+            ].tolist()
+            == getattr(skyobj_full, param)[
+                skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
+            ].tolist()
         )
     else:
         assert np.allclose(
@@ -1367,7 +1370,7 @@ def test_concat_optional_params(param):
             getattr(skyobj_new, param)[: skyobj_full.Ncomponents // 2].value
         ).all()
     elif param == "extended_model_group":
-        assert np.all(getattr(skyobj_new, param)[: skyobj_full.Ncomponents // 2] == 0)
+        assert np.all(getattr(skyobj_new, param)[: skyobj_full.Ncomponents // 2] == "")
     else:
         assert np.isnan(
             getattr(skyobj_new, param)[:, :, : skyobj_full.Ncomponents // 2]
@@ -1386,11 +1389,17 @@ def test_concat_optional_params(param):
     skyobj_new.history = skyobj_full.history
 
     assert getattr(skyobj_new, "_" + param) != getattr(skyobj_full, "_" + param)
-    if param in ["reference_frequency", "extended_model_group"]:
+    if param == "reference_frequency":
         assert np.allclose(
             getattr(skyobj_new, param)[: skyobj_full.Ncomponents // 2],
             getattr(skyobj_full, param)[: skyobj_full.Ncomponents // 2],
         )
+    elif param == "extended_model_group":
+        assert (
+            getattr(skyobj_new, param)[: skyobj_full.Ncomponents // 2].tolist()
+            == getattr(skyobj_full, param)[: skyobj_full.Ncomponents // 2].tolist()
+        )
+
     else:
         assert np.allclose(
             getattr(skyobj_new, param)[:, :, : skyobj_full.Ncomponents // 2],
@@ -1408,7 +1417,7 @@ def test_concat_optional_params(param):
             getattr(skyobj_new, param)[
                 skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
             ]
-            == 0
+            == ""
         )
     else:
         assert np.isnan(
@@ -1929,7 +1938,7 @@ def test_select(spec_type, time_location):
     skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, with_error=True)
 
     skyobj.beam_amp = np.ones((4, skyobj.Nfreqs, skyobj.Ncomponents))
-    skyobj.extended_model_group = np.empty(skyobj.Ncomponents, dtype=str)
+    skyobj.extended_model_group = np.full(skyobj.Ncomponents, "", dtype="<U10")
     skyobj.update_positions(time, array_location)
 
     skyobj2 = skyobj.select(component_inds=np.arange(10), inplace=False)
