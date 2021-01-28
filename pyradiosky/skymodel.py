@@ -1456,7 +1456,6 @@ class SkyModel(UVBase):
                 (this.extended_model_group, other.extended_model_group)
             )
         elif this.extended_model_group is not None:
-            # TODO convert to empty string (rather than zero) when PR to change to strings is in
             warnings.warn(
                 "This object has extended_model_group values, other object does not. "
                 "Filling missing values with zeros."
@@ -1465,12 +1464,11 @@ class SkyModel(UVBase):
                 (
                     this.extended_model_group,
                     np.full(
-                        other.Ncomponents, 0, dtype=this.extended_model_group.dtype
+                        other.Ncomponents, "", dtype=this.extended_model_group.dtype
                     ),
                 )
             )
         elif other.extended_model_group is not None:
-            # TODO convert to empty string (rather than zero) when PR to change to strings is in
             warnings.warn(
                 "This object does not have extended_model_group values, other object does. "
                 "Filling missing values with zeros."
@@ -1478,7 +1476,7 @@ class SkyModel(UVBase):
             this.extended_model_group = np.concatenate(
                 (
                     np.full(
-                        this.Ncomponents, 0, dtype=other.extended_model_group.dtype
+                        this.Ncomponents, "", dtype=other.extended_model_group.dtype
                     ),
                     other.extended_model_group,
                 )
