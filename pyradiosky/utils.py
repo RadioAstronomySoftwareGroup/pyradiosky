@@ -19,7 +19,8 @@ from astropy.time import Time
 from astropy.coordinates import Angle
 import astropy.units as units
 from astropy.units import Quantity
-import healpy as hp
+import astropy_healpix.healpy as hp
+import astropy_healpix as astrohp
 
 # The frame radio astronomers call the apparent or current epoch is the
 # "true equator & equinox" frame, notated E_upsilon in the USNO circular
@@ -319,20 +320,21 @@ def modified_gleam(gleam_filename="gleamegc.dat", usecols=(10,12,77,-5), fill_bl
         
     #fill blank regions
     if fill_blank:
-        npix=hp.nside2npix(nside)
+        
+        npix = hp.nside2npix(nside)
         numhpxmap = np.zeros(npix, dtype=np.float)
-        indices=hp.ang2pix(nside,cat_gleam[:,0],cat_gleam[:,1],lonlat=True)
+        indices = hp.ang2pix(nside,cat_gleam[:,0],cat_gleam[:,1],lonlat=True)
         
         #fill hpmap with number of source
         for i in range(npix):
             wr = np.where(indices == i)
-            numhpxmap[i]=wr[0].size
+            numhpxmap[i] = wr[0].size
 
         #non zero indices in the hpmap
         non_zero_ind = np.nonzero(numhpxmap)[0]
 
         #find zero indices with neighbour >2
-        nn = hp.get_all_neighbours(nside,np.arange(npix))
+        nn = astrohp.neighbours(np.arange(npix),nside)
         zero_ind = []
 
         for i in range(npix):
