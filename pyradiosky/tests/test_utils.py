@@ -138,20 +138,20 @@ def test_jy_to_ksr():
     
 def test_modified_gleam():
     
-    #if file is not present in that directory
+    # if file is not present in that directory
     with pytest.raises(ValueError, match="File not found"):
         skyutils.modified_gleam('testgleam.dat')
   
-    #read the dummy cat file present in the directory
+    # read the dummy cat file present in the directory
     cat1 = skyutils.modified_gleam('pyradiosky/data/cat_mock.dat')
 
-    #read the dummy cat file and fill the blank regions
-    cat2 = skyutils.modified_gleam('pyradiosky/data/cat_mock.dat',fill_blank=True, nside=8)
+    # read the dummy cat file and fill the blank regions
+    cat2 = skyutils.modified_gleam('pyradiosky/data/cat_mock.dat', fill_blank=True, nside=8)
 
-    #read the dummy cat file and fill the blank regions,and also add the peeled sources
-    cat3 = skyutils.modified_gleam('pyradiosky/data/cat_mock.dat',fill_blank=True, nside=8, add_peeled_sources=True)
+    # read the dummy cat file and fill the blank regions,and also add the peeled sources
+    cat3 = skyutils.modified_gleam('pyradiosky/data/cat_mock.dat', fill_blank=True, nside=8, add_peeled_sources=True)
     
     assert len(cat2) > len(cat1)
     
-    #9 is added peeled source
+    # 9 is added peeled source
     assert len(cat3) - len(cat2) == 9                      
