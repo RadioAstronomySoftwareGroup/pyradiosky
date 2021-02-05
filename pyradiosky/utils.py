@@ -284,7 +284,7 @@ def download_gleam(path=".", filename="gleam.vot", overwrite=False, row_limit=No
     print("GLEAM catalog downloaded and saved to " + opath)
 
 
-def modified_gleam(gleam_filename="gleamegc.dat", usecols=(10,12,77,-5), fill_blank=False, nside=32, add_peeled_sources=False, modified_gleam_filename=''):
+def modified_gleam(gleam_filename="gleamegc.dat", usecols=(10, 12, 77, -5), fill_blank=False, nside=32, add_peeled_sources=False, modified_gleam_filename=''):
     """
     Write modified gleam catalogue to fill the blank regions, and also to add the peeled sources.
 
@@ -322,7 +322,7 @@ def modified_gleam(gleam_filename="gleamegc.dat", usecols=(10,12,77,-5), fill_bl
         
         npix = hp.nside2npix(nside)
         numhpxmap = np.zeros(npix, dtype=np.float)
-        indices = hp.ang2pix(nside, cat_gleam[:,0], cat_gleam[:,1], lonlat=True)
+        indices = hp.ang2pix(nside, cat_gleam[:, 0], cat_gleam[:, 1], lonlat=True)
         
         # fill hpmap with number of source
         for i in range(npix):
