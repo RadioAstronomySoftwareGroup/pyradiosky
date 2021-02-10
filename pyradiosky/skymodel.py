@@ -241,7 +241,7 @@ class SkyModel(UVBase):
         self._nside = UVParameter(
             "nside",
             description=desc,
-            expected_type=np.int,
+            expected_type=int,
             required=False,
         )
 
@@ -250,7 +250,7 @@ class SkyModel(UVBase):
             "hpx_inds",
             description=desc,
             form=("Ncomponents",),
-            expected_type=np.int,
+            expected_type=int,
             required=False,
         )
 
@@ -395,7 +395,7 @@ class SkyModel(UVBase):
         )
 
         # handle old parameter order
-        # (use to be: name, ra, dec, stokes, freq_array spectral_type)
+        # (use to be: name, ra, dec, stokes, freq_array, spectral_type)
         if isinstance(spectral_type, (np.ndarray, list, float, Quantity)):
             warnings.warn(
                 "The input parameters to SkyModel.__init__ have changed. Please "
@@ -406,8 +406,7 @@ class SkyModel(UVBase):
             spectral_type = freq_array
 
             if spectral_type == "flat" and np.unique(freqs_use).size == 1:
-                reference_frequency = np.zeros((self.Ncomponents), dtype=np.float)
-                reference_frequency.fill(freqs_use[0])
+                reference_frequency = np.full((self.Ncomponents), freqs_use[0])
                 freq_array = None
             else:
                 freq_array = freqs_use
@@ -1189,7 +1188,7 @@ class SkyModel(UVBase):
 
         R_avg = self._calc_average_rotation_matrix()
 
-        R_exact = np.zeros((3, 3, n_inds), dtype=np.float)
+        R_exact = np.zeros((3, 3, n_inds), dtype=np.float64)
 
         for src_i in range(n_inds):
             intermediate_vec = np.matmul(R_avg, radec_vec[:, src_i])
@@ -1230,7 +1229,7 @@ class SkyModel(UVBase):
         theta_altaz = np.pi / 2.0 - self.alt_az[0, inds]
         phi_altaz = self.alt_az[1, inds]
 
-        coherency_rot_matrix = np.zeros((2, 2, n_inds), dtype=np.float)
+        coherency_rot_matrix = np.zeros((2, 2, n_inds), dtype=np.float64)
         for src_i in range(n_inds):
             coherency_rot_matrix[
                 :, :, src_i
