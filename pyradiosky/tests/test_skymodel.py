@@ -490,8 +490,7 @@ def test_init_lists_errors(spec_type, param, msg, zenith_skycoord):
     elif param == "stokes_hz":
         stokes = stokes.value * units.Hz
     elif param == "stokes_obj":
-        stokes = list(stokes)
-        stokes[1] = [icrs_coord] * 5
+        stokes = icrs_coord
 
     with pytest.raises(ValueError, match=msg):
         if list_warning is not None:
