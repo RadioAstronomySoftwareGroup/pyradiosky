@@ -301,8 +301,6 @@ def test_init_lists(spec_type, param, zenith_skycoord):
     stokes = np.zeros((4, n_freqs, 5), dtype=np.float) * units.Jy
     stokes[0, :, :] = 1 * units.Jy
 
-    assert not isinstance(stokes, list)
-
     if spec_type == "spectral_index":
         ref_freqs = np.zeros(5, dtype=np.float) + 150e6 * units.Hz
         spec_index = np.zeros(5, dtype=np.float) - 0.8
@@ -321,25 +319,45 @@ def test_init_lists(spec_type, param, zenith_skycoord):
         spectral_type=spec_type,
     )
 
+    list_warning = None
     if param == "ra":
         ras = list(ras)
     elif param == "dec":
         decs = list(decs)
     elif param == "reference_frequency":
         ref_freqs = list(ref_freqs)
+        list_warning = (
+            "reference_frequency is a list. Attempting to convert to a Quantity."
+        )
+        warn_type = UserWarning
     elif param == "freq_array":
         freq_array = list(freq_array)
+        list_warning = "freq_array is a list. Attempting to convert to a Quantity."
+        warn_type = UserWarning
 
-    list_model = SkyModel(
-        name=names,
-        ra=ras,
-        dec=decs,
-        stokes=stokes,
-        reference_frequency=ref_freqs,
-        spectral_index=spec_index,
-        freq_array=freq_array,
-        spectral_type=spec_type,
-    )
+    if list_warning is not None:
+        with uvtest.check_warnings(warn_type, match=list_warning):
+            list_model = SkyModel(
+                name=names,
+                ra=ras,
+                dec=decs,
+                stokes=stokes,
+                reference_frequency=ref_freqs,
+                spectral_index=spec_index,
+                freq_array=freq_array,
+                spectral_type=spec_type,
+            )
+    else:
+        list_model = SkyModel(
+            name=names,
+            ra=ras,
+            dec=decs,
+            stokes=stokes,
+            reference_frequency=ref_freqs,
+            spectral_index=spec_index,
+            freq_array=freq_array,
+            spectral_type=spec_type,
+        )
 
     assert ref_model == list_model
 
@@ -354,20 +372,12 @@ def test_init_lists(spec_type, param, zenith_skycoord):
         (
             "flat",
             "stokes",
-            "If stokes is supplied as a list, all the elements must be Quantity objects with compatible units.",
-        ),
-        (
-            "flat",
-            "stokes_hz",
-            re.escape(
-                "'Hz' (frequency) and 'Jy' (spectral flux density) are not convertible"
-            ),
+            "Stokes should be passed as an astropy Quantity array not a list",
         ),
         (
             "flat",
             "stokes_obj",
-            "If stokes is supplied as a list, all the elements must be Quantity "
-            "objects with compatible units.",
+            "Stokes should be passed as an astropy Quantity array.",
         ),
         (
             "spectral_index",
@@ -432,10 +442,7 @@ def test_init_lists_errors(spec_type, param, msg, zenith_skycoord):
         spec_index = None
 
     list_warning = None
-    if "stokes" in param:
-        list_warning = "stokes is a list. Attempting to convert to a Quantity."
-        warn_type = UserWarning
-    elif "freq_array" in param:
+    if "freq_array" in param:
         list_warning = "freq_array is a list. Attempting to convert to a Quantity."
         warn_type = UserWarning
     elif "reference_frequency" in param:
@@ -478,8 +485,7 @@ def test_init_lists_errors(spec_type, param, msg, zenith_skycoord):
         stokes = list(stokes)
         stokes[1] = stokes[1].value.tolist()
     elif param == "stokes_hz":
-        stokes = list(stokes)
-        stokes[1] = stokes[1].value * units.Hz
+        stokes = stokes.value * units.Hz
     elif param == "stokes_obj":
         stokes = list(stokes)
         stokes[1] = [icrs_coord] * 5

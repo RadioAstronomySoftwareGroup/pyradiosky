@@ -567,28 +567,10 @@ class SkyModel(UVBase):
             if isinstance(stokes, Quantity):
                 self.stokes = stokes
             elif isinstance(stokes, list):
-                # try just converting the list to a Quantity. This will work if all
-                # the elements are Quantities with compatible units.
-                warnings.warn(
-                    "stokes is a list. Attempting to convert to a Quantity.",
+                raise ValueError(
+                    "Stokes should be passed as an astropy Quantity array not a list",
                 )
-                try:
-                    # if some are Quantities and some are floats, this can strip
-                    # the units from the Quantities (I guess because it's a nested list?).
-                    # Check that next.
-                    stokes = Quantity(stokes)
-                except (TypeError):
-                    raise ValueError(
-                        "If stokes is supplied as a list, all the elements must be "
-                        "Quantity objects with compatible units."
-                    )
-                if stokes.unit == "":
-                    raise ValueError(
-                        "If stokes is supplied as a list, all the elements must be "
-                        "Quantity objects with compatible units."
-                    )
-                self.stokes = stokes
-            if self.stokes is None:
+            elif isinstance(stokes, np.ndarray):
                 # this catches stokes supplied as a numpy array
                 warnings.warn(
                     "In version 0.2.0, stokes will be required to be an astropy "
@@ -596,7 +578,11 @@ class SkyModel(UVBase):
                     f"Currently, floats are assumed to be in {default_unit}.",
                     category=DeprecationWarning,
                 )
-                self.stokes = Quantity(np.asarray(stokes), default_unit)
+                self.stokes = Quantity(stokes, default_unit)
+            else:
+                raise ValueError(
+                    "Stokes should be passed as an astropy Quantity array."
+                )
 
             if self.Ncomponents == 1:
                 self.stokes = self.stokes.reshape(4, self.Nfreqs, 1)
@@ -703,10 +689,12 @@ class SkyModel(UVBase):
             else:
                 allowed_units = ["Jy/sr", "K"]
 
-            if not (
-                param_unit.is_equivalent(allowed_units[0])
-                or param_unit.is_equivalent(allowed_units[1])
-            ):
+            equivalent = False
+            for unit in allowed_units:
+                if param_unit.is_equivalent(unit):
+                    equivalent = True
+                    break
+            if not equivalent:
                 raise ValueError(
                     f"For {self.component_type} component types, the "
                     f"{param.name} parameter must have a unit that can be "
