@@ -30,6 +30,9 @@ from pyradiosky import skymodel, SkyModel
 
 GLEAM_vot = os.path.join(SKY_DATA_PATH, "gleam_50srcs.vot")
 
+# ignore new numpy 1.20 warning emitted from h5py
+pytestmark = pytest.mark.filterwarnings("ignore:Passing None into shape arguments")
+
 
 @pytest.fixture
 def time_location():
@@ -288,7 +291,7 @@ def test_init_lists(spec_type, param, zenith_skycoord):
     ras = Longitude(
         [zenith_skycoord.ra + Longitude(0.5 * ind * units.deg) for ind in range(5)]
     )
-    decs = Latitude(np.zeros(5, dtype=np.float) + icrs_coord.dec.value * units.deg)
+    decs = Latitude(np.zeros(5, dtype=np.float64) + icrs_coord.dec.value * units.deg)
     names = ["src_" + str(ind) for ind in range(5)]
 
     if spec_type in ["subband", "full"]:
@@ -298,12 +301,12 @@ def test_init_lists(spec_type, param, zenith_skycoord):
         n_freqs = 1
         freq_array = None
 
-    stokes = np.zeros((4, n_freqs, 5), dtype=np.float) * units.Jy
+    stokes = np.zeros((4, n_freqs, 5), dtype=np.float64) * units.Jy
     stokes[0, :, :] = 1 * units.Jy
 
     if spec_type == "spectral_index":
-        ref_freqs = np.zeros(5, dtype=np.float) + 150e6 * units.Hz
-        spec_index = np.zeros(5, dtype=np.float) - 0.8
+        ref_freqs = np.zeros(5, dtype=np.float64) + 150e6 * units.Hz
+        spec_index = np.zeros(5, dtype=np.float64) - 0.8
     else:
         ref_freqs = None
         spec_index = None
@@ -421,7 +424,7 @@ def test_init_lists_errors(spec_type, param, msg, zenith_skycoord):
     ras = Longitude(
         [zenith_skycoord.ra + Longitude(0.5 * ind * units.deg) for ind in range(5)]
     )
-    decs = Latitude(np.zeros(5, dtype=np.float) + icrs_coord.dec.value * units.deg)
+    decs = Latitude(np.zeros(5, dtype=np.float64) + icrs_coord.dec.value * units.deg)
     names = ["src_" + str(ind) for ind in range(5)]
 
     if spec_type in ["subband", "full"]:
@@ -431,12 +434,12 @@ def test_init_lists_errors(spec_type, param, msg, zenith_skycoord):
         n_freqs = 1
         freq_array = None
 
-    stokes = np.zeros((4, n_freqs, 5), dtype=np.float) * units.Jy
+    stokes = np.zeros((4, n_freqs, 5), dtype=np.float64) * units.Jy
     stokes[0, :, :] = 1.0 * units.Jy
 
     if spec_type == "spectral_index":
-        ref_freqs = np.zeros(5, dtype=np.float) + 150e6 * units.Hz
-        spec_index = np.zeros(5, dtype=np.float) - 0.8
+        ref_freqs = np.zeros(5, dtype=np.float64) + 150e6 * units.Hz
+        spec_index = np.zeros(5, dtype=np.float64) - 0.8
     else:
         ref_freqs = None
         spec_index = None
