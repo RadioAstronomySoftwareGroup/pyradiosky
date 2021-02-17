@@ -405,8 +405,8 @@ class SkyModel(UVBase):
             freqs_use = spectral_type
             spectral_type = freq_array
 
-            if spectral_type == "flat" and np.unique(freqs_use).size == 1:
-                reference_frequency = np.full((self.Ncomponents), freqs_use[0])
+            if spectral_type == "flat" and np.asarray(freqs_use).size == 1:
+                reference_frequency = np.zeros(self.Ncomponents) + freqs_use[0]
                 freq_array = None
             else:
                 freq_array = freqs_use
@@ -556,13 +556,6 @@ class SkyModel(UVBase):
             if spectral_index is not None:
                 self.spectral_index = np.atleast_1d(spectral_index)
 
-            if self.component_type == "point":
-                allowed_units = ["Jy", "K sr"]
-                default_unit = "Jy"
-            else:
-                allowed_units = ["Jy/sr", "K"]
-                default_unit = "K"
-
             if isinstance(stokes, Quantity):
                 self.stokes = stokes
             elif isinstance(stokes, list):
@@ -571,6 +564,13 @@ class SkyModel(UVBase):
                 )
             elif isinstance(stokes, np.ndarray):
                 # this catches stokes supplied as a numpy array
+                if self.component_type == "point":
+                    allowed_units = ["Jy", "K sr"]
+                    default_unit = "Jy"
+                else:
+                    allowed_units = ["Jy/sr", "K"]
+                    default_unit = "K"
+
                 warnings.warn(
                     "In version 0.2.0, stokes will be required to be an astropy "
                     f"Quantity with units that are convertable to one of {allowed_units}. "
@@ -684,16 +684,11 @@ class SkyModel(UVBase):
         for param in [self._stokes, self._coherency_radec]:
             param_unit = param.value.unit
             if self.component_type == "point":
-                allowed_units = ["Jy", "K sr"]
+                allowed_units = ("Jy", "K sr")
             else:
-                allowed_units = ["Jy/sr", "K"]
+                allowed_units = ("Jy/sr", "K")
 
-            equivalent = False
-            for unit in allowed_units:
-                if param_unit.is_equivalent(unit):
-                    equivalent = True
-                    break
-            if not equivalent:
+            if not param_unit.is_equivalent(allowed_units):
                 raise ValueError(
                     f"For {self.component_type} component types, the "
                     f"{param.name} parameter must have a unit that can be "
