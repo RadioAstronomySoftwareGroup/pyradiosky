@@ -2,10 +2,14 @@
 
 ## [Unreleased]
 
+## [0.1.1] - 2021-02-17
+
 ### Added
+- Read and write methods for skyh5 -- our newly defined hdf5 file format that fully
+    supports all SkyModel types.
 - Classmethods `from_recarray`, `from_healpix_hdf5`, `from_votable_catalog`,
-  `from_text_catalog`, `from_gleam_catalog` and `from_idl_catalog` to enable
-  instantiation from different formats directly.
+    `from_text_catalog`, `from_gleam_catalog` and `from_idl_catalog` to enable
+    instantiation from different formats directly.
 
 ### Changed
 - Changed default `spectral_type` for `read_gleam_catalog` to `subband` rather than `flat`.
