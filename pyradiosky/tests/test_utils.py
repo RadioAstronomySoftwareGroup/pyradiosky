@@ -137,6 +137,9 @@ def test_jy_to_ksr():
     
     
 def test_modified_gleam():
+
+    pytest.importorskip("astropy_healpix")
+    import astropy_healpix
     
     # if file is not present in that directory
     with pytest.raises(ValueError, match="File not found"):

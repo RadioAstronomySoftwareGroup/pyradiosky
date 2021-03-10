@@ -19,8 +19,6 @@ from astropy.time import Time
 from astropy.coordinates import Angle
 import astropy.units as units
 from astropy.units import Quantity
-import astropy_healpix.healpy as hp
-import astropy_healpix as astrohp
 
 # The frame radio astronomers call the apparent or current epoch is the
 # "true equator & equinox" frame, notated E_upsilon in the USNO circular
@@ -305,6 +303,9 @@ def modified_gleam(gleam_filename="gleamegc.dat", usecols=(10, 12, 77, -5), fill
         name of the modified gleam catalogue file.
 
     """
+    import astropy_healpix as astrohp
+    import astropy_healpix.healpy as hp
+
     # check if file exists in the given path
     if os.path.exists(gleam_filename):
         print('true gleam catalogue file - ', gleam_filename)
