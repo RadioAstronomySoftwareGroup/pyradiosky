@@ -139,14 +139,13 @@ def test_jy_to_ksr():
 def test_modified_gleam():
 
     pytest.importorskip("astropy_healpix")
-    import astropy_healpix
     
     # if file is not present in that directory
     with pytest.raises(ValueError, match="File not found"):
         skyutils.modified_gleam('testgleam.dat')
   
     # read the dummy cat file present in the directory
-    cat1 = skyutils.modified_gleam('pyradiosky/data/cat_mock.dat')
+    cat1 = skyutils.modified_gleam('pyradiosky/data/cat_mock.dat', modified_gleam_filename='pyradiosky/data/cat_moc_out.dat')
 
     # read the dummy cat file and fill the blank regions
     cat2 = skyutils.modified_gleam('pyradiosky/data/cat_mock.dat', fill_blank=True, nside=8)
