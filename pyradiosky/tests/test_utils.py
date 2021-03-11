@@ -134,26 +134,38 @@ def test_jy_to_ksr():
     conv1 = jy2ksr_nonastropy(freqs) * units.K * units.sr / units.Jy
 
     assert np.allclose(conv0, conv1)
-    
-    
+
+
 def test_modified_gleam():
 
     pytest.importorskip("astropy_healpix")
-    
+
     # if file is not present in that directory
     with pytest.raises(ValueError, match="File not found"):
-        skyutils.modified_gleam('testgleam.dat')
-  
+        skyutils.modified_gleam("testgleam.dat")
+
     # read the dummy cat file present in the directory
-    cat1 = skyutils.modified_gleam('pyradiosky/data/cat_mock.dat', usecols=(0, 1, 2, 3), modified_gleam_filename='pyradiosky/data/cat_moc_out.dat')
+    cat1 = skyutils.modified_gleam(
+        "pyradiosky/data/cat_mock.dat",
+        usecols=(0, 1, 2, 3),
+        modified_gleam_filename="pyradiosky/data/cat_moc_out.dat",
+    )
 
     # read the dummy cat file and fill the blank regions
-    cat2 = skyutils.modified_gleam('pyradiosky/data/cat_mock.dat', usecols=(0, 1, 2, 3), fill_blank=True, nside=8)
+    cat2 = skyutils.modified_gleam(
+        "pyradiosky/data/cat_mock.dat", usecols=(0, 1, 2, 3), fill_blank=True, nside=8
+    )
 
     # read the dummy cat file and fill the blank regions,and also add the peeled sources
-    cat3 = skyutils.modified_gleam('pyradiosky/data/cat_mock.dat', usecols=(0, 1, 2, 3), fill_blank=True, nside=8, add_peeled_sources=True)
-    
+    cat3 = skyutils.modified_gleam(
+        "pyradiosky/data/cat_mock.dat",
+        usecols=(0, 1, 2, 3),
+        fill_blank=True,
+        nside=8,
+        add_peeled_sources=True,
+    )
+
     assert len(cat2) > len(cat1)
-    
+
     # 9 is added peeled source
-    assert len(cat3) - len(cat2) == 9                      
+    assert len(cat3) - len(cat2) == 9

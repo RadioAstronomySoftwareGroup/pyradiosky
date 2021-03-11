@@ -282,7 +282,14 @@ def download_gleam(path=".", filename="gleam.vot", overwrite=False, row_limit=No
     print("GLEAM catalog downloaded and saved to " + opath)
 
 
-def modified_gleam(gleam_filename="gleamegc.dat", usecols=(10, 12, 77, -5), fill_blank=False, nside=32, add_peeled_sources=False, modified_gleam_filename=''):
+def modified_gleam(
+    gleam_filename="gleamegc.dat",
+    usecols=(10, 12, 77, -5),
+    fill_blank=False,
+    nside=32,
+    add_peeled_sources=False,
+    modified_gleam_filename="",
+):
     """
     Write modified gleam catalogue to fill the blank regions, and also to add the peeled sources.
 
@@ -291,7 +298,7 @@ def modified_gleam(gleam_filename="gleamegc.dat", usecols=(10, 12, 77, -5), fill
     gleam_filename : str
         name of the gleam catalogue file.
     usecols : tuple
-        default = (10,12,77,-5) 
+        default = (10,12,77,-5)
         4 columns, 1st-RA (deg), 2nd-Dec (deg), 3rd - Flux at 100 MHz (Jy), 4th - sp. index
     fill_blank : bool
         If True, it will fill the blank regions
@@ -308,23 +315,23 @@ def modified_gleam(gleam_filename="gleamegc.dat", usecols=(10, 12, 77, -5), fill
 
     # check if file exists in the given path
     if os.path.exists(gleam_filename):
-        print('true gleam catalogue file - ', gleam_filename)
+        print("true gleam catalogue file - ", gleam_filename)
     else:
-        raise ValueError('File not found')
-    
+        raise ValueError("File not found")
+
     # read array of RA (deg), Dec (deg), Flux at 100 MHz (Jy), sp. index
     aa = np.genfromtxt(gleam_filename, usecols=usecols)
 
     # use sources with finite flux and sp. index values
-    cat_gleam = aa[(aa[:, 2] >= 0.) & np.isfinite(aa[:, 2]) & np.isfinite(aa[:, 3])]
-        
+    cat_gleam = aa[(aa[:, 2] >= 0.0) & np.isfinite(aa[:, 2]) & np.isfinite(aa[:, 3])]
+
     # fill blank regions
     if fill_blank:
-        
+
         npix = hp.nside2npix(nside)
         numhpxmap = np.zeros(npix, dtype=np.float)
         indices = hp.ang2pix(nside, cat_gleam[:, 0], cat_gleam[:, 1], lonlat=True)
-        
+
         # fill hpmap with number of source
         for i in range(npix):
             wr = np.where(indices == i)
@@ -347,33 +354,39 @@ def modified_gleam(gleam_filename="gleamegc.dat", usecols=(10, 12, 77, -5), fill
         zero_fill_ind = np.random.choice(non_zero_ind, size=len(zero_ind))
 
         numhpxmap_fill = copy.deepcopy(numhpxmap)
-        numhpxmap_fill[zero_ind] = numhpxmap[zero_fill_ind]  
-        
+        numhpxmap_fill[zero_ind] = numhpxmap[zero_fill_ind]
+
         ra_zero, dec_zero = hp.pix2ang(nside, zero_ind, lonlat=True)
-        
+
         cat_random = []
         for i in range(len(ra_zero)):
             wr = np.where(indices == zero_fill_ind[i])
             for j in wr[0]:
-                cat_random.append((ra_zero[i], dec_zero[i], cat_gleam[j, 2], cat_gleam[j, 3]))
+                cat_random.append(
+                    (ra_zero[i], dec_zero[i], cat_gleam[j, 2], cat_gleam[j, 3])
+                )
         cat_random = np.array(cat_random)
         cat_gleam = np.vstack((cat_gleam, cat_random))
-       
-    # add peeled sources 
+
+    # add peeled sources
     if add_peeled_sources:
-        gleam_peeled = np.array([[201.3667, -43.0192, 1937.472, -0.50],  # Centaurus A
-                                 [139.5250, -12.0956, 544.686, -0.96],  # Hydra A
-                                 [79.9583, -45.7789, 774.612, -0.99],  # Pictor A
-                                 [252.7833, 4.9925, 791.486, -1.07],  # Hercules A
-                                 [187.7042, 12.3911, 1562.747, -0.86],  # Virgo A
-                                 [83.6333, 22.0144, 1560.743, -0.22],  # Crab
-                                 [299.8667, 40.7339, 13599.676, -0.78],  # Cygnus A
-                                 [350.8667, 58.8117, 15811.361, -0.41],  # Cassiopeia A
-                                 [50.6708, -37.2083, 1256.016, -0.81]])  # Fornax A
+        gleam_peeled = np.array(
+            [
+                [201.3667, -43.0192, 1937.472, -0.50],  # Centaurus A
+                [139.5250, -12.0956, 544.686, -0.96],  # Hydra A
+                [79.9583, -45.7789, 774.612, -0.99],  # Pictor A
+                [252.7833, 4.9925, 791.486, -1.07],  # Hercules A
+                [187.7042, 12.3911, 1562.747, -0.86],  # Virgo A
+                [83.6333, 22.0144, 1560.743, -0.22],  # Crab
+                [299.8667, 40.7339, 13599.676, -0.78],  # Cygnus A
+                [350.8667, 58.8117, 15811.361, -0.41],  # Cassiopeia A
+                [50.6708, -37.2083, 1256.016, -0.81],
+            ]
+        )  # Fornax A
         cat_gleam = np.vstack((gleam_peeled, cat_gleam))
-    
+
     # save in a file
-    if modified_gleam_filename != '':
+    if modified_gleam_filename != "":
         np.savetxt(modified_gleam_filename, cat_gleam)
-    
+
     return cat_gleam
