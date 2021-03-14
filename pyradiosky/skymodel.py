@@ -146,6 +146,9 @@ class SkyModel(UVBase):
     spectral_index : array_like of float
         Spectral index of each source, shape (Ncomponents).
         None if spectral_type is not 'spectral_index'.
+    component_type : str
+        Component type, either 'point' or 'healpix'. If this is not set, the type is
+        inferred from whether `nside` is set.
     nside : int
         nside parameter for HEALPix maps.
     hpx_inds : array_like of int
@@ -172,6 +175,7 @@ class SkyModel(UVBase):
         freq_array=None,
         reference_frequency=None,
         spectral_index=None,
+        component_type=None,
         nside=None,
         hpx_inds=None,
         extended_model_group=None,
@@ -412,8 +416,14 @@ class SkyModel(UVBase):
                 freq_array = freqs_use
                 reference_frequency = None
 
-        if nside is not None:
+        if component_type is not None:
+            self._set_component_type_params(component_type)
+        elif nside is not None:
             self._set_component_type_params("healpix")
+        else:
+            self._set_component_type_params("point")
+
+        if self.component_type == "healpix":
             req_args = ["nside", "hpx_inds", "stokes", "spectral_type"]
             args_set_req = [
                 nside is not None,
@@ -422,7 +432,6 @@ class SkyModel(UVBase):
                 spectral_type is not None,
             ]
         else:
-            self._set_component_type_params("point")
             req_args = ["name", "ra", "dec", "stokes", "spectral_type"]
             args_set_req = [
                 name is not None,
@@ -453,22 +462,26 @@ class SkyModel(UVBase):
                     f"If initializing with values, all of {req_args} must be set."
                 )
 
+            if name is not None:
+                self.name = np.atleast_1d(name)
+            if nside is not None:
+                self.nside = nside
+            if hpx_inds is not None:
+                self.hpx_inds = np.atleast_1d(hpx_inds)
+
             if self.component_type == "healpix":
+                self.Ncomponents = self.hpx_inds.size
                 try:
                     import astropy_healpix
                 except ImportError as e:
                     raise ImportError(
                         "The astropy-healpix module must be installed to use HEALPix methods"
                     ) from e
-                self.nside = nside
-                self.hpx_inds = np.atleast_1d(hpx_inds)
-                self.Ncomponents = self.hpx_inds.size
                 ra, dec = astropy_healpix.healpix_to_lonlat(hpx_inds, nside)
                 self.ra = ra
                 self.dec = dec
 
             else:
-                self.name = np.atleast_1d(name)
                 self.Ncomponents = self.name.size
                 if isinstance(ra, (list)):
                     # Cannot just try converting to Longitude because if the values are
@@ -790,6 +803,11 @@ class SkyModel(UVBase):
             )
 
         self.stokes = self.stokes * conv_factor
+        if self.stokes.unit.is_equivalent("Jy"):
+            # need the `to(units.Jy)` call because otherwise even though it's in Jy,
+            # the units are a CompositeUnit object which doesn't have all the same
+            # functionality as a Unit object
+            self.stokes = self.stokes.to(units.Jy)
         self.coherency_radec = skyutils.stokes_to_coherency(self.stokes)
 
     def jansky_to_kelvin(self):
@@ -1909,7 +1927,6 @@ class SkyModel(UVBase):
                     raise ValueError("Nfreqs is not equal to the size of 'freq_array'.")
 
             # remove parameters not needed in __init__
-            init_params.pop("component_type")
             init_params.pop("Ncomponents")
             init_params.pop("Nfreqs")
 
@@ -2961,7 +2978,7 @@ class SkyModel(UVBase):
                     dtype = np.dtype(type(val))
 
                 # Strings and arrays of strings require special handling.
-                if dtype.kind == "U":
+                if dtype.kind == "U" or param.expected_type == str:
                     if isinstance(val, (list, np.ndarray)):
                         header[parname] = np.asarray(val, dtype="bytes")
                     else:
