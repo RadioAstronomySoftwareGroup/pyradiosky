@@ -2569,9 +2569,9 @@ def test_atfreq_tol(tmpdir, mock_point_skies):
 
 
 @pytest.mark.parametrize("stype", ["full", "subband", "spectral_index", "flat"])
-def test_hdf5_file_loop(mock_point_skies, stype, tmpdir):
+def test_skyh5_file_loop(mock_point_skies, stype, tmpdir):
     sky = mock_point_skies(stype)
-    testfile = str(tmpdir.join("testfile.hdf5"))
+    testfile = str(tmpdir.join("testfile.skyh5"))
 
     sky.write_skyh5(testfile)
 
@@ -2581,7 +2581,7 @@ def test_hdf5_file_loop(mock_point_skies, stype, tmpdir):
 
 
 @pytest.mark.parametrize("history", [None, "test"])
-def test_hdf5_file_loop_healpix(healpix_disk_new, history, tmpdir):
+def test_skyh5_file_loop_healpix(healpix_disk_new, history, tmpdir):
     sky = healpix_disk_new
 
     run_check = True
@@ -2591,7 +2591,7 @@ def test_hdf5_file_loop_healpix(healpix_disk_new, history, tmpdir):
     else:
         sky.history = history
 
-    testfile = str(tmpdir.join("testfile.hdf5"))
+    testfile = str(tmpdir.join("testfile.skyh5"))
     sky.write_skyh5(testfile, run_check=run_check)
 
     sky2 = SkyModel.from_skyh5(testfile)
@@ -2599,13 +2599,27 @@ def test_hdf5_file_loop_healpix(healpix_disk_new, history, tmpdir):
     assert sky2 == sky
 
 
-def test_hdf5_file_loop_healpix_cut_sky(healpix_disk_new, tmpdir):
+def test_skyh5_file_loop_healpix_cut_sky(healpix_disk_new, tmpdir):
     sky = healpix_disk_new
 
     sky.select(component_inds=np.arange(10))
     sky.check()
 
-    testfile = str(tmpdir.join("testfile.hdf5"))
+    testfile = str(tmpdir.join("testfile.skyh5"))
+    sky.write_skyh5(testfile)
+
+    sky2 = SkyModel.from_skyh5(testfile)
+
+    assert sky2 == sky
+
+
+def test_skyh5_file_loop_healpix_to_point(healpix_disk_new, tmpdir):
+    sky = healpix_disk_new
+
+    sky.healpix_to_point()
+    sky.check()
+
+    testfile = str(tmpdir.join("testfile.skyh5"))
     sky.write_skyh5(testfile)
 
     sky2 = SkyModel.from_skyh5(testfile)
@@ -2621,10 +2635,10 @@ def test_hdf5_file_loop_healpix_cut_sky(healpix_disk_new, tmpdir):
         ("Nfreqs", 10, "Nfreqs is not equal to the size of 'freq_array'."),
     ],
 )
-def test_hdf5_read_errors(mock_point_skies, param, value, errormsg, tmpdir):
+def test_skyh5_read_errors(mock_point_skies, param, value, errormsg, tmpdir):
     sky = mock_point_skies("full")
 
-    testfile = str(tmpdir.join("testfile.hdf5"))
+    testfile = str(tmpdir.join("testfile.skyh5"))
     sky.write_skyh5(testfile)
 
     with h5py.File(testfile, "r+") as fileobj:
@@ -2651,10 +2665,10 @@ def test_hdf5_read_errors(mock_point_skies, param, value, errormsg, tmpdir):
         ("Ncomponents", 10, "Ncomponents is not equal to the size of 'hpx_inds'."),
     ],
 )
-def test_hdf5_read_errors_healpix(healpix_disk_new, param, value, errormsg, tmpdir):
+def test_skyh5_read_errors_healpix(healpix_disk_new, param, value, errormsg, tmpdir):
     sky = healpix_disk_new
 
-    testfile = str(tmpdir.join("testfile.hdf5"))
+    testfile = str(tmpdir.join("testfile.skyh5"))
     sky.write_skyh5(testfile)
 
     with h5py.File(testfile, "r+") as fileobj:
@@ -2669,7 +2683,7 @@ def test_hdf5_read_errors_healpix(healpix_disk_new, param, value, errormsg, tmpd
         SkyModel.from_skyh5(testfile)
 
 
-def test_hdf5_read_errors_oldstyle_healpix():
+def test_skyh5_read_errors_oldstyle_healpix():
     with pytest.raises(
         ValueError, match="This is an old 'healvis' style healpix HDF5 file"
     ):
