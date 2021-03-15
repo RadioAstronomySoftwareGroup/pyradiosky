@@ -191,6 +191,7 @@ class SkyModel(UVBase):
         component_type=None,
         nside=None,
         hpx_inds=None,
+        stokes_error=None,
         extended_model_group=None,
         beam_amp=None,
         history="",
@@ -291,12 +292,29 @@ class SkyModel(UVBase):
             tols=self.freq_tol,
         )
 
-        desc = "Component flux per frequency and Stokes parameter"
+        desc = (
+            "Component flux per frequency and Stokes parameter. Units compatible with "
+            "one of: ['Jy', 'K str', 'Jy/str', 'K']. Shape: (4, Nfreqs, Ncomponents). "
+        )
         self._stokes = UVParameter(
             "stokes",
             description=desc,
             form=(4, "Nfreqs", "Ncomponents"),
             expected_type=Quantity,
+        )
+
+        desc = (
+            "Error on the component flux per frequency and Stokes parameter. The "
+            "details of how this is calculated depends on the catalog. Units should "
+            "be equivalent to the units of the stokes parameter. "
+            "Shape: (4, Nfreqs, Ncomponents). "
+        )
+        self._stokes_error = UVParameter(
+            "stokes_error",
+            description=desc,
+            form=(4, "Nfreqs", "Ncomponents"),
+            expected_type=Quantity,
+            required=False,
         )
 
         # The coherency is a 2x2 matrix giving electric field correlation in Jy
@@ -617,6 +635,11 @@ class SkyModel(UVBase):
             if self.Ncomponents == 1:
                 self.stokes = self.stokes.reshape(4, self.Nfreqs, 1)
 
+            if stokes_error is not None:
+                self.stokes_error = stokes_error
+                if self.Ncomponents == 1:
+                    self.stokes_error = self.stokes_error.reshape(4, self.Nfreqs, 1)
+
             if extended_model_group is not None:
                 self.extended_model_group = extended_model_group
 
@@ -712,6 +735,13 @@ class SkyModel(UVBase):
                     f"{param.name} parameter must have a unit that can be "
                     f"converted to {allowed_units}. "
                     f"Currently units are {self.stokes.unit}"
+                )
+
+        if self.stokes_error is not None:
+            if not self.stokes_error.unit.is_equivalent(self.stokes.unit):
+                raise ValueError(
+                    "stokes_error parameter must have units that are equivalent to the "
+                    "units of the stokes parameter."
                 )
 
         # Run the basic check from UVBase
@@ -1402,6 +1432,8 @@ class SkyModel(UVBase):
             skyobj.spectral_index = skyobj.spectral_index[component_inds]
         skyobj.stokes = skyobj.stokes[:, :, component_inds]
         skyobj.coherency_radec = skyobj.coherency_radec[:, :, :, component_inds]
+        if skyobj.stokes_error is not None:
+            skyobj.stokes_error = skyobj.stokes_error[:, :, component_inds]
         if skyobj.beam_amp is not None:
             skyobj.beam_amp = skyobj.beam_amp[:, :, component_inds]
         if skyobj.extended_model_group is not None:
@@ -1573,7 +1605,7 @@ class SkyModel(UVBase):
         -----
         This stores all SkyModel data in a contiguous array
         that can be more easily handled with numpy.
-        This is used by pyuvsim for sharing catalog data via MPI.
+
         """
         self.check()
         original_comp_type = self.component_type
@@ -1595,6 +1627,11 @@ class SkyModel(UVBase):
         stokes_names = [(f"flux_density_{k}", k) for k in ["I", "Q", "U", "V"]]
         fieldshapes = [()] * 3
 
+        if self.stokes_error is not None:
+            stokes_error_names = [
+                (f"flux_density_error_{k}", f"{k}_error") for k in ["I", "Q", "U", "V"]
+            ]
+
         n_stokes = 0
         stokes_keep = []
         for si, total in enumerate(np.nansum(self.stokes.to("Jy"), axis=(1, 2))):
@@ -1602,6 +1639,10 @@ class SkyModel(UVBase):
                 fieldnames.append(stokes_names[si])
                 fieldshapes.append((self.Nfreqs,))
                 fieldtypes.append("f8")
+                if self.stokes_error is not None:
+                    fieldnames.append(stokes_error_names[si])
+                    fieldshapes.append((self.Nfreqs,))
+                    fieldtypes.append("f8")
                 n_stokes += 1
             stokes_keep.append(total > 0)
 
@@ -1651,6 +1692,10 @@ class SkyModel(UVBase):
         for ii in range(4):
             if stokes_keep[ii]:
                 arr[stokes_names[ii][0]] = self.stokes[ii].T.to("Jy").value
+                if self.stokes_error is not None:
+                    arr[stokes_error_names[ii][0]] = (
+                        self.stokes_error[ii].T.to("Jy").value
+                    )
 
         if self.freq_array is not None:
             if self.spectral_type == "subband":
@@ -1768,6 +1813,19 @@ class SkyModel(UVBase):
             if spar in recarray_in.dtype.names:
                 stokes[ii] = recarray_in[spar].T * units.Jy
 
+        errors_present = False
+        for field in fieldnames:
+            if "error" in field:
+                errors_present = True
+                break
+        if errors_present:
+            stokes_error = Quantity(np.zeros((4, Nfreqs, Ncomponents)), "Jy")
+            for ii, spar in enumerate(["I_error", "Q_error", "U_error", "V_error"]):
+                if spar in recarray_in.dtype.names:
+                    stokes_error[ii] = recarray_in[spar].T * units.Jy
+        else:
+            stokes_error = None
+
         names = ids
 
         self = cls(
@@ -1779,6 +1837,7 @@ class SkyModel(UVBase):
             freq_array=freq_array,
             reference_frequency=reference_frequency,
             spectral_index=spectral_index,
+            stokes_error=stokes_error,
             history=history,
         )
 
@@ -1856,6 +1915,7 @@ class SkyModel(UVBase):
                 "_freq_array",
                 "_reference_frequency",
                 "_spectral_index",
+                "_stokes_error",
                 "_beam_amp",
                 "_extended_model_group",
             ]
@@ -1867,6 +1927,7 @@ class SkyModel(UVBase):
                 "_freq_array",
                 "_reference_frequency",
                 "_spectral_index",
+                "_stokes_error",
                 "_beam_amp",
                 "_extended_model_group",
             ]
@@ -2134,6 +2195,7 @@ class SkyModel(UVBase):
         reference_frequency=None,
         freq_array=None,
         spectral_index_column=None,
+        flux_error_columns=None,
         source_select_kwds=None,
         history="",
         run_check=True,
@@ -2165,6 +2227,11 @@ class SkyModel(UVBase):
         freq_array : :class:`astropy.Quantity`
             Frequencies corresponding to flux_columns (should be same length).
             Required for multiple flux columns.
+        spectral_index_column : str
+            Part of expected spectral index column. Should match only one column in the table.
+        flux_error_columns : str or list of str
+            Part of expected Flux error column(s). Each one should match only one
+            column in the table.
         return_table : bool, optional
             Whether to return the astropy table instead of a list of Source objects.
         source_select_kwds : dict, optional
@@ -2300,6 +2367,37 @@ class SkyModel(UVBase):
         for index, col in enumerate(flux_cols_use):
             stokes[0, index, :] = astropy_table[col].quantity.to(unit_use)
 
+        if flux_error_columns is not None:
+            if isinstance(flux_error_columns, (str)):
+                flux_error_columns = [flux_error_columns]
+            flux_err_cols_use = []
+            for col in flux_error_columns:
+                flux_err_cols_use.append(
+                    _get_matching_fields(col, astropy_table.colnames)
+                )
+
+            err_col_units = []
+            for index, col in enumerate(flux_err_cols_use):
+                err_col_units.append(astropy_table[col].unit)
+
+            if not np.all(
+                np.array(
+                    [this_unit.is_equivalent(unit_use) for this_unit in err_col_units]
+                )
+            ):
+                raise ValueError(
+                    "All flux error columns must have units compatible with the units "
+                    "of the flux columns."
+                )
+
+            stokes_error = Quantity(
+                np.zeros((4, len(flux_err_cols_use), len(astropy_table))), unit_use
+            )
+            for index, col in enumerate(flux_err_cols_use):
+                stokes_error[0, index, :] = astropy_table[col].quantity.to(unit_use)
+        else:
+            stokes_error = None
+
         self.__init__(
             name=astropy_table[id_col_use].data.data.astype("str"),
             ra=Longitude(astropy_table[ra_col_use].quantity),
@@ -2309,6 +2407,7 @@ class SkyModel(UVBase):
             freq_array=freq_array,
             reference_frequency=reference_frequency,
             spectral_index=spectral_index,
+            stokes_error=stokes_error,
             history=history,
         )
 
@@ -2397,20 +2496,30 @@ class SkyModel(UVBase):
 
         if spectral_type == "flat":
             flux_columns = "Fintwide"
+            flux_error_columns = "e_Fintwide"
             reference_frequency = 200e6 * units.Hz
             freq_array = None
             spectral_index_column = None
         elif spectral_type == "spectral_index":
             flux_columns = "Fintfit200"
+            flux_error_columns = "e_Fintfit200"
             reference_frequency = 200e6 * units.Hz
             spectral_index_column = "alpha"
             freq_array = None
         else:
             # fmt: off
-            flux_columns = ["Fint076", "Fint084", "Fint092", "Fint099", "Fint107",
-                            "Fint115", "Fint122", "Fint130", "Fint143", "Fint151",
-                            "Fint158", "Fint166", "Fint174", "Fint181", "Fint189",
-                            "Fint197", "Fint204", "Fint212", "Fint220", "Fint227"]
+            flux_columns = [
+                "Fint076", "Fint084", "Fint092", "Fint099", "Fint107",
+                "Fint115", "Fint122", "Fint130", "Fint143", "Fint151",
+                "Fint158", "Fint166", "Fint174", "Fint181", "Fint189",
+                "Fint197", "Fint204", "Fint212", "Fint220", "Fint227"
+            ]
+            flux_error_columns = [
+                "e_Fint076", "e_Fint084", "e_Fint092", "e_Fint099", "e_Fint107",
+                "e_Fint115", "e_Fint122", "e_Fint130", "e_Fint143", "e_Fint151",
+                "e_Fint158", "e_Fint166", "e_Fint174", "e_Fint181", "e_Fint189",
+                "e_Fint197", "e_Fint204", "e_Fint212", "e_Fint220", "e_Fint227"
+            ]
             freq_array = [76, 84, 92, 99, 107, 115, 122, 130, 143, 151, 158, 166,
                           174, 181, 189, 197, 204, 212, 220, 227]
             freq_array = np.array(freq_array) * 1e6 * units.Hz
@@ -2428,6 +2537,7 @@ class SkyModel(UVBase):
             freq_array=freq_array,
             reference_frequency=reference_frequency,
             spectral_index_column=spectral_index_column,
+            flux_error_columns=flux_error_columns,
             source_select_kwds=source_select_kwds,
         )
 
@@ -2519,7 +2629,21 @@ class SkyModel(UVBase):
         flux_fields = [
             colname for colname in header if colname.lower().startswith("flux")
         ]
+        flux_error_fields = [
+            colname for colname in flux_fields if "error" in colname.lower()
+        ]
+        if len(flux_error_fields) > 0:
+            for colname in flux_error_fields:
+                flux_fields.remove(colname)
+
         flux_fields_lower = [colname.lower() for colname in flux_fields]
+
+        if len(flux_error_fields) > 0:
+            if len(flux_error_fields) != len(flux_fields):
+                raise ValueError(
+                    "Number of flux error fields does not match number of flux fields."
+                )
+            flux_error_fields_lower = [colname.lower() for colname in flux_error_fields]
 
         header_lower = [colname.lower() for colname in header]
 
@@ -2530,7 +2654,10 @@ class SkyModel(UVBase):
                     "If frequency column is present, only one flux column allowed."
                 )
             freq_array = None
-            expected_cols.extend([flux_fields_lower[0], "frequency"])
+            expected_cols.append(flux_fields_lower[0])
+            if len(flux_error_fields) > 0:
+                expected_cols.append("flux_error")
+            expected_cols.append("frequency")
             if "spectral_index" in header_lower:
                 spectral_type = "spectral_index"
                 expected_cols.append("spectral_index")
@@ -2560,7 +2687,12 @@ class SkyModel(UVBase):
                     else:
                         spectral_type = "flat"
                 # This has a freq_array
-                expected_cols.extend(flux_fields_lower)
+                if len(flux_error_fields) > 0:
+                    for ind in range(n_freqs):
+                        expected_cols.append(flux_fields_lower[ind])
+                        expected_cols.append(flux_error_fields_lower[ind])
+                else:
+                    expected_cols.extend(flux_fields_lower)
                 freq_array = np.array(frequencies) * units.Hz
             else:
                 # This is a flat spectrum (no freq info)
@@ -2568,6 +2700,8 @@ class SkyModel(UVBase):
                 spectral_type = "flat"
                 freq_array = None
                 expected_cols.append("flux")
+                if len(flux_error_fields) > 0:
+                    expected_cols.append("flux_error")
 
         if expected_cols != header_lower:
             raise ValueError(
@@ -2587,8 +2721,18 @@ class SkyModel(UVBase):
         decs = Latitude(catalog_table[col_names[2]], units.deg)
 
         stokes = Quantity(np.zeros((4, n_freqs, len(catalog_table))), "Jy")
+        if len(flux_error_fields) > 0:
+            stokes_error = Quantity(np.zeros((4, n_freqs, len(catalog_table))), "Jy")
+        else:
+            stokes_error = None
         for ind in np.arange(n_freqs):
-            stokes[0, ind, :] = catalog_table[col_names[ind + 3]] * units.Jy
+            if len(flux_error_fields) > 0:
+                stokes[0, ind, :] = catalog_table[col_names[ind * 2 + 3]] * units.Jy
+                stokes_error[0, ind, :] = (
+                    catalog_table[col_names[ind * 2 + 4]] * units.Jy
+                )
+            else:
+                stokes[0, ind, :] = catalog_table[col_names[ind + 3]] * units.Jy
 
         if "frequency" in header_lower and freq_array is None:
             freq_ind = np.where(np.array(header_lower) == "frequency")[0][0]
@@ -2611,7 +2755,10 @@ class SkyModel(UVBase):
             freq_array=freq_array,
             reference_frequency=reference_frequency,
             spectral_index=spectral_index,
+            stokes_error=stokes_error,
         )
+
+        assert type(self.stokes_error) == type(stokes_error)
 
         if source_select_kwds is not None:
             self.source_cuts(**source_select_kwds)
@@ -2954,6 +3101,7 @@ class SkyModel(UVBase):
                 "_freq_array",
                 "_reference_frequency",
                 "_spectral_index",
+                "_stokes_error",
                 "_beam_amp",
                 "_extended_model_group",
             ]
@@ -3095,8 +3243,13 @@ class SkyModel(UVBase):
         header = "SOURCE_ID\tRA_J2000 [deg]\tDec_J2000 [deg]"
         format_str = "{}\t{:0.8f}\t{:0.8f}"
         if self.reference_frequency is not None:
-            header += "\tFlux [Jy]\tFrequency [Hz]"
-            format_str += "\t{:0.8f}\t{:0.8f}"
+            header += "\tFlux [Jy]"
+            if self.stokes_error is not None:
+                header += "\tFlux_error [Jy]"
+                format_str += "\t{:0.8f}"
+            header += "\tFrequency [Hz]"
+            format_str += "\t{:0.8f}"
+            format_str += "\t{:0.8f}"
             if self.spectral_index is not None:
                 header += "\tSpectral_Index"
                 format_str += "\t{:0.8f}"
@@ -3112,15 +3265,24 @@ class SkyModel(UVBase):
                 else:
                     freq_str = "{:g}_Hz".format(freq_hz_val)
 
+                format_str += "\t{:0.8f}"
                 if self.spectral_type == "subband":
                     header += f"\tFlux_subband_{freq_str} [Jy]"
+                    if self.stokes_error is not None:
+                        header += f"\tFlux_error_subband_{freq_str} [Jy]"
+                        format_str += "\t{:0.8f}"
                 else:
                     header += f"\tFlux_{freq_str} [Jy]"
-                format_str += "\t{:0.8f}"
+                    if self.stokes_error is not None:
+                        header += f"\tFlux_error_{freq_str} [Jy]"
+                        format_str += "\t{:0.8f}"
         else:
             # flat spectral response, no freq info
             header += "\tFlux [Jy]"
             format_str += "\t{:0.8f}"
+            if self.stokes_error is not None:
+                header += "\tFlux_error [Jy]"
+                format_str += "\t{:0.8f}"
 
         header += "\n"
         format_str += "\n"
@@ -3136,19 +3298,29 @@ class SkyModel(UVBase):
                 ra = entry["ra_j2000"]
                 dec = entry["dec_j2000"]
                 flux_i = entry["I"]
+                if self.stokes_error is not None:
+                    flux_i_err = entry["I_error"]
+                    fluxes_write = []
+                    for ind in range(self.Nfreqs):
+                        fluxes_write.extend([flux_i[ind], flux_i_err[ind]])
+                else:
+                    fluxes_write = flux_i
+
                 if self.reference_frequency is not None:
                     rfreq = entry["reference_frequency"]
                     if self.spectral_index is not None:
                         spec_index = entry["spectral_index"]
                         fo.write(
                             format_str.format(
-                                srcid, ra, dec, *flux_i, rfreq, spec_index
+                                srcid, ra, dec, *fluxes_write, rfreq, spec_index
                             )
                         )
                     else:
-                        fo.write(format_str.format(srcid, ra, dec, *flux_i, rfreq))
+                        fo.write(
+                            format_str.format(srcid, ra, dec, *fluxes_write, rfreq)
+                        )
                 else:
-                    fo.write(format_str.format(srcid, ra, dec, *flux_i))
+                    fo.write(format_str.format(srcid, ra, dec, *fluxes_write))
 
 
 def read_healpix_hdf5(hdf5_filename):

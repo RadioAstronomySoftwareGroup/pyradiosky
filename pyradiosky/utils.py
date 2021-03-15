@@ -19,6 +19,8 @@ from astropy.coordinates import Angle
 import astropy.units as units
 from astropy.units import Quantity
 
+from pyradiosky.data import DATA_PATH as SKY_DATA_PATH
+
 
 # The frame radio astronomers call the apparent or current epoch is the
 # "true equator & equinox" frame, notated E_upsilon in the USNO circular
@@ -200,7 +202,13 @@ def jy_to_ksr(freqs):
     return conv_factor
 
 
-def download_gleam(path=".", filename="gleam.vot", overwrite=False, row_limit=None):
+def download_gleam(
+    path=".",
+    filename="gleam.vot",
+    overwrite=False,
+    row_limit=None,
+    for_testing=False,
+):
     """
     Download the GLEAM vot table from Vizier.
 
@@ -214,6 +222,10 @@ def download_gleam(path=".", filename="gleam.vot", overwrite=False, row_limit=No
         Option to download the file even if it already exists.
     row_limit : int, optional
         Max number of rows (sources) to download, default is None meaning download all rows.
+    for_testing : bool
+        Download a file to use for unit tests. If True, some additional columns are
+        included, the rows are limited to 50, the path and filename are set to put
+        the file in the correct location and the overwrite keyword is set to True.
 
     """
     try:
@@ -222,6 +234,12 @@ def download_gleam(path=".", filename="gleam.vot", overwrite=False, row_limit=No
         raise ImportError(
             "The astroquery module required to use the download_gleam function."
         ) from e
+
+    if for_testing:
+        path = SKY_DATA_PATH
+        filename = "gleam_50srcs.vot"
+        overwrite = True
+        row_limit = 50
 
     opath = os.path.join(path, filename)
     if os.path.exists(opath) and not overwrite:
@@ -240,8 +258,12 @@ def download_gleam(path=".", filename="gleam.vot", overwrite=False, row_limit=No
         "RAJ2000",
         "DEJ2000",
         "Fintwide",
+        "e_Fintwide",
         "alpha",
+        "e_alpha",
+        "chi2",
         "Fintfit200",
+        "e_Fintfit200",
         "Fint076",
         "Fint084",
         "Fint092",
@@ -262,7 +284,30 @@ def download_gleam(path=".", filename="gleam.vot", overwrite=False, row_limit=No
         "Fint212",
         "Fint220",
         "Fint227",
+        "e_Fint076",
+        "e_Fint084",
+        "e_Fint092",
+        "e_Fint099",
+        "e_Fint107",
+        "e_Fint115",
+        "e_Fint122",
+        "e_Fint130",
+        "e_Fint143",
+        "e_Fint151",
+        "e_Fint158",
+        "e_Fint166",
+        "e_Fint174",
+        "e_Fint181",
+        "e_Fint189",
+        "e_Fint197",
+        "e_Fint204",
+        "e_Fint212",
+        "e_Fint220",
+        "e_Fint227",
     ]
+    if for_testing:
+        desired_columns.append("Fpwide")
+
     # There is a bug that causes astroquery to only download the first 14-16 specified
     # columns if you pass it a long list of columns.
     # The workaround is to download all columns and then remove the ones we don't need.
@@ -271,6 +316,9 @@ def download_gleam(path=".", filename="gleam.vot", overwrite=False, row_limit=No
     Vizier.columns = ["all"]
     catname = "VIII/100/gleamegc"
     table = Vizier.get_catalogs(catname)[0]
+
+    for col in desired_columns:
+        assert col in table.colnames, f"column {col} not in downloaded table."
 
     columns_to_remove = list(set(table.colnames) - set(desired_columns))
     table.remove_columns(columns_to_remove)
