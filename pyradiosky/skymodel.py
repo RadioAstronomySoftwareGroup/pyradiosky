@@ -838,11 +838,17 @@ class SkyModel(UVBase):
             )
 
         self.stokes = self.stokes * conv_factor
+        if self.stokes_error is not None:
+            self.stokes_error = self.stokes_error * conv_factor
+
         if self.stokes.unit.is_equivalent("Jy"):
             # need the `to(units.Jy)` call because otherwise even though it's in Jy,
             # the units are a CompositeUnit object which doesn't have all the same
             # functionality as a Unit object
             self.stokes = self.stokes.to(units.Jy)
+            if self.stokes_error is not None:
+                self.stokes_error = self.stokes_error.to(units.Jy)
+
         self.coherency_radec = skyutils.stokes_to_coherency(self.stokes)
 
     def jansky_to_kelvin(self):
@@ -883,6 +889,9 @@ class SkyModel(UVBase):
             )
 
         self.stokes = self.stokes * conv_factor
+        if self.stokes_error is not None:
+            self.stokes_error = self.stokes_error * conv_factor
+
         self.coherency_radec = skyutils.stokes_to_coherency(self.stokes)
 
     def healpix_to_point(
@@ -2444,7 +2453,7 @@ class SkyModel(UVBase):
         gleam_file,
         spectral_type="subband",
         source_select_kwds=None,
-        with_error=True,
+        with_error=False,
         run_check=True,
         check_extra=True,
         run_check_acceptability=True,
