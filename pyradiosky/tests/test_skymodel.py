@@ -242,6 +242,20 @@ def test_init_error_freqparams(zenith_skycoord, spec_type):
         )
 
 
+def test_check_errors():
+    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot)
+
+    # Change units on stokes_error
+    skyobj.stokes_error = skyobj.stokes_error / units.sr
+
+    with pytest.raises(
+        ValueError,
+        match="stokes_error parameter must have units that are equivalent to the "
+        "units of the stokes parameter.",
+    ):
+        skyobj.check()
+
+
 def test_source_zenith_from_icrs(time_location):
     """Test single source position at zenith constructed using icrs."""
     time, array_location = time_location
@@ -270,6 +284,7 @@ def test_source_zenith_from_icrs(time_location):
         dec=dec,
         stokes=[1.0, 0, 0, 0] * units.Jy,
         spectral_type="flat",
+        stokes_error=[0.1, 0, 0, 0] * units.Jy,
     )
 
     zenith_source.update_positions(time, array_location)
@@ -1615,12 +1630,16 @@ def test_healpix_positions(tmp_path, time_location):
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 @pytest.mark.filterwarnings("ignore:The reference_frequency is aliased as `frequency`")
 @pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index", "full"])
-def test_array_to_skymodel_loop(spec_type):
+@pytest.mark.parametrize("with_errors", [False, True])
+def test_array_to_skymodel_loop(spec_type, with_errors):
     spectral_type = "subband" if spec_type == "full" else spec_type
 
     sky = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type=spectral_type)
     if spec_type == "full":
         sky.spectral_type = "full"
+
+    if not with_errors:
+        sky.stokes_error = None
 
     arr = sky.to_recarray()
     sky2 = SkyModel.from_recarray(arr)
@@ -2120,10 +2139,20 @@ def test_read_deprecated_votable():
 def test_read_votable_errors():
 
     # fmt: off
-    flux_columns = ["Fint076", "Fint084", "Fint092", "Fint099", "Fint107",
-                    "Fint115", "Fint122", "Fint130", "Fint143", "Fint151",
-                    "Fint158", "Fint166", "Fint174", "Fint181", "Fint189",
-                    "Fint197", "Fint204", "Fint212", "Fint220", "Fint227"]
+    flux_columns = [
+        "Fint076", "Fint084", "Fint092", "Fint099", "Fint107",
+        "Fint115", "Fint122", "Fint130", "Fint143", "Fint151",
+        "Fint158", "Fint166", "Fint174", "Fint181", "Fint189",
+        "Fint197", "Fint204", "Fint212", "Fint220", "Fint227"
+    ]
+    flux_error_columns = [
+        "e_Fint076", "e_Fint084", "e_Fint092", "e_Fint099", "e_Fint107",
+        "e_Fint115", "e_Fint122", "e_Fint130", "e_Fint143", "e_Fint151",
+        "e_Fint158", "e_Fint166", "e_Fint174", "e_Fint181", "e_Fint189",
+        "e_Fint197", "e_Fint204", "e_Fint212", "e_Fint220", "e_Fint227"
+    ]
+    freq_array = [76, 84, 92, 99, 107, 115, 122, 130, 143, 151, 158, 166,
+                  174, 181, 189, 197, 204, 212, 220, 227]
     # fmt: on
     with pytest.raises(
         ValueError, match="freq_array must be provided for multiple flux columns."
@@ -2136,6 +2165,7 @@ def test_read_votable_errors():
             "DEJ2000",
             flux_columns,
             reference_frequency=200e6 * units.Hz,
+            flux_error_columns=flux_error_columns,
         )
 
     with pytest.raises(
@@ -2149,6 +2179,7 @@ def test_read_votable_errors():
             "DEJ2000",
             "Fintwide",
             reference_frequency=200e6,
+            flux_error_columns="e_Fintwide",
         )
 
     with pytest.raises(ValueError, match="All flux columns must have compatible units"):
@@ -2160,6 +2191,21 @@ def test_read_votable_errors():
             "DEJ2000",
             ["Fintwide", "Fpwide"],
             freq_array=[150e6, 200e6] * units.Hz,
+        )
+
+    flux_error_columns[0] = "e_Fp076"
+    with pytest.raises(
+        ValueError, match="All flux error columns must have units compatible with"
+    ):
+        SkyModel.from_votable_catalog(
+            GLEAM_vot,
+            "GLEAM",
+            "GLEAM",
+            "RAJ2000",
+            "DEJ2000",
+            flux_columns,
+            flux_error_columns=flux_error_columns,
+            freq_array=freq_array,
         )
 
 
@@ -2392,15 +2438,15 @@ def test_text_catalog_loop(tmp_path, spec_type, with_error):
         # again with no reference_frequency field
         reference_frequency = skyobj.reference_frequency
         skyobj.reference_frequency = None
-        arr = skyobj.to_recarray()
-        skyobj2 = SkyModel.from_recarray(arr)
+        skyobj.write_text_catalog(fname)
+        skyobj2 = SkyModel.from_text_catalog(fname)
 
         assert skyobj == skyobj2
 
         # again with flat & freq_array
         skyobj.freq_array = np.atleast_1d(np.unique(reference_frequency))
-        arr = skyobj.to_recarray()
-        skyobj2 = SkyModel.from_recarray(arr)
+        skyobj.write_text_catalog(fname)
+        skyobj2 = SkyModel.from_text_catalog(fname)
 
         assert skyobj == skyobj2
 

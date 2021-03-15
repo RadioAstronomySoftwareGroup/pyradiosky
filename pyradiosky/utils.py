@@ -235,7 +235,7 @@ def download_gleam(
             "The astroquery module required to use the download_gleam function."
         ) from e
 
-    if for_testing:
+    if for_testing:  # pragma: no cover
         path = SKY_DATA_PATH
         filename = "gleam_50srcs.vot"
         overwrite = True
@@ -305,8 +305,8 @@ def download_gleam(
         "e_Fint220",
         "e_Fint227",
     ]
-    if for_testing:
-        desired_columns.append("Fpwide")
+    if for_testing:  # pragma: no cover
+        desired_columns.extend(["Fpwide", "e_Fp076"])
 
     # There is a bug that causes astroquery to only download the first 14-16 specified
     # columns if you pass it a long list of columns.
