@@ -2444,6 +2444,7 @@ class SkyModel(UVBase):
         gleam_file,
         spectral_type="subband",
         source_select_kwds=None,
+        with_error=True,
         run_check=True,
         check_extra=True,
         run_check_acceptability=True,
@@ -2461,8 +2462,6 @@ class SkyModel(UVBase):
             One of 'flat', 'subband' or 'spectral_index'. If set to 'flat', the
             wide band integrated flux will be used, if set to 'spectral_index' the
             fitted flux at 200 MHz will be used for the flux column.
-        return_table : bool, optional
-            Whether to return the astropy table instead of a SkyModel object.
         source_select_kwds : dict, optional
             Dictionary of keywords for source selection Valid options:
 
@@ -2474,6 +2473,9 @@ class SkyModel(UVBase):
               :func:`array_to_skymodel` docstring)
             * `min_flux`: Minimum stokes I flux to select [Jy]
             * `max_flux`: Maximum stokes I flux to select [Jy]
+        with_error : bool
+            Option to include the errors on the stokes array on the object in the
+            `stokes_error` parameter.
         run_check : bool
             Option to check for the existence and proper shapes of parameters
             after downselecting data on this object (the default is True,
@@ -2526,6 +2528,9 @@ class SkyModel(UVBase):
             reference_frequency = None
             spectral_index_column = None
             # fmt: on
+
+        if not with_error:
+            flux_error_columns = None
 
         self.read_votable_catalog(
             gleam_file,

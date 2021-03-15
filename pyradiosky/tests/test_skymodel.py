@@ -1630,16 +1630,15 @@ def test_healpix_positions(tmp_path, time_location):
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 @pytest.mark.filterwarnings("ignore:The reference_frequency is aliased as `frequency`")
 @pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index", "full"])
-@pytest.mark.parametrize("with_errors", [False, True])
-def test_array_to_skymodel_loop(spec_type, with_errors):
+@pytest.mark.parametrize("with_error", [False, True])
+def test_array_to_skymodel_loop(spec_type, with_error):
     spectral_type = "subband" if spec_type == "full" else spec_type
 
-    sky = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type=spectral_type)
+    sky = SkyModel.from_gleam_catalog(
+        GLEAM_vot, spectral_type=spectral_type, with_error=with_error
+    )
     if spec_type == "full":
         sky.spectral_type = "full"
-
-    if not with_errors:
-        sky.stokes_error = None
 
     arr = sky.to_recarray()
     sky2 = SkyModel.from_recarray(arr)
@@ -2416,12 +2415,11 @@ def test_catalog_file_writer(tmp_path):
 def test_text_catalog_loop(tmp_path, spec_type, with_error):
     spectral_type = "subband" if spec_type == "full" else spec_type
 
-    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type=spectral_type)
+    skyobj = SkyModel.from_gleam_catalog(
+        GLEAM_vot, spectral_type=spectral_type, with_error=with_error
+    )
     if spec_type == "full":
         skyobj.spectral_type = "full"
-
-    if not with_error:
-        skyobj.stokes_error = None
 
     fname = os.path.join(tmp_path, "temp_cat.txt")
 
