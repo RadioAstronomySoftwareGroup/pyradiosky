@@ -29,6 +29,14 @@ parser.add_argument(
     help="Max number of rows (sources) to download, default is to download all rows.",
     default=None,
 )
+parser.add_argument(
+    "--for_testing",
+    help="Download a file to use for unit tests. If True, some additional columns are "
+    "included, the rows are limited to 50, the path and filename are set to put "
+    "the file in the correct location and the overwrite keyword is set to True.",
+    default=False,
+    action="store_true",
+)
 
 args = parser.parse_args()
 
@@ -37,4 +45,5 @@ utils.download_gleam(
     filename=args.filename,
     overwrite=args.overwrite,
     row_limit=args.row_limit,
+    for_testing=args.for_testing,
 )

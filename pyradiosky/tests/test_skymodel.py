@@ -2366,12 +2366,16 @@ def test_catalog_file_writer(tmp_path):
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 @pytest.mark.filterwarnings("ignore:The reference_frequency is aliased as `frequency`")
 @pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index", "full"])
-def test_text_catalog_loop(tmp_path, spec_type):
+@pytest.mark.parametrize("with_error", [False, True])
+def test_text_catalog_loop(tmp_path, spec_type, with_error):
     spectral_type = "subband" if spec_type == "full" else spec_type
 
     skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type=spectral_type)
     if spec_type == "full":
         skyobj.spectral_type = "full"
+
+    if not with_error:
+        skyobj.stokes_error = None
 
     fname = os.path.join(tmp_path, "temp_cat.txt")
 
@@ -2454,6 +2458,20 @@ def test_read_text_errors(tmp_path):
 
     fname = os.path.join(tmp_path, "temp_cat.txt")
     skyobj.write_text_catalog(fname)
+    with fileinput.input(files=fname, inplace=True) as infile:
+        for line in infile:
+            line = line.replace("Flux_subband_76_MHz [Jy]", "Frequency [Hz]")
+            print(line, end="")
+
+    with pytest.raises(
+        ValueError,
+        match="Number of flux error fields does not match number of flux fields.",
+    ):
+        SkyModel.from_text_catalog(fname)
+
+    skyobj2 = skyobj.copy()
+    skyobj2.stokes_error = None
+    skyobj2.write_text_catalog(fname)
     with fileinput.input(files=fname, inplace=True) as infile:
         for line in infile:
             line = line.replace("Flux_subband_76_MHz [Jy]", "Frequency [Hz]")
@@ -2582,6 +2600,19 @@ def test_atfreq_tol(tmpdir, mock_point_skies):
 def test_skyh5_file_loop(mock_point_skies, stype, tmpdir):
     sky = mock_point_skies(stype)
     testfile = str(tmpdir.join("testfile.skyh5"))
+
+    sky.write_skyh5(testfile)
+
+    sky2 = SkyModel.from_skyh5(testfile)
+
+    assert sky2 == sky
+
+
+@pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index"])
+def test_skyh5_file_loop_gleam(spec_type, tmpdir):
+    sky = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type=spec_type)
+
+    testfile = str(tmpdir.join("testfile.hdf5"))
 
     sky.write_skyh5(testfile)
 
