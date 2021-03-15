@@ -243,7 +243,7 @@ def test_init_error_freqparams(zenith_skycoord, spec_type):
 
 
 def test_check_errors():
-    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot)
+    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, with_error=True)
 
     # Change units on stokes_error
     skyobj.stokes_error = skyobj.stokes_error / units.sr
@@ -822,7 +822,9 @@ def test_skymodel_deprecated(time_location):
 @pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index"])
 def test_jansky_to_kelvin_loop(spec_type):
 
-    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type=spec_type)
+    skyobj = SkyModel.from_gleam_catalog(
+        GLEAM_vot, spectral_type=spec_type, with_error=True
+    )
 
     stokes_expected = np.zeros_like(skyobj.stokes.value) * units.K * units.sr
     if spec_type == "subband":
@@ -841,6 +843,7 @@ def test_jansky_to_kelvin_loop(spec_type):
 
     skyobj2 = skyobj.copy()
     skyobj2.jansky_to_kelvin()
+    skyobj2.check()
 
     assert units.quantity.allclose(skyobj2.stokes, stokes_expected, equal_nan=True)
 
@@ -851,6 +854,7 @@ def test_jansky_to_kelvin_loop(spec_type):
     assert skyobj3 == skyobj2
 
     skyobj2.kelvin_to_jansky()
+    skyobj2.check()
 
     assert skyobj == skyobj2
 
@@ -1478,7 +1482,7 @@ def test_read_write_healpix_old_nover_history(tmp_path, healpix_data, healpix_di
 
 @pytest.mark.filterwarnings("ignore:This method writes an old 'healvis' style healpix")
 def test_write_healpix_error(tmp_path):
-    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot)
+    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, with_error=True)
     test_filename = os.path.join(tmp_path, "tempfile.hdf5")
 
     with pytest.raises(
@@ -1664,7 +1668,7 @@ def test_array_to_skymodel_loop(spec_type, with_error):
 def test_param_flux_cuts():
     # Check that min/max flux limits in test params work.
 
-    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot)
+    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, with_error=True)
 
     skyobj2 = skyobj.source_cuts(
         min_flux=0.2 * units.Jy, max_flux=1.5 * units.Jy, inplace=False
@@ -1686,7 +1690,7 @@ def test_param_flux_cuts():
 def test_select(spec_type, time_location):
     time, array_location = time_location
 
-    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot)
+    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, with_error=True)
 
     skyobj.beam_amp = np.ones((4, skyobj.Nfreqs, skyobj.Ncomponents))
     skyobj.extended_model_group = np.empty(skyobj.Ncomponents, dtype=str)
@@ -1700,7 +1704,7 @@ def test_select(spec_type, time_location):
 
 
 def test_select_none():
-    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot)
+    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, with_error=True)
 
     skyobj2 = skyobj.select(component_inds=None, inplace=False)
     assert skyobj2 == skyobj
@@ -2016,7 +2020,9 @@ def test_get_matching_fields_errors(name_to_match, name_list, error_message):
 
 @pytest.mark.parametrize("spec_type", ["flat", "subband"])
 def test_read_gleam(spec_type):
-    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type=spec_type)
+    skyobj = SkyModel.from_gleam_catalog(
+        GLEAM_vot, spectral_type=spec_type, with_error=True
+    )
 
     assert skyobj.Ncomponents == 50
     if spec_type == "subband":
@@ -2452,7 +2458,9 @@ def test_text_catalog_loop(tmp_path, spec_type, with_error):
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 @pytest.mark.parametrize("freq_mult", [1e-6, 1e-3, 1e3])
 def test_text_catalog_loop_other_freqs(tmp_path, freq_mult):
-    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type="flat")
+    skyobj = SkyModel.from_gleam_catalog(
+        GLEAM_vot, spectral_type="flat", with_error=True
+    )
     skyobj.freq_array = np.atleast_1d(np.unique(skyobj.reference_frequency) * freq_mult)
     skyobj.reference_frequency = None
 
@@ -2478,7 +2486,9 @@ def test_write_text_catalog_error(tmp_path, healpix_disk_new):
 @pytest.mark.parametrize("spec_type", ["flat", "subband"])
 def test_read_text_source_cuts(tmp_path, spec_type):
 
-    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type=spec_type)
+    skyobj = SkyModel.from_gleam_catalog(
+        GLEAM_vot, spectral_type=spec_type, with_error=True
+    )
     fname = os.path.join(tmp_path, "temp_cat.txt")
     skyobj.write_text_catalog(fname)
 
@@ -2498,7 +2508,9 @@ def test_pyuvsim_mock_catalog_read():
 
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 def test_read_text_errors(tmp_path):
-    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type="subband")
+    skyobj = SkyModel.from_gleam_catalog(
+        GLEAM_vot, spectral_type="subband", with_error=True
+    )
 
     fname = os.path.join(tmp_path, "temp_cat.txt")
     skyobj.write_text_catalog(fname)
@@ -2654,7 +2666,9 @@ def test_skyh5_file_loop(mock_point_skies, stype, tmpdir):
 
 @pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index"])
 def test_skyh5_file_loop_gleam(spec_type, tmpdir):
-    sky = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type=spec_type)
+    sky = SkyModel.from_gleam_catalog(
+        GLEAM_vot, spectral_type=spec_type, with_error=True
+    )
 
     testfile = str(tmpdir.join("testfile.hdf5"))
 
