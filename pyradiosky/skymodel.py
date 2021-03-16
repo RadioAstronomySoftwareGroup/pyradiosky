@@ -165,6 +165,19 @@ class SkyModel(UVBase):
 
     """
 
+    def _set_component_type_params(self, component_type):
+        """Set parameters depending on component_type."""
+        self.component_type = component_type
+
+        if component_type == "healpix":
+            self._name.required = False
+            self._hpx_inds.required = True
+            self._nside.required = True
+        else:
+            self._name.required = True
+            self._hpx_inds.required = False
+            self._nside.required = False
+
     def __init__(
         self,
         name=None,
@@ -417,6 +430,11 @@ class SkyModel(UVBase):
                 reference_frequency = None
 
         if component_type is not None:
+            if component_type not in self._component_type.acceptable_vals:
+                raise ValueError(
+                    "component_type must be one of:",
+                    self._component_type.acceptable_vals,
+                )
             self._set_component_type_params(component_type)
         elif nside is not None:
             self._set_component_type_params("healpix")
@@ -654,19 +672,6 @@ class SkyModel(UVBase):
         )
 
         self._set_spectral_type_params(spectral_type)
-
-    def _set_component_type_params(self, component_type):
-        """Set parameters depending on component_type."""
-        self.component_type = component_type
-
-        if component_type == "healpix":
-            self._name.required = False
-            self._hpx_inds.required = True
-            self._nside.required = True
-        else:
-            self._name.required = True
-            self._hpx_inds.required = False
-            self._nside.required = False
 
     def check(self, check_extra=True, run_check_acceptability=True):
         """
