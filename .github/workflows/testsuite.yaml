@@ -85,10 +85,11 @@ jobs:
 
       - name: Run Tests
         run: |
-          mkdir -p empty
-          cd empty
-          pytest --pyargs pyradiosky --cov=pyradiosky --cov-config=../.coveragerc --cov-report xml:../coverage.xml --junitxml=../test-reports/xunit.xml
-          cd ..
+          python -m pytest --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml --junitxml=test-reports/xunit.xml
+          # mkdir -p empty
+          # cd empty
+          # pytest --pyargs pyradiosky --cov=pyradiosky --cov-config=../.coveragerc --cov-report xml:../coverage.xml --junitxml=../test-reports/xunit.xml
+          # cd ..
 
       - uses: codecov/codecov-action@master
         if: success()
