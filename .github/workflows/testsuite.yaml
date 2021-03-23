@@ -97,6 +97,7 @@ jobs:
           file: ./coverage.xml #optional
 
   min_deps:
+    needs: tests
     env:
       ENV_NAME: min_deps
       PYTHON: 3.7
