@@ -2484,7 +2484,14 @@ class SkyModel(UVBase):
             * `max_flux`: Maximum stokes I flux to select [Jy]
         with_error : bool
             Option to include the errors on the stokes array on the object in the
-            `stokes_error` parameter.
+            `stokes_error` parameter. Note that the values assigned to this parameter
+            are the flux fitting errors. The GLEAM paper (Hurley-Walker et al., 2019)
+            specifies that flux scale errors should be added in quadrature to these
+            fitting errors, but that the size of the flux scale errors depends on
+            whether the comparison is between GLEAM sub-bands or with another catalog.
+            Between GLEAM sub-bands, the flux scale error is 2-3% of the component flux
+            (depending on declination), while flux scale errors between GLEAM and other
+            catalogs is 8-80% of the component flux (depending on declination).
         run_check : bool
             Option to check for the existence and proper shapes of parameters
             after downselecting data on this object (the default is True,
