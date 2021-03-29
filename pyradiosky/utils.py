@@ -326,3 +326,84 @@ def download_gleam(
     table.write(opath, format="votable", overwrite=overwrite)
 
     print("GLEAM catalog downloaded and saved to " + opath)
+
+
+def download_gleam_4jy(
+    path=".", filename="gleam_4Jy.vot", overwrite=False, row_limit=None
+):
+    """
+    Download the GLEAM 4Jy vot table from Vizier.
+
+    Parameters
+    ----------
+    path : str
+        Folder location to save catalog to.
+    filename : str
+        Filename to save catalog to.
+    overwrite : bool
+        Option to download the file even if it already exists.
+    row_limit : int, optional
+        Max number of rows (sources) to download, default is None meaning download all rows.
+
+    """
+    try:
+        from astroquery.vizier import Vizier
+    except ImportError as e:
+        raise ImportError(
+            "The astroquery module required to use the download_gleam function."
+        ) from e
+
+    opath = os.path.join(path, filename)
+    if os.path.exists(opath) and not overwrite:
+        print(
+            f"GLEAM already downloaded to {opath}. Set overwrite=True to re-download it."
+        )
+        return
+
+    # full download is too slow for unit tests
+    if row_limit is None:  # pragma: no cover
+        Vizier.ROW_LIMIT = -1
+    else:
+        Vizier.ROW_LIMIT = row_limit
+    desired_columns = [
+        "G4Jy" "GLEAM",
+        "RAJ2000",
+        "DEJ2000",
+        "Fintwide",
+        "alphaG4Jy",
+        "Fint076",
+        "Fint084",
+        "Fint092",
+        "Fint099",
+        "Fint107",
+        "Fint115",
+        "Fint122",
+        "Fint130",
+        "Fint143",
+        "Fint151",
+        "Fint158",
+        "Fint166",
+        "Fint174",
+        "Fint181",
+        "Fint189",
+        "Fint197",
+        "Fint204",
+        "Fint212",
+        "Fint220",
+        "Fint227",
+    ]
+    # There is a bug that causes astroquery to only download the first 14-16 specified
+    # columns if you pass it a long list of columns.
+    # The workaround is to download all columns and then remove the ones we don't need.
+    # This is not ideal because it substantially increases the download time, but seems
+    # to be required for now.
+    Vizier.columns = ["all"]
+    catname = "VIII/105/catalog"
+    table = Vizier.get_catalogs(catname)[0]
+
+    columns_to_remove = list(set(table.colnames) - set(desired_columns))
+    table.remove_columns(columns_to_remove)
+
+    table.write(opath, format="votable", overwrite=overwrite)
+
+    print("GLEAM catalog downloaded and saved to " + opath)
