@@ -1404,6 +1404,7 @@ class SkyModel(UVBase):
         self,
         other,
         clear_time_position=True,
+        verbose_history=False,
         inplace=True,
         run_check=True,
         check_extra=True,
@@ -1423,6 +1424,14 @@ class SkyModel(UVBase):
             Option to clear time and position dependent parameters on both objects
             before concatenation. If False, time and position dependent parameters
             must match on both objects.
+        verbose_history : bool
+            Option to allow more verbose history. If True and if the histories for the
+            two objects are different, the combined object will keep all the history of
+            both input objects (if many objects are combined in succession this can
+            lead to very long histories). If False and if the histories for the two
+            objects are different, the combined object will have the history of the
+            first object and only the parts of the second object history that are unique
+            (this is done word by word and can result in hard to interpret histories).
         run_check : bool
             Option to check for the existence and proper shapes of parameters
             after combining objects.
@@ -1638,9 +1647,29 @@ class SkyModel(UVBase):
         history_update_string = (
             " Combined skymodels along the component axis using pyradiosky."
         )
-        this.history += history_update_string
+        histories_match = uvutils._check_histories(this.history, other.history)
 
-        this.history = uvutils._combine_histories(this.history, other.history)
+        this.history += history_update_string
+        if not histories_match:
+            if verbose_history:
+                this.history += " Next object history follows. " + other.history
+            else:
+                if "_combine_history_addition" in dir(uvutils):  # pragma: no cover
+                    # this uses very new (unreleased) functionality in pyuvdata
+                    extra_history = uvutils._combine_history_addition(
+                        this.history, other.history
+                    )
+                    if extra_history is not None:
+                        this.history += (
+                            " Unique part of next object history follows. "
+                            + extra_history
+                        )
+                else:
+                    # backwards compatibility for older versions of pyuvdata
+                    this.history = uvutils._combine_histories(
+                        this.history + " Unique part of next object history follows. ",
+                        other.history,
+                    )
 
         # Check final object is self-consistent
         if run_check:

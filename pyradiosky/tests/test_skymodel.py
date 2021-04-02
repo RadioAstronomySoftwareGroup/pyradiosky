@@ -23,6 +23,7 @@ from astropy.coordinates import (
 from astropy.time import Time, TimeDelta
 import scipy.io
 import pyuvdata.tests as uvtest
+import pyuvdata.utils as uvutils
 
 from pyradiosky.data import DATA_PATH as SKY_DATA_PATH
 from pyradiosky import utils as skyutils
@@ -1305,10 +1306,31 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
         skyobj_full.history
         + " Combined skymodels along the component axis using pyradiosky."
     )
-    assert skyobj_new.history == expected_history
+    assert uvutils._check_histories(skyobj_new.history, expected_history)
 
     skyobj_new.history = skyobj_full.history
     assert skyobj_new == skyobj_full
+
+    # change the history to test history handling
+    skyobj2.history += " testing the history."
+    skyobj_new = skyobj1.concat(skyobj2, inplace=False)
+    assert skyobj_new.history != skyobj_full.history
+    expected_history = (
+        skyobj_full.history
+        + " Combined skymodels along the component axis using pyradiosky. "
+        + "Unique part of next object history follows.  testing history."
+    )
+    assert uvutils._check_histories(skyobj_new.history, expected_history)
+
+    skyobj_new = skyobj1.concat(skyobj2, inplace=False, verbose_history=True)
+    assert skyobj_new.history != skyobj_full.history
+    expected_history = (
+        skyobj_full.history
+        + " Combined skymodels along the component axis using pyradiosky. "
+        + "Next object history follows. "
+        + skyobj2.history
+    )
+    assert uvutils._check_histories(skyobj_new.history, expected_history)
 
 
 @pytest.mark.parametrize(
