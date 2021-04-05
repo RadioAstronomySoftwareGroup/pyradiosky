@@ -3087,6 +3087,7 @@ def test_healpix_hdf5_read_errors_newstyle_healpix():
 
 def test_hpx_ordering():
     # Setting the hpx_order parameter
+    pytest.importorskip("astropy_healpix")
     nside = 16
     npix = 12 * nside ** 2
     stokes = np.zeros((4, 1, npix)) * units.K
