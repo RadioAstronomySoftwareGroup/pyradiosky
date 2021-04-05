@@ -3789,7 +3789,7 @@ def write_healpix_hdf5(filename, hpmap, indices, freqs, nside=None, history=None
                 fileobj.attrs[k] = d
 
 
-def healpix_to_sky(hpmap, indices, freqs):
+def healpix_to_sky(hpmap, indices, freqs, hpx_order="ring"):
     """
     Convert a healpix map in K to a set of point source components in Jy.
 
@@ -3804,6 +3804,9 @@ def healpix_to_sky(hpmap, indices, freqs):
         Corresponding HEALPix indices for hpmap.
     freqs : array_like, float
         Frequencies in Hz. Shape (Nfreqs)
+    hpx_order : str
+        HEALPix map ordering parameter: ring or nested.
+        Defaults to ring.
 
     Returns
     -------
@@ -3827,10 +3830,13 @@ def healpix_to_sky(hpmap, indices, freqs):
         "This function will be removed in version 0.2.0.",
         category=DeprecationWarning,
     )
+    hpx_order = str(hpx_order).lower()
+    if hpx_order not in ["ring", "nested"]:
+        raise ValueError("order must be 'nested' or 'ring'")
 
     nside = int(astropy_healpix.npix_to_nside(hpmap.shape[-1]))
 
-    ra, dec = astropy_healpix.healpix_to_lonlat(indices, nside)
+    ra, dec = astropy_healpix.healpix_to_lonlat(indices, nside, order=hpx_order)
     freq = Quantity(freqs, "hertz")
 
     stokes = Quantity(np.zeros((4, len(freq), len(indices))), "K")
@@ -3844,6 +3850,7 @@ def healpix_to_sky(hpmap, indices, freqs):
         freq_array=freq,
         nside=nside,
         hpx_inds=indices,
+        hpx_order=hpx_order,
     )
     return sky
 

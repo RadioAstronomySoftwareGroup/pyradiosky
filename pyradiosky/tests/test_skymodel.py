@@ -1607,6 +1607,30 @@ def test_units_healpix_to_sky(healpix_data, healpix_disk_old):
     assert units.quantity.allclose(sky.stokes[0, 0], stokes[0])
 
 
+@pytest.mark.filterwarnings("ignore:This method reads an old 'healvis' style healpix")
+@pytest.mark.parametrize("hpx_order", ["none", "ring", "nested"])
+def test_order_healpix_to_sky(healpix_data, hpx_order):
+
+    inds = np.arange(healpix_data["npix"])
+    hmap_orig = np.zeros_like(inds)
+    hmap_orig[healpix_data["ipix_disc"]] = healpix_data["npix"] - 1
+    hmap_orig = np.repeat(hmap_orig[None, :], 10, axis=0)
+    with pytest.warns(
+        DeprecationWarning,
+        match="This function is deprecated, use `SkyModel.read_skyh5` or `SkyModel.read_healpix_hdf5` instead.",
+    ):
+        if hpx_order == "none":
+            with pytest.raises(ValueError, match="order must be 'nested' or 'ring'"):
+                sky = skymodel.healpix_to_sky(
+                    hmap_orig, inds, healpix_data["frequencies"], hpx_order=hpx_order
+                )
+        else:
+            sky = skymodel.healpix_to_sky(
+                hmap_orig, inds, healpix_data["frequencies"], hpx_order=hpx_order
+            )
+            assert sky.hpx_order == hpx_order
+
+
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 def test_healpix_recarray_loop(healpix_data, healpix_disk_new):
 
