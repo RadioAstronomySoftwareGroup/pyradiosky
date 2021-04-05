@@ -3,11 +3,13 @@
 ## [Unreleased]
 
 ### Added
+- Support for ring / nested healpix ordering.
 - New `SkyModel.concat` method to support concatenating catalogs.
 - A new optional parameters `stokes_error` to track errors on the fluxes reported by catalogs.
 
 ### Fixed
 - Some bugs related to writing & reading skyh5 files after converting object using `healpix_to_point` method.
+
 ## [0.1.1] - 2021-02-17
 
 ### Added
