@@ -192,6 +192,7 @@ class SkyModel(UVBase):
         nside=None,
         hpx_inds=None,
         stokes_error=None,
+        hpx_order=None,
         extended_model_group=None,
         beam_amp=None,
         history="",
@@ -261,6 +262,17 @@ class SkyModel(UVBase):
             description=desc,
             expected_type=int,
             required=False,
+        )
+        desc = (
+            "Healpix pixel ordering (ring or nested). Only required for HEALPix maps."
+        )
+        self._hpx_order = UVParameter(
+            "hpx_order",
+            description=desc,
+            value="ring",
+            expected_type=str,
+            required=False,
+            acceptable_vals=["ring", "nested"],
         )
 
         desc = "Healpix index, only reqired for HEALPix maps. shape (Ncomponents,)"
@@ -508,6 +520,11 @@ class SkyModel(UVBase):
                 self.nside = nside
             if hpx_inds is not None:
                 self.hpx_inds = np.atleast_1d(hpx_inds)
+            if hpx_order is not None:
+                self.hpx_order = str(hpx_order).lower()
+
+                # Ensure that the value can be used in healpix_to_lonlat below.
+                self._hpx_order.check_acceptability()
 
             if self.component_type == "healpix":
                 self.Ncomponents = self.hpx_inds.size
@@ -517,7 +534,9 @@ class SkyModel(UVBase):
                     raise ImportError(
                         "The astropy-healpix module must be installed to use HEALPix methods"
                     ) from e
-                ra, dec = astropy_healpix.healpix_to_lonlat(hpx_inds, nside)
+                ra, dec = astropy_healpix.healpix_to_lonlat(
+                    hpx_inds, nside, order=self.hpx_order
+                )
                 self.ra = ra
                 self.dec = dec
 

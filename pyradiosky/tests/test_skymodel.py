@@ -3059,3 +3059,36 @@ def test_skyh5_read_errors_oldstyle_healpix():
 def test_healpix_hdf5_read_errors_newstyle_healpix():
     with pytest.raises(ValueError, match="This is a skyh5 file"):
         SkyModel.from_healpix_hdf5(os.path.join(SKY_DATA_PATH, "healpix_disk.skyh5"))
+
+
+def test_hpx_ordering():
+    # Setting the hpx_order parameter
+    nside = 16
+    npix = 12 * nside ** 2
+    stokes = np.zeros((4, 1, npix)) * units.K
+
+    with pytest.raises(ValueError, match="order must be 'nested' or 'ring'"):
+        sky = SkyModel(
+            hpx_inds=np.arange(npix),
+            nside=nside,
+            hpx_order="none",
+            stokes=stokes,
+            spectral_type="flat",
+        )
+
+    sky = SkyModel(
+        hpx_inds=np.arange(npix),
+        nside=16,
+        hpx_order="Ring",
+        stokes=stokes,
+        spectral_type="flat",
+    )
+    assert sky.hpx_order == "ring"
+    sky = SkyModel(
+        hpx_inds=np.arange(npix),
+        nside=16,
+        hpx_order="NESTED",
+        stokes=stokes,
+        spectral_type="flat",
+    )
+    assert sky.hpx_order == "nested"
