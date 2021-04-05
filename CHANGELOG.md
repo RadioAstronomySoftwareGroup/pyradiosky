@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- New `SkyModel.concat` method to support concatenating catalogs.
 - A new optional parameters `stokes_error` to track errors on the fluxes reported by catalogs.
 
 ### Fixed
