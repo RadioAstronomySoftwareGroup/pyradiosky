@@ -452,7 +452,7 @@ def download_gleam_galactic_plane(
         "RAJ2000",
         "DEJ2000",
         "Fintwide",
-        "alphaG4Jy",
+        "alpha",
         "Fintfit200",
         "Fint076",
         "Fint084",
