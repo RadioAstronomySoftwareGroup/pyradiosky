@@ -153,6 +153,9 @@ class SkyModel(UVBase):
         nside parameter for HEALPix maps.
     hpx_inds : array_like of int
         Indices for HEALPix maps, only used if nside is set.
+    hpx_order : str
+        For HEALPix maps, pixel ordering parameter. Can be "ring" or "nested".
+        Defaults to "ring" if unset in init keywords.
     extended_model_group : array_like of str
         Identifier that groups components of an extended source model.
         Empty string for point sources, shape (Ncomponents,).
@@ -269,13 +272,13 @@ class SkyModel(UVBase):
         self._hpx_order = UVParameter(
             "hpx_order",
             description=desc,
-            value="ring",
+            value=None,
             expected_type=str,
             required=False,
             acceptable_vals=["ring", "nested"],
         )
 
-        desc = "Healpix index, only reqired for HEALPix maps. shape (Ncomponents,)"
+        desc = "Healpix indices, only required for HEALPix maps."
         self._hpx_inds = UVParameter(
             "hpx_inds",
             description=desc,
@@ -476,7 +479,7 @@ class SkyModel(UVBase):
             self._set_component_type_params("point")
 
         if self.component_type == "healpix":
-            req_args = ["nside", "hpx_inds", "stokes", "spectral_type"]
+            req_args = ["nside", "hpx_inds", "stokes", "spectral_type", "hpx_order"]
             args_set_req = [
                 nside is not None,
                 hpx_inds is not None,
@@ -527,13 +530,17 @@ class SkyModel(UVBase):
                 self._hpx_order.check_acceptability()
 
             if self.component_type == "healpix":
-                self.Ncomponents = self.hpx_inds.size
                 try:
                     import astropy_healpix
                 except ImportError as e:
                     raise ImportError(
                         "The astropy-healpix module must be installed to use HEALPix methods"
                     ) from e
+
+                if self.hpx_order is None:
+                    self.hpx_order = "ring"
+
+                self.Ncomponents = self.hpx_inds.size
                 ra, dec = astropy_healpix.healpix_to_lonlat(
                     hpx_inds, nside, order=self.hpx_order
                 )
