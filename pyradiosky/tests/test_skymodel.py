@@ -19,11 +19,14 @@ from astropy.coordinates import (
     AltAz,
     Longitude,
     Latitude,
+    Galactic,
 )
 from astropy.time import Time, TimeDelta
 import scipy.io
 import pyuvdata.tests as uvtest
 import pyuvdata.utils as uvutils
+
+from pyuvdata.tests import check_warnings
 
 from pyradiosky.data import DATA_PATH as SKY_DATA_PATH
 from pyradiosky import utils as skyutils
@@ -132,6 +135,25 @@ def healpix_data():
         "pixel_area": pixel_area,
         "ipix_disc": ipix_disc,
     }
+
+
+@pytest.fixture
+def healpix_icrs():
+    astropy_healpix = pytest.importorskip("astropy_healpix")
+
+    nside = 32
+    hp_obj = astropy_healpix.HEALPix(nside=nside, frame=Galactic())
+
+    coords = hp_obj.healpix_to_skycoord(np.arange(hp_obj.npix))
+    coords_icrs = coords.transform_to("icrs")
+
+    stokes = units.Quantity(np.zeros((4, 1, hp_obj.npix)), unit=units.K)
+    stokes[0] += 1 << units.K
+    freq = 75 * units.MHz
+
+    yield hp_obj, coords_icrs, stokes, freq
+
+    del hp_obj, coords_icrs, stokes, freq
 
 
 @pytest.fixture
@@ -3117,3 +3139,86 @@ def test_hpx_ordering():
         spectral_type="flat",
     )
     assert sky.hpx_order == "nested"
+
+
+def test_healpix_coordinate_init_override(healpix_icrs):
+    hp_obj, coords_icrs, stokes, freq = healpix_icrs
+
+    with check_warnings(
+        UserWarning, "Input ra and dec parameters are being used instead of"
+    ):
+        skymod = SkyModel(
+            ra=coords_icrs.ra,
+            dec=coords_icrs.dec,
+            stokes=stokes,
+            spectral_type="full",
+            freq_array=freq,
+            nside=hp_obj.nside,
+            hpx_inds=np.arange(hp_obj.npix)
+        )
+
+    assert np.array_equal(skymod.ra, coords_icrs.ra)
+    assert np.array_equal(skymod.dec, coords_icrs.dec)
+
+
+def test_healpix_coordinate_init_no_override(healpix_icrs):
+    astropy_healpix = pytest.importorskip("astropy_healpix")
+    hp_obj, coords_icrs, stokes, freq = healpix_icrs
+
+    hp_ra, hp_dec = astropy_healpix.healpix_to_lonlat(
+        np.arange(hp_obj.npix),
+        hp_obj.nside,
+    )
+
+    with check_warnings(
+        UserWarning, "Either the ra or dec was attempted to be initialized without"
+    ):
+        skymod = SkyModel(
+            ra=coords_icrs.ra,
+            stokes=stokes,
+            spectral_type="full",
+            freq_array=freq,
+            nside=hp_obj.nside,
+            hpx_inds=np.arange(hp_obj.npix)
+        )
+
+    assert not np.array_equal(skymod.ra, coords_icrs.ra)
+    assert np.array_equal(skymod.ra, hp_ra)
+    assert np.array_equal(skymod.dec, hp_dec)
+
+
+@pytest.mark.parametrize(
+    "param,val,err_msg",
+    [
+        ("ra", 10, "All values in ra must be Longitude objects"),
+        ("dec", 10, "All values in dec must be Latitude objects"),
+    ]
+)
+@pytest.mark.filterwarnings("ignore:Input ra and dec parameters are being used instead of")
+def test_healpix_init_overrid_errors(healpix_icrs, param, val, err_msg):
+    astropy_healpix = pytest.importorskip("astropy_healpix")
+    hp_obj, coords_icrs, stokes, freq = healpix_icrs
+
+    hp_ra, hp_dec = astropy_healpix.healpix_to_lonlat(
+        np.arange(hp_obj.npix),
+        hp_obj.nside,
+    )
+    ra, dec = coords_icrs.ra, coords_icrs.dec
+
+    ra = list(ra)
+    dec = list(dec)
+    if param == "ra":
+        ra[-1] = val
+    else:
+        dec[-1] = val
+
+    with pytest.raises(ValueError, match=err_msg):
+        SkyModel(
+            ra=ra,
+            dec=dec,
+            stokes=stokes,
+            spectral_type="full",
+            freq_array=freq,
+            nside=hp_obj.nside,
+            hpx_inds=np.arange(hp_obj.npix)
+        )

@@ -541,11 +541,49 @@ class SkyModel(UVBase):
                     self.hpx_order = "ring"
 
                 self.Ncomponents = self.hpx_inds.size
-                ra, dec = astropy_healpix.healpix_to_lonlat(
-                    hpx_inds, nside, order=self.hpx_order
-                )
-                self.ra = ra
-                self.dec = dec
+                if ra is not None and dec is not None:
+                    warnings.warn(
+                        "Input ra and dec parameters are being used instead of "
+                        "the default healpix coordinates. These coordinates will "
+                        "not necessarily line up with healpix pixel indicies. "
+                        "If you are intentionally trying to overwrite healpix "
+                        "coordinates please ensure the pixel indices are properly "
+                        "updated."
+                    )
+                    if isinstance(ra, (list)):
+                        # Cannot just try converting to Longitude because if the values are
+                        # Latitudes they are silently converted to Longitude rather than
+                        # throwing an error.
+                        for val in ra:
+                            if not isinstance(val, (Longitude)):
+                                raise ValueError(
+                                    "All values in ra must be Longitude objects"
+                                )
+                        ra = Longitude(ra)
+                    self.ra = np.atleast_1d(ra)
+                    if isinstance(dec, (list)):
+                        # Cannot just try converting to Latitude because if the values are
+                        # Longitude they are silently converted to Longitude rather than
+                        # throwing an error.
+                        for val in dec:
+                            if not isinstance(val, (Latitude)):
+                                raise ValueError(
+                                    "All values in dec must be Latitude objects"
+                                )
+                        dec = Latitude(dec)
+                    self.dec = np.atleast_1d(dec)
+
+                else:
+                    if ra is not None or dec is not None:
+                        warnings.warn(
+                            "Either the ra or dec was attempted to be initialized "
+                            "without specifying the other. Either both need to be "
+                            "given to overwrite healpix coordinates or neither. "
+                            "Proceeding with the default healpix coordinates"
+                        )
+                    ra, dec = astropy_healpix.healpix_to_lonlat(hpx_inds, nside)
+                    self.ra = ra
+                    self.dec = dec
 
             else:
                 self.Ncomponents = self.name.size
