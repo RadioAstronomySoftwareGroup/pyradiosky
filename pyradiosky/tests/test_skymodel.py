@@ -3222,3 +3222,33 @@ def test_healpix_init_overrid_errors(healpix_icrs, param, val, err_msg):
             nside=hp_obj.nside,
             hpx_inds=np.arange(hp_obj.npix)
         )
+
+
+def test_write_clobber_error(mock_point_skies, tmpdir):
+    sky = mock_point_skies("subband")
+    testfile = str(tmpdir.join("testfile.skyh5"))
+
+    sky.write_skyh5(testfile)
+
+    with pytest.raises(IOError, match="File exists; If overwriting is desired"):
+        sky.write_skyh5(testfile, clobber=False)
+
+
+def test_write_clobber(mock_point_skies, tmpdir):
+    sky = mock_point_skies("subband")
+    testfile = str(tmpdir.join("testfile.skyh5"))
+
+    sky.write_skyh5(testfile)
+    sky2 = SkyModel.from_skyh5(testfile)
+
+    assert sky2 == sky
+
+    sky.stokes = sky.stokes * 2
+    sky.coherency_radec = skyutils.stokes_to_coherency(sky.stokes)
+    assert sky != sky2
+
+    sky.write_skyh5(testfile, clobber=True)
+    sky3 = SkyModel.from_skyh5(testfile)
+
+    assert sky3 == sky
+    assert sky3 != sky2
