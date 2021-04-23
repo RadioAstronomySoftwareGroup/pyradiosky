@@ -312,7 +312,7 @@ class SkyModel(UVBase):
 
         desc = (
             "Component flux per frequency and Stokes parameter. Units compatible with "
-            "one of: ['Jy', 'K str', 'Jy/sr', 'K']. Shape: (4, Nfreqs, Ncomponents). "
+            "one of: ['Jy', 'K sr', 'Jy/sr', 'K']. Shape: (4, Nfreqs, Ncomponents). "
         )
         self._stokes = UVParameter(
             "stokes",
