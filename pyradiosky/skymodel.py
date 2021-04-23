@@ -582,7 +582,9 @@ class SkyModel(UVBase):
                             "given to overwrite healpix coordinates or neither. "
                             "Proceeding with the default healpix coordinates"
                         )
-                    ra, dec = astropy_healpix.healpix_to_lonlat(hpx_inds, nside)
+                    ra, dec = astropy_healpix.healpix_to_lonlat(
+                        hpx_inds, nside, order=self.hpx_order,
+                    )
                     self.ra = ra
                     self.dec = dec
 
