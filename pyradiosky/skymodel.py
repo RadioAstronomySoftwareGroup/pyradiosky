@@ -5,6 +5,7 @@
 
 import warnings
 
+import os
 import h5py
 import numpy as np
 from scipy.linalg import orthogonal_procrustes as ortho_procr
@@ -3428,6 +3429,7 @@ class SkyModel(UVBase):
     def write_skyh5(
         self,
         filename,
+        clobber=False,
         data_compression=None,
         run_check=True,
         check_extra=True,
@@ -3440,6 +3442,8 @@ class SkyModel(UVBase):
         ----------
         filename : str
             Path and name of the file to write to.
+        clobber : bool
+            Indicate whether an existing file should be overwritten (clobbered).
         data_compression : str
             HDF5 filter to apply when writing the stokes data. Default is None
             (no filter/compression). One reasonable option to reduce file size
@@ -3468,6 +3472,14 @@ class SkyModel(UVBase):
                 self.history, self.pyradiosky_version_str
             ):
                 self.history += self.pyradiosky_version_str
+
+        if os.path.exists(filename):
+            if not clobber:
+                raise IOError(
+                    "File exists; If overwriting is desired set the clobber keyword to True."
+                )
+            else:
+                print("File exists; clobbering.")
 
         with h5py.File(filename, "w") as fileobj:
             # create header
