@@ -3579,7 +3579,7 @@ class SkyModel(UVBase):
                 dtype=self.stokes.dtype,
                 chunks=True,
             )
-            dgrp["stokes"].attrs["unit"] = self.stokes.unit.name
+            dgrp["stokes"].attrs["unit"] = str(self.stokes.unit)
 
     def write_healpix_hdf5(self, filename):
         """
