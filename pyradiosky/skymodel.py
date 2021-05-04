@@ -126,6 +126,10 @@ class SkyModel(UVBase):
         source RA in J2000 (or ICRS) coordinates, shape (Ncomponents,).
     dec : :class:`astropy.Latitude`
         source Dec in J2000 (or ICRS) coordinates, shape (Ncomponents,).
+    gl : :class:`astropy.Longitude`
+        source Galactic longitude, shape (Ncomponents,).
+    gb : :class:`astropy.Latitude`
+        source Galactic latitude, shape (Ncomponents,).
     stokes : :class:`astropy.Quantity` or array_like of float (Deprecated)
         The source flux, shape (4, Nfreqs, Ncomponents). The first axis indexes
         the polarization as [I, Q, U, V].
@@ -186,6 +190,9 @@ class SkyModel(UVBase):
         name=None,
         ra=None,
         dec=None,
+        gl=None,
+        gb=None,
+        frame="icrs",
         stokes=None,
         spectral_type=None,
         freq_array=None,
@@ -207,6 +214,9 @@ class SkyModel(UVBase):
         # Frequency tolerance: 1 Hz
         self.freq_tol = 1 * units.Hz
 
+        # SkyCoord instance that will handle component positions.
+        self._component_pos = None
+
         self._Ncomponents = UVParameter(
             "Ncomponents", description="Number of components", expected_type=int
         )
@@ -224,6 +234,7 @@ class SkyModel(UVBase):
             form=("Ncomponents",),
             expected_type=Longitude,
             tols=angle_tol,
+            required=False,
         )
 
         desc = "Declination of components in ICRS coordinates. shape (Ncomponents,)"
@@ -233,6 +244,34 @@ class SkyModel(UVBase):
             form=("Ncomponents",),
             expected_type=Latitude,
             tols=angle_tol,
+            required=False,
+        )
+
+        desc = "Galactic longitude of components. shape (Ncomponents,)"
+        self._gl = UVParameter(
+            "gl",
+            description=desc,
+            form=("Ncomponents",),
+            expected_type=Longitude,
+            tols=angle_tol,
+            required=False,
+        )
+
+        desc = "Galactic Latitude of components. shape (Ncomponents,)"
+        self._gb = UVParameter(
+            "gb",
+            description=desc,
+            form=("Ncomponents",),
+            expected_type=Latitude,
+            tols=angle_tol,
+            required=False,
+        )
+
+        desc = 'Coordinate system in use ["icrs", "galactic"].'
+        self._frame = UVParameter(
+            "frame",
+            description=desc,
+            expected_type=str,
         )
 
         desc = (
@@ -478,6 +517,11 @@ class SkyModel(UVBase):
         else:
             self._set_component_type_params("point")
 
+        if not frame.lower() in ["icrs", "galactic"]:
+            raise ValueError(f"Frame {frame} is not supported at this time.")
+
+        self.frame = frame.lower()
+
         if self.component_type == "healpix":
             req_args = ["nside", "hpx_inds", "stokes", "spectral_type", "hpx_order"]
             args_set_req = [
@@ -487,14 +531,34 @@ class SkyModel(UVBase):
                 spectral_type is not None,
             ]
         else:
-            req_args = ["name", "ra", "dec", "stokes", "spectral_type"]
+            req_args = ["name", "stokes", "spectral_type"]
             args_set_req = [
                 name is not None,
-                ra is not None,
-                dec is not None,
                 stokes is not None,
                 spectral_type is not None,
             ]
+
+            if self.frame == "icrs":
+                self._ra.required = True
+                self._dec.required = True
+                req_args.extend(["ra", "dec"])
+                args_set_req.extend(
+                    [
+                        ra is not None,
+                        dec is not None,
+                    ]
+                )
+            if self.frame == "galactic":
+                self._gl.required = True
+                self._gb.required = True
+                req_args.extend(["gl", "gb"])
+                args_set_req.extend(
+                    [
+                        gl is not None,
+                        gb is not None,
+                    ]
+                )
+
         if spectral_type == "spectral_index":
             req_args.extend(["spectral_index", "reference_frequency"])
             args_set_req.extend(
@@ -541,11 +605,16 @@ class SkyModel(UVBase):
                     self.hpx_order = "ring"
 
                 self.Ncomponents = self.hpx_inds.size
-                ra, dec = astropy_healpix.healpix_to_lonlat(
+                lon, lat = astropy_healpix.healpix_to_lonlat(
                     hpx_inds, nside, order=self.hpx_order
                 )
-                self.ra = ra
-                self.dec = dec
+
+                if self.frame == "icrs":
+                    self.ra = lon
+                    self.dec = lat
+                elif self.frame == "galactic":
+                    self.gl = lon
+                    self.gb = lat
 
             else:
                 self.Ncomponents = self.name.size
