@@ -3154,7 +3154,7 @@ def test_healpix_coordinate_init_override(healpix_icrs):
             spectral_type="full",
             freq_array=freq,
             nside=hp_obj.nside,
-            hpx_inds=np.arange(hp_obj.npix)
+            hpx_inds=np.arange(hp_obj.npix),
         )
 
     assert np.array_equal(skymod.ra, coords_icrs.ra)
@@ -3174,12 +3174,11 @@ def test_healpix_coordinate_init_override_lists(healpix_icrs):
             spectral_type="full",
             freq_array=freq,
             nside=hp_obj.nside,
-            hpx_inds=np.arange(hp_obj.npix)
+            hpx_inds=np.arange(hp_obj.npix),
         )
 
     assert np.array_equal(skymod.ra, coords_icrs.ra)
     assert np.array_equal(skymod.dec, coords_icrs.dec)
-
 
 
 def test_healpix_coordinate_init_no_override(healpix_icrs):
@@ -3200,7 +3199,7 @@ def test_healpix_coordinate_init_no_override(healpix_icrs):
             spectral_type="full",
             freq_array=freq,
             nside=hp_obj.nside,
-            hpx_inds=np.arange(hp_obj.npix)
+            hpx_inds=np.arange(hp_obj.npix),
         )
 
     assert not np.array_equal(skymod.ra, coords_icrs.ra)
@@ -3213,9 +3212,11 @@ def test_healpix_coordinate_init_no_override(healpix_icrs):
     [
         ("ra", 10, "All values in ra must be Longitude objects"),
         ("dec", 10, "All values in dec must be Latitude objects"),
-    ]
+    ],
 )
-@pytest.mark.filterwarnings("ignore:Input ra and dec parameters are being used instead of")
+@pytest.mark.filterwarnings(
+    "ignore:Input ra and dec parameters are being used instead of"
+)
 def test_healpix_init_override_errors(healpix_icrs, param, val, err_msg):
     astropy_healpix = pytest.importorskip("astropy_healpix")
     hp_obj, coords_icrs, stokes, freq = healpix_icrs
@@ -3241,7 +3242,7 @@ def test_healpix_init_override_errors(healpix_icrs, param, val, err_msg):
             spectral_type="full",
             freq_array=freq,
             nside=hp_obj.nside,
-            hpx_inds=np.arange(hp_obj.npix)
+            hpx_inds=np.arange(hp_obj.npix),
         )
 
 

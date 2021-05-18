@@ -583,7 +583,9 @@ class SkyModel(UVBase):
                             "Proceeding with the default healpix coordinates"
                         )
                     ra, dec = astropy_healpix.healpix_to_lonlat(
-                        hpx_inds, nside, order=self.hpx_order,
+                        hpx_inds,
+                        nside,
+                        order=self.hpx_order,
                     )
                     self.ra = ra
                     self.dec = dec
