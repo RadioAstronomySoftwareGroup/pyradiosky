@@ -3161,6 +3161,27 @@ def test_healpix_coordinate_init_override(healpix_icrs):
     assert np.array_equal(skymod.dec, coords_icrs.dec)
 
 
+def test_healpix_coordinate_init_override_lists(healpix_icrs):
+    hp_obj, coords_icrs, stokes, freq = healpix_icrs
+
+    with check_warnings(
+        UserWarning, "Input ra and dec parameters are being used instead of"
+    ):
+        skymod = SkyModel(
+            ra=list(coords_icrs.ra),
+            dec=list(coords_icrs.dec),
+            stokes=stokes,
+            spectral_type="full",
+            freq_array=freq,
+            nside=hp_obj.nside,
+            hpx_inds=np.arange(hp_obj.npix)
+        )
+
+    assert np.array_equal(skymod.ra, coords_icrs.ra)
+    assert np.array_equal(skymod.dec, coords_icrs.dec)
+
+
+
 def test_healpix_coordinate_init_no_override(healpix_icrs):
     astropy_healpix = pytest.importorskip("astropy_healpix")
     hp_obj, coords_icrs, stokes, freq = healpix_icrs
@@ -3195,7 +3216,7 @@ def test_healpix_coordinate_init_no_override(healpix_icrs):
     ]
 )
 @pytest.mark.filterwarnings("ignore:Input ra and dec parameters are being used instead of")
-def test_healpix_init_overrid_errors(healpix_icrs, param, val, err_msg):
+def test_healpix_init_override_errors(healpix_icrs, param, val, err_msg):
     astropy_healpix = pytest.importorskip("astropy_healpix")
     hp_obj, coords_icrs, stokes, freq = healpix_icrs
 
