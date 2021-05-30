@@ -3521,7 +3521,7 @@ def test_healpix_coordinate_init_override(healpix_icrs):
     hp_obj, coords_icrs, stokes, freq = healpix_icrs
 
     with check_warnings(
-        UserWarning, "Input ra and dec parameters are being used instead of"
+        UserWarning, "Input lon and lat parameters are being used instead of"
     ):
         skymod = SkyModel(
             ra=coords_icrs.ra,
@@ -3541,7 +3541,7 @@ def test_healpix_coordinate_init_override_lists(healpix_icrs):
     hp_obj, coords_icrs, stokes, freq = healpix_icrs
 
     with check_warnings(
-        UserWarning, "Input ra and dec parameters are being used instead of"
+        UserWarning, "Input lon and lat parameters are being used instead of"
     ):
         skymod = SkyModel(
             ra=list(coords_icrs.ra),
@@ -3567,7 +3567,7 @@ def test_healpix_coordinate_init_no_override(healpix_icrs):
     )
 
     with check_warnings(
-        UserWarning, "Either the ra or dec was attempted to be initialized without"
+        UserWarning, "Either the lon or lat was attempted to be initialized without"
     ):
         skymod = SkyModel(
             ra=coords_icrs.ra,
@@ -3592,7 +3592,7 @@ def test_healpix_coordinate_init_no_override(healpix_icrs):
     ],
 )
 @pytest.mark.filterwarnings(
-    "ignore:Input ra and dec parameters are being used instead of"
+    "ignore:Input lon and lat parameters are being used instead of"
 )
 def test_healpix_init_override_errors(healpix_icrs, param, val, err_msg):
     astropy_healpix = pytest.importorskip("astropy_healpix")
