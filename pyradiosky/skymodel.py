@@ -10,7 +10,7 @@ import h5py
 import numpy as np
 from scipy.linalg import orthogonal_procrustes as ortho_procr
 import scipy.io
-from astropy.coordinates import Angle, EarthLocation, AltAz, Latitude, Longitude
+from astropy.coordinates import Angle, EarthLocation, AltAz, Latitude, Longitude, frame_transform_graph
 from astropy.time import Time
 import astropy.units as units
 from astropy.units import Quantity
@@ -187,8 +187,13 @@ class SkyModel(UVBase):
     def __init__(
         self,
         name=None,
+        lon=None,           #!!!!!!!!!!!
+        lat=None,           #!!!!!!!!!!!
         ra=None,
         dec=None,
+        l=None,            #!!!!!!!!!!!
+        b=None,            #!!!!!!!!!!!
+        frame=None,         #!!!!!!!!!!!
         stokes=None,
         spectral_type=None,
         freq_array=None,
@@ -220,24 +225,26 @@ class SkyModel(UVBase):
         )
         self._Nfreqs = UVParameter("Nfreqs", description=desc, expected_type=int)
 
-        desc = (
-            "Right ascension of components in ICRS coordinates, not required for "
-            "Healpix component_type. shape (Ncomponents,)"
+        desc = "Name of the source coordinate frame."
+        self._frame = UVParameter(
+            "frame",
+            description=desc,
+            expected_type=str,
+            #expected_type=BaseCoordinateFrame, # TODO -- This breaks the check()
         )
-        self._ra = UVParameter(
-            "ra",
+
+        desc = "Longitudes of source component positions. shape (Ncomponents,)"
+        self._lon = UVParameter(
+            "lon",
             description=desc,
             form=("Ncomponents",),
             expected_type=Longitude,
             tols=angle_tol,
         )
 
-        desc = (
-            "Declination of components in ICRS coordinates, not required for "
-            "Healpix component_type. shape (Ncomponents,)"
-        )
-        self._dec = UVParameter(
-            "dec",
+        desc = "Latitudes of source component positions. shape (Ncomponents,)"
+        self._lat = UVParameter(
+            "lat",
             description=desc,
             form=("Ncomponents",),
             expected_type=Latitude,
@@ -475,6 +482,29 @@ class SkyModel(UVBase):
                 freq_array = freqs_use
                 reference_frequency = None
 
+        # TODO -- Raise error if missing the right combination.
+        frame_guess = None
+        if (ra is not None) and (dec is not None):
+            lon = ra
+            lat = dec
+            frame_guess = 'icrs'
+        elif (l is not None) and (b is not None):
+            lon = l
+            lat = b
+            frame_guess = 'galactic'
+
+        # Set frame if unset
+        frame = frame_guess if frame is None else frame
+
+        if isinstance(frame, str):
+            frame = frame_transform_graph.lookup_name(frame)
+            if frame is None:
+                raise ValueError(f"Invalid frame name {frame}.")
+            frame = frame()
+
+        self._frame_inst = frame
+        self._frame.value = frame.name
+
         if component_type is not None:
             if component_type not in self._component_type.acceptable_vals:
                 raise ValueError(
@@ -496,11 +526,11 @@ class SkyModel(UVBase):
                 spectral_type is not None,
             ]
         else:
-            req_args = ["name", "ra", "dec", "stokes", "spectral_type"]
+            req_args = ["name", "lon", "lat", "stokes", "spectral_type"]
             args_set_req = [
                 name is not None,
-                ra is not None,
-                dec is not None,
+                lon is not None,
+                lat is not None,
                 stokes is not None,
                 spectral_type is not None,
             ]
@@ -546,42 +576,42 @@ class SkyModel(UVBase):
                     self.hpx_order = "ring"
 
                 self.Ncomponents = self.hpx_inds.size
-                if ra is not None and dec is not None:
+                if lon is not None and dec is not None:
                     warnings.warn(
-                        "Input ra and dec parameters are being used instead of "
+                        "Input lon and lat parameters are being used instead of "
                         "the default healpix coordinates. These coordinates will "
                         "not necessarily line up with healpix pixel indicies. "
                         "If you are intentionally trying to overwrite healpix "
                         "coordinates please ensure the pixel indices are properly "
                         "updated."
                     )
-                    if isinstance(ra, (list)):
+                    if isinstance(lon, (list)):
                         # Cannot just try converting to Longitude because if the values are
                         # Latitudes they are silently converted to Longitude rather than
                         # throwing an error.
-                        for val in ra:
+                        for val in lon:
                             if not isinstance(val, (Longitude)):
                                 raise ValueError(
-                                    "All values in ra must be Longitude objects"
+                                    "All values in lon must be Longitude objects"
                                 )
-                        ra = Longitude(ra)
-                    self.ra = np.atleast_1d(ra)
-                    if isinstance(dec, (list)):
+                        lon = Longitude(lon)
+                    self.lon = np.atleast_1d(lon)
+                    if isinstance(lat, (list)):
                         # Cannot just try converting to Latitude because if the values are
                         # Longitude they are silently converted to Longitude rather than
                         # throwing an error.
-                        for val in dec:
-                            if not isinstance(val, (Latitude)):
+                        for val in lat:
+                            if not isinstance(lat, (Latitude)):
                                 raise ValueError(
-                                    "All values in dec must be Latitude objects"
+                                    "All values in lat must be Latitude objects"
                                 )
-                        dec = Latitude(dec)
-                    self.dec = np.atleast_1d(dec)
+                        lat = Latitude(lat)
+                    self.lat = np.atleast_1d(lat)
 
                 else:
-                    if ra is not None or dec is not None:
+                    if lon is not None or lat is not None:
                         warnings.warn(
-                            "Either the ra or dec was attempted to be initialized "
+                            "Either the lon or lat was attempted to be initialized "
                             "without specifying the other. Either both need to be "
                             "given to overwrite healpix coordinates or neither. "
                             "Proceeding with the default healpix coordinates"
@@ -589,28 +619,30 @@ class SkyModel(UVBase):
 
             else:
                 self.Ncomponents = self.name.size
-                if isinstance(ra, (list)):
+                if isinstance(lon, (list)):
                     # Cannot just try converting to Longitude because if the values are
                     # Latitudes they are silently converted to Longitude rather than
                     # throwing an error.
-                    for val in ra:
+                    for val in lon:
                         if not isinstance(val, (Longitude)):
+                            # TODO -- Say the correct name of the longitude variable based on the frame.
                             raise ValueError(
-                                "All values in ra must be Longitude objects"
+                                "All values in lon must be Longitude objects"
                             )
-                    ra = Longitude(ra)
-                self.ra = np.atleast_1d(ra)
-                if isinstance(dec, (list)):
+                    lon = Longitude(lon)
+                self.lon = np.atleast_1d(lon)
+                if isinstance(lat, (list)):
                     # Cannot just try converting to Latitude because if the values are
                     # Longitude they are silently converted to Longitude rather than
                     # throwing an error.
-                    for val in dec:
+                    for val in lat:
                         if not isinstance(val, (Latitude)):
+                            # TODO -- Say the correct name of the latitude variable based on the frame.
                             raise ValueError(
-                                "All values in dec must be Latitude objects"
+                                "All values in lat must be Latitude objects"
                             )
-                    dec = Latitude(dec)
-                self.dec = np.atleast_1d(dec)
+                    lat = Latitude(lat)
+                self.lat = np.atleast_1d(lat)
 
             self._set_spectral_type_params(spectral_type)
 
@@ -745,24 +777,24 @@ class SkyModel(UVBase):
         """Provide ra and dec for healpix objects with deprecation warnings."""
         if name == "ra" and not self._ra.required and self._ra.value is None:
             warnings.warn(
-                "ra is no longer a required parameter on Healpix objects and the "
-                "value is currently None. Use `get_ra_dec` to get the ra and dec "
+                "lon is no longer a required parameter on Healpix objects and the "
+                "value is currently None. Use `get_lon_lat` to get the lon and lat "
                 "values for Healpix components. Starting in version 0.3.0 this call "
                 "will return None.",
                 category=DeprecationWarning,
             )
-            ra, _ = self.get_ra_dec()
-            return ra
+            lon, _ = self.get_lon_lat()
+            return lon
         elif name == "dec" and not self._dec.required and self._dec.value is None:
             warnings.warn(
-                "dec is no longer a required parameter on Healpix objects and the "
-                "value is currently None. Use `get_ra_dec` to get the ra and dec "
+                "lat is no longer a required parameter on Healpix objects and the "
+                "value is currently None. Use `get_lon_lat` to get the lon and lat "
                 "values for Healpix components. Starting in version 0.3.0 this call "
                 "will return None.",
                 category=DeprecationWarning,
             )
-            _, dec = self.get_ra_dec()
-            return dec
+            _, lat = self.get_lon_lat()
+            return lat
 
         return super().__getattribute__(name)
 
@@ -900,32 +932,45 @@ class SkyModel(UVBase):
 
         return True
 
+    def __getattr__(self, name):
+        """For handling references to ra/dec/l/b etc."""
+        if hasattr(self, "_frame"):
+            comp_dict = self._frame_inst.get_representation_component_names()
+            if name in comp_dict:
+                lonlat = comp_dict[name]
+                return getattr(self, lonlat)    # Should return either lon or lat.
+
+        # Error if attribute not found
+        return self.__getattribute__(name)
+
     def __eq__(self, other, check_extra=True):
         """Check for equality, check for future equality."""
         # Run the basic __eq__ from UVBase
         # the filters below should be removed in version 0.3.0
         with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message="ra is no longer")
-            warnings.filterwarnings("ignore", message="dec is no longer")
+            warnings.filterwarnings("ignore", message="lon is no longer")
+            warnings.filterwarnings("ignore", message="lat is no longer")
             equal = super(SkyModel, self).__eq__(other, check_extra=check_extra)
 
         # Issue deprecation warning if ra/decs aren't close to future_angle_tol levels
-        if self._ra.value is not None and not units.quantity.allclose(
-            self.ra, other.ra, rtol=0, atol=self.future_angle_tol
+        if self._lon.value is not None and not units.quantity.allclose(
+            self.lon, other.lon, rtol=0, atol=self.future_angle_tol
         ):
+            # TODO -- Correct name of longitude var.
             warnings.warn(
-                "The _ra parameters are not within the future tolerance. "
-                f"Left is {self.ra}, right is {other.ra}. "
+                "The _lon parameters are not within the future tolerance. "
+                f"Left is {self.lon}, right is {other.lon}. "
                 "This will become an error in version 0.2.0",
                 category=DeprecationWarning,
             )
 
-        if self._dec.value is not None and not units.quantity.allclose(
-            self.dec, other.dec, rtol=0, atol=self.future_angle_tol
+        if self._lat.value is not None and not units.quantity.allclose(
+            self.lat, other.lat, rtol=0, atol=self.future_angle_tol
         ):
+            # TODO -- Correct name of latitude var.
             warnings.warn(
-                "The _dec parameters are not within the future tolerance. "
-                f"Left is {self.dec}, right is {other.dec}. "
+                "The _lat parameters are not within the future tolerance. "
+                f"Left is {self.lat}, right is {other.lat}. "
                 "This will become an error in version 0.2.0",
                 category=DeprecationWarning,
             )
@@ -933,8 +978,8 @@ class SkyModel(UVBase):
         if not equal:
             # the filters below should be removed in version 0.3.0
             with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", message="ra is no longer")
-                warnings.filterwarnings("ignore", message="dec is no longer")
+                warnings.filterwarnings("ignore", message="lon is no longer")
+                warnings.filterwarnings("ignore", message="lat is no longer")
                 equal = super(SkyModel, self).__eq__(other, check_extra=False)
 
             if equal:
@@ -959,8 +1004,8 @@ class SkyModel(UVBase):
         """Overload this method to filter ra/dec warnings that shouldn't be issued."""
         # this method should be removed in version 0.3.0
         with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message="ra is no longer")
-            warnings.filterwarnings("ignore", message="dec is no longer")
+            warnings.filterwarnings("ignore", message="lon is no longer")
+            warnings.filterwarnings("ignore", message="lat is no longer")
             return super(SkyModel, self).copy()
 
     def kelvin_to_jansky(self):
@@ -1057,7 +1102,7 @@ class SkyModel(UVBase):
 
         self.coherency_radec = skyutils.stokes_to_coherency(self.stokes)
 
-    def get_ra_dec(self):
+    def get_lon_lat(self):
         """
         Retrieve ra and dec values for components.
 
@@ -1074,14 +1119,15 @@ class SkyModel(UVBase):
                     "The astropy-healpix module must be installed to use HEALPix "
                     "methods"
                 ) from e
-            ra, dec = astropy_healpix.healpix_to_lonlat(
+            lon, lat = astropy_healpix.healpix_to_lonlat(
                 self.hpx_inds,
                 self.nside,
                 order=self.hpx_order,
+                frame=self._frame_inst,
             )
-            return ra, dec
+            return lon, lat
         else:
-            return self.ra, self.dec
+            return self.lon, self.lat
 
     def healpix_to_point(
         self,
