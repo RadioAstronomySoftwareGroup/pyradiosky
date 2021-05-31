@@ -119,10 +119,23 @@ class SkyModel(UVBase):
     name : array_like of str
         Unique identifier for each source component, shape (Ncomponents,).
         Not used if nside is set.
+    lon : :class:`astropy.Longitude`
+        Source longitude in frame specified by keyword `frame`, shape (Ncomponents,).
+    lat : :class:`astropy.Latitude`
+        Source latiitude in frame specified by keyword `frame`, shape (Ncomponents,).
     ra : :class:`astropy.Longitude`
         source RA in J2000 (or ICRS) coordinates, shape (Ncomponents,).
     dec : :class:`astropy.Latitude`
         source Dec in J2000 (or ICRS) coordinates, shape (Ncomponents,).
+    l : :class:`astropy.Longitude`
+        source longitude in Galactic coordinates, shape (Ncomponents,).
+    b : :class:`astropy.Latitude`
+        source latitude in Galactic coordinates, shape (Ncomponents,).
+    frame : str
+        Name of coordinates frame of source positions.
+        If ra/dec or l/b are provided, this will be set to `icrs` or `galactic` by default.
+        Must be interpretable by `astropy.coordinates.frame_transform_graph.lookup_name()`.
+        Required if keywords `lon` and `lat` are used.
     stokes : :class:`astropy.Quantity` or array_like of float (Deprecated)
         The source flux, shape (4, Nfreqs, Ncomponents). The first axis indexes
         the polarization as [I, Q, U, V].
@@ -187,13 +200,13 @@ class SkyModel(UVBase):
     def __init__(
         self,
         name=None,
-        lon=None,           #!!!!!!!!!!!
-        lat=None,           #!!!!!!!!!!!
+        lon=None,
+        lat=None,
         ra=None,
         dec=None,
-        l=None,            #!!!!!!!!!!!
-        b=None,            #!!!!!!!!!!!
-        frame=None,         #!!!!!!!!!!!
+        l=None,
+        b=None,
+        frame=None,
         stokes=None,
         spectral_type=None,
         freq_array=None,
@@ -230,7 +243,6 @@ class SkyModel(UVBase):
             "frame",
             description=desc,
             expected_type=str,
-            #expected_type=BaseCoordinateFrame, # TODO -- This breaks the check()
         )
 
         desc = "Longitudes of source component positions. shape (Ncomponents,)"
@@ -482,7 +494,25 @@ class SkyModel(UVBase):
                 freq_array = freqs_use
                 reference_frequency = None
 
-        # TODO -- Raise error if missing the right combination.
+        # Raise error if missing the right combination.
+        coords_given = {
+                "lon" : lon is not None,
+                "lat" : lat is not None,
+                "ra" :  ra is not None,
+                "dec" : dec is not None,
+                "l" : l is not None,
+                "b" : b is not None,
+        }
+
+        valid_combos = [{'ra', 'dec'}, {'lat', 'lon'}, {'l', 'b'}, {}]
+        input_combo = set([k for k,v in coords_given.items() if v])
+
+        if input_combo not in valid_combos:
+            raise ValueError(f"Invalid input coordinate combination: {input_combo}")
+
+        if input_combo == {'lat', 'lon'} and frame is None:
+            raise ValueError(f"The 'frame' keyword must be set to initialize from lat/lon.")
+
         frame_guess = None
         if (ra is not None) and (dec is not None):
             lon = ra
@@ -492,15 +522,19 @@ class SkyModel(UVBase):
             lon = l
             lat = b
             frame_guess = 'galactic'
+            if frame is not None and frame.lower() != 'galactic':
+                warnings.warn(f"Warning: Galactic coordinates l and b were given, but the frame keyword is {frame}. "
+                               "Ignoring frame keyword and interpreting coordinates as Galactic.")
+                frame = None
 
         # Set frame if unset
         frame = frame_guess if frame is None else frame
 
         if isinstance(frame, str):
-            frame = frame_transform_graph.lookup_name(frame)
-            if frame is None:
+            frame_class = frame_transform_graph.lookup_name(frame)
+            if frame_class is None:
                 raise ValueError(f"Invalid frame name {frame}.")
-            frame = frame()
+            frame = frame_class()
 
         self._frame_inst = frame
         self._frame.value = frame.name
@@ -625,9 +659,9 @@ class SkyModel(UVBase):
                     # throwing an error.
                     for val in lon:
                         if not isinstance(val, (Longitude)):
-                            # TODO -- Say the correct name of the longitude variable based on the frame.
+                            lon_name = [k for k in ['ra', 'l', 'lon'] if coords_given[k]][0]
                             raise ValueError(
-                                "All values in lon must be Longitude objects"
+                                f"All values in {lon_name} must be Longitude objects"
                             )
                     lon = Longitude(lon)
                 self.lon = np.atleast_1d(lon)
@@ -637,9 +671,9 @@ class SkyModel(UVBase):
                     # throwing an error.
                     for val in lat:
                         if not isinstance(val, (Latitude)):
-                            # TODO -- Say the correct name of the latitude variable based on the frame.
+                            lat_name = [k for k in ['dec', 'b', 'lat'] if coords_given[k]][0]
                             raise ValueError(
-                                "All values in lat must be Latitude objects"
+                                f"All values in {lat_name} must be Latitude objects"
                             )
                     lat = Latitude(lat)
                 self.lat = np.atleast_1d(lat)
@@ -956,7 +990,6 @@ class SkyModel(UVBase):
         if self._lon.value is not None and not units.quantity.allclose(
             self.lon, other.lon, rtol=0, atol=self.future_angle_tol
         ):
-            # TODO -- Correct name of longitude var.
             warnings.warn(
                 "The _lon parameters are not within the future tolerance. "
                 f"Left is {self.lon}, right is {other.lon}. "
@@ -967,7 +1000,6 @@ class SkyModel(UVBase):
         if self._lat.value is not None and not units.quantity.allclose(
             self.lat, other.lat, rtol=0, atol=self.future_angle_tol
         ):
-            # TODO -- Correct name of latitude var.
             warnings.warn(
                 "The _lat parameters are not within the future tolerance. "
                 f"Left is {self.lat}, right is {other.lat}. "
