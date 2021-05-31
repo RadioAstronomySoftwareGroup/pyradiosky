@@ -209,13 +209,13 @@ class SkyModel(UVBase):
         name=None,
         lon=None,
         lat=None,
+        spectral_type=None,
         ra=None,
         dec=None,
         gl=None,
         gb=None,
         frame=None,
         stokes=None,
-        spectral_type=None,
         freq_array=None,
         reference_frequency=None,
         spectral_index=None,
@@ -485,14 +485,20 @@ class SkyModel(UVBase):
 
         # handle old parameter order
         # (use to be: name, ra, dec, stokes, freq_array, spectral_type)
+        # (now it's name, lon, lat, spectral_type, ra, dec, gl, gb, frame, stokes...)
         if isinstance(spectral_type, (np.ndarray, list, float, Quantity)):
             warnings.warn(
                 "The input parameters to SkyModel.__init__ have changed. Please "
                 "update the call. This will become an error in version 0.2.0.",
                 category=DeprecationWarning,
             )
-            freqs_use = spectral_type
-            spectral_type = freq_array
+            stokes = spectral_type
+            freqs_use = ra
+            spectral_type = dec
+            ra = lon
+            dec = lat
+            lon = None
+            lat = None
 
             if spectral_type == "flat" and np.asarray(freqs_use).size == 1:
                 reference_frequency = np.zeros(self.Ncomponents) + freqs_use[0]
@@ -511,7 +517,7 @@ class SkyModel(UVBase):
             "gb": gb is not None,
         }
 
-        valid_combos = [{"ra", "dec"}, {"lat", "lon"}, {"gl", "gb"}, {}]
+        valid_combos = [{"ra", "dec"}, {"lat", "lon"}, {"gl", "gb"}, set()]
         input_combo = {k for k, v in coords_given.items() if v}
 
         if input_combo not in valid_combos:
@@ -548,7 +554,8 @@ class SkyModel(UVBase):
             frame = frame_class()
 
         self._frame_inst = frame
-        self._frame.value = frame.name
+        if frame is not None:
+            self._frame.value = frame.name
 
         if component_type is not None:
             if component_type not in self._component_type.acceptable_vals:
@@ -619,6 +626,14 @@ class SkyModel(UVBase):
             if self.component_type == "healpix":
                 if self.hpx_order is None:
                     self.hpx_order = "ring"
+
+                if self.frame is None:
+                    warnings.warn(
+                        "In version 0.2.0, the frame keyword will be required for HEALPix maps. "
+                        "Defaulting to ICRS",
+                        category=DeprecationWarning,
+                    )
+                    self.frame = "icrs"
 
                 self.Ncomponents = self.hpx_inds.size
                 if lon is not None and dec is not None:
@@ -983,7 +998,7 @@ class SkyModel(UVBase):
 
     def __getattr__(self, name):
         """Handle references to frame coordinates (ra/dec/gl/gb, etc.)."""
-        if hasattr(self, "_frame"):
+        if (not name.startswith("__")) and self._frame_inst is not None:
             comp_dict = self._frame_inst.get_representation_component_names()
             # Naming for galactic is different from astropy:
             if name == "gl":
@@ -1226,7 +1241,7 @@ class SkyModel(UVBase):
                 "The astropy-healpix module must be installed to use HEALPix methods"
             ) from e
 
-        self.ra, self.dec = self.get_ra_dec()
+        self.lon, self.lat = self.get_lon_lat()
         self._set_component_type_params("point")
         self.stokes = self.stokes * astropy_healpix.nside_to_pixel_area(self.nside)
         self.coherency_radec = (
@@ -1475,7 +1490,7 @@ class SkyModel(UVBase):
                                     "using the `at_frequencies` method first or a "
                                     "larger nside."
                                 )
-                            elif param not in ["_ra", "_dec", "_name"]:
+                            elif param not in ["_lon", "_lat", "_name"]:
                                 raise ValueError(
                                     "Multiple components map to a single healpix pixel "
                                     f"and the {param_name} varies among them."
@@ -1541,7 +1556,7 @@ class SkyModel(UVBase):
             # already verified that they don't vary among the components that map to
             # each pixel
             for param in sky.ncomponent_length_params:
-                if param in ["_ra", "_dec", "_name", "_hpx_inds"]:
+                if param in ["_lon", "_lat", "_name", "_hpx_inds"]:
                     continue
                 attr = getattr(sky, param)
                 if attr.value is not None:
@@ -1767,9 +1782,9 @@ class SkyModel(UVBase):
         self.time = time
         self.telescope_location = telescope_location
 
-        ra, dec = self.get_ra_dec()
+        lon, lat = self.get_lon_lat()
 
-        skycoord_use = SkyCoord(ra, dec, frame="icrs")
+        skycoord_use = SkyCoord(lon, lat, frame=self._frame_inst)
         if isinstance(self.telescope_location, MoonLocation):
             source_altaz = skycoord_use.transform_to(
                 LunarTopo(obstime=self.time, location=self.telescope_location)
@@ -1859,8 +1874,8 @@ class SkyModel(UVBase):
         n_inds = len(inds)
 
         # Find mathematical points and vectors for RA/Dec
-        theta_radec = np.pi / 2.0 - self.dec.rad[inds]
-        phi_radec = self.ra.rad[inds]
+        theta_radec = np.pi / 2.0 - self.lat.rad[inds]
+        phi_radec = self.lon.rad[inds]
         radec_vec = sct.r_hat(theta_radec, phi_radec)
         assert radec_vec.shape == (3, n_inds)
 
@@ -1906,8 +1921,8 @@ class SkyModel(UVBase):
         basis_rotation_matrix = self._calc_rotation_matrix(inds)
 
         # Find mathematical points and vectors for RA/Dec
-        theta_radec = np.pi / 2.0 - self.dec.rad[inds]
-        phi_radec = self.ra.rad[inds]
+        theta_radec = np.pi / 2.0 - self.lat.rad[inds]
+        phi_radec = self.lon.rad[inds]
 
         # Find mathematical points and vectors for Alt/Az
         theta_altaz = np.pi / 2.0 - self.alt_az[0, inds]
@@ -2130,7 +2145,7 @@ class SkyModel(UVBase):
             this.name = np.concatenate((this.name, other.name))
 
         if this.component_type == "healpix":
-            for param in ["_ra", "_dec", "_name"]:
+            for param in ["_lon", "_lat", "_name"]:
                 this_param = getattr(this, param)
                 other_param = getattr(other, param)
                 param_name = this_param.name
@@ -2866,6 +2881,10 @@ class SkyModel(UVBase):
             downselecting data on this object (the default is True, meaning the
             acceptable range check will be done).
 
+        Notes
+        -----
+        skyh5 only support ICRS RA/Dec coordinates at this time.
+
         """
         with h5py.File(filename, "r") as fileobj:
             if "/Header" not in fileobj:
@@ -2884,8 +2903,8 @@ class SkyModel(UVBase):
                 "_Nfreqs",
                 "_component_type",
                 "_spectral_type",
-                "_ra",
-                "_dec",
+                "_lon",
+                "_lat",
                 "_history",
                 "_name",
                 "_nside",
@@ -2913,7 +2932,7 @@ class SkyModel(UVBase):
                 "_beam_amp",
                 "_extended_model_group",
             ]
-            init_params = {}
+            init_params = {"frame": "icrs"}
 
             for par in header_params:
                 param = getattr(self, par)
@@ -2924,7 +2943,13 @@ class SkyModel(UVBase):
                     if parname not in header:
                         continue
 
-                dset = header[parname]
+                if parname == "lat":
+                    dset = header["dec"]
+                elif parname == "lon":
+                    dset = header["ra"]
+                else:
+                    dset = header[parname]
+
                 value = dset[()]
 
                 if "unit" in dset.attrs:
@@ -3113,6 +3138,7 @@ class SkyModel(UVBase):
             spectral_type="full",
             freq_array=freq,
             history=history,
+            frame="icrs",
         )
         assert self.component_type == "healpix"
 
@@ -4066,6 +4092,10 @@ class SkyModel(UVBase):
             Option to check acceptable range of the values of parameters after
             downselecting data on this object (the default is True, meaning the
             acceptable range check will be done).
+
+        Notes
+        -----
+        Assumes
         """
         if run_check:
             self.check(
@@ -4097,8 +4127,8 @@ class SkyModel(UVBase):
                 "_Nfreqs",
                 "_component_type",
                 "_spectral_type",
-                "_ra",
-                "_dec",
+                "_lon",
+                "_lat",
                 "_history",
                 "_name",
                 "_nside",
@@ -4115,6 +4145,17 @@ class SkyModel(UVBase):
                 param = getattr(self, par)
                 val = param.value
                 parname = param.name
+
+                if (self.frame is None) or (self.frame != "icrs"):
+                    raise ValueError(
+                        "SkyModel must be in ICRS to write to skyh5 format. "
+                        f"Current frame is {self.frame}."
+                    )
+
+                if parname == "lon":
+                    parname = "ra"
+                if parname == "lat":
+                    parname = "dec"
 
                 # Skip if parameter is unset.
                 if val is None:
