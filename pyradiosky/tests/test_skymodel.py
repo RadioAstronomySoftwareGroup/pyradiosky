@@ -639,7 +639,7 @@ def test_skymodel_init_errors(zenith_skycoord):
     # Check error cases
     with pytest.raises(
         ValueError,
-        match=("UVParameter _ra is not the appropriate type."),
+        match=("UVParameter _lon is not the appropriate type."),
     ):
         SkyModel(
             name="icrs_zen",
@@ -651,7 +651,7 @@ def test_skymodel_init_errors(zenith_skycoord):
 
     with pytest.raises(
         ValueError,
-        match=("UVParameter _dec is not the appropriate type."),
+        match=("UVParameter _lat is not the appropriate type."),
     ):
         SkyModel(
             name="icrs_zen",
@@ -835,7 +835,7 @@ def test_skymodel_deprecated(time_location):
     )
     with pytest.warns(
         DeprecationWarning,
-        match=("The _dec parameters are not within the future tolerance"),
+        match=("The _lat parameters are not within the future tolerance"),
     ):
         assert source_new == source_old
 
@@ -849,7 +849,7 @@ def test_skymodel_deprecated(time_location):
     )
     with pytest.warns(
         DeprecationWarning,
-        match=("The _ra parameters are not within the future tolerance"),
+        match=("The _lon parameters are not within the future tolerance"),
     ):
         assert source_new == source_old
 
@@ -1623,6 +1623,7 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
         component_inds=np.arange(skyobj_full.Ncomponents // 2, skyobj_full.Ncomponents),
         inplace=False,
     )
+
     skyobj_new = skyobj1.concat(skyobj2, inplace=False)
 
     assert skyobj_new.history != skyobj_full.history
@@ -1673,7 +1674,7 @@ def test_concat_optional_params(param, healpix_disk_new):
     if param in ["ra", "dec", "name"]:
         skyobj_full = healpix_disk_new
         if param in ["ra", "dec"]:
-            skyobj_full.ra, skyobj_full.dec = skyobj_full.get_ra_dec()
+            skyobj_full.ra, skyobj_full.dec = skyobj_full.get_lon_lat()
         else:
             skyobj_full.name = np.array(
                 ["hpx" + str(ind) for ind in skyobj_full.hpx_inds]
@@ -3577,7 +3578,7 @@ def test_healpix_coordinate_init_no_override(healpix_icrs):
             nside=hp_obj.nside,
             hpx_inds=np.arange(hp_obj.npix),
         )
-    skymod_ra, skymod_dec = skymod.get_ra_dec()
+    skymod_ra, skymod_dec = skymod.get_lon_lat()
 
     assert not np.array_equal(skymod_ra, coords_icrs.ra)
     assert np.array_equal(skymod_ra, hp_ra)
@@ -3659,7 +3660,7 @@ def test_write_clobber(mock_point_skies, tmpdir):
         ({"ra": Longitude("1d"), "dec": Latitude("1d")}, None, "icrs"),
         ({"gl": Longitude("1d"), "gb": Latitude("1d")}, None, "galactic"),
         (
-            {"ra": Longitude("1d"), "b": Latitude("1d")},
+            {"ra": Longitude("1d"), "gb": Latitude("1d")},
             "Invalid input coordinate combination",
             None,
         ),
@@ -3703,12 +3704,12 @@ def test_skymodel_init_with_frame(coord_kwds, err_msg, exp_frame):
 
 def test_skymodel_init_galactic_warning():
     with pytest.warns(
-        UserWarning, match="Warning: Galactic coordinates l and b were given, but"
+        UserWarning, match="Warning: Galactic coordinates gl and gb were given, but"
     ):
         SkyModel(
             name=["src"],
-            l=Longitude("1d"),
-            b=Latitude("1d"),
+            gl=Longitude("1d"),
+            gb=Latitude("1d"),
             stokes=np.zeros((4, 1, 1)),
             spectral_type="flat",
             frame="icrs",
