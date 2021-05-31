@@ -10,7 +10,14 @@ import h5py
 import numpy as np
 from scipy.linalg import orthogonal_procrustes as ortho_procr
 import scipy.io
-from astropy.coordinates import Angle, EarthLocation, AltAz, Latitude, Longitude, frame_transform_graph
+from astropy.coordinates import (
+    Angle,
+    EarthLocation,
+    AltAz,
+    Latitude,
+    Longitude,
+    frame_transform_graph,
+)
 from astropy.time import Time
 import astropy.units as units
 from astropy.units import Quantity
@@ -127,9 +134,9 @@ class SkyModel(UVBase):
         source RA in J2000 (or ICRS) coordinates, shape (Ncomponents,).
     dec : :class:`astropy.Latitude`
         source Dec in J2000 (or ICRS) coordinates, shape (Ncomponents,).
-    l : :class:`astropy.Longitude`
+    gl : :class:`astropy.Longitude`
         source longitude in Galactic coordinates, shape (Ncomponents,).
-    b : :class:`astropy.Latitude`
+    gb : :class:`astropy.Latitude`
         source latitude in Galactic coordinates, shape (Ncomponents,).
     frame : str
         Name of coordinates frame of source positions.
@@ -204,8 +211,8 @@ class SkyModel(UVBase):
         lat=None,
         ra=None,
         dec=None,
-        l=None,
-        b=None,
+        gl=None,
+        gb=None,
         frame=None,
         stokes=None,
         spectral_type=None,
@@ -496,35 +503,39 @@ class SkyModel(UVBase):
 
         # Raise error if missing the right combination.
         coords_given = {
-                "lon" : lon is not None,
-                "lat" : lat is not None,
-                "ra" :  ra is not None,
-                "dec" : dec is not None,
-                "l" : l is not None,
-                "b" : b is not None,
+            "lon": lon is not None,
+            "lat": lat is not None,
+            "ra": ra is not None,
+            "dec": dec is not None,
+            "gl": gl is not None,
+            "gb": gb is not None,
         }
 
-        valid_combos = [{'ra', 'dec'}, {'lat', 'lon'}, {'l', 'b'}, {}]
-        input_combo = set([k for k,v in coords_given.items() if v])
+        valid_combos = [{"ra", "dec"}, {"lat", "lon"}, {"gl", "gb"}, {}]
+        input_combo = {k for k, v in coords_given.items() if v}
 
         if input_combo not in valid_combos:
             raise ValueError(f"Invalid input coordinate combination: {input_combo}")
 
-        if input_combo == {'lat', 'lon'} and frame is None:
-            raise ValueError(f"The 'frame' keyword must be set to initialize from lat/lon.")
+        if input_combo == {"lat", "lon"} and frame is None:
+            raise ValueError(
+                "The 'frame' keyword must be set to initialize from lat/lon."
+            )
 
         frame_guess = None
         if (ra is not None) and (dec is not None):
             lon = ra
             lat = dec
-            frame_guess = 'icrs'
-        elif (l is not None) and (b is not None):
-            lon = l
-            lat = b
-            frame_guess = 'galactic'
-            if frame is not None and frame.lower() != 'galactic':
-                warnings.warn(f"Warning: Galactic coordinates l and b were given, but the frame keyword is {frame}. "
-                               "Ignoring frame keyword and interpreting coordinates as Galactic.")
+            frame_guess = "icrs"
+        elif (gl is not None) and (gb is not None):
+            lon = gl
+            lat = gb
+            frame_guess = "galactic"
+            if frame is not None and frame.lower() != "galactic":
+                warnings.warn(
+                    f"Warning: Galactic coordinates gl and gb were given, but the frame keyword is {frame}. "
+                    "Ignoring frame keyword and interpreting coordinates as Galactic."
+                )
                 frame = None
 
         # Set frame if unset
@@ -659,7 +670,9 @@ class SkyModel(UVBase):
                     # throwing an error.
                     for val in lon:
                         if not isinstance(val, (Longitude)):
-                            lon_name = [k for k in ['ra', 'l', 'lon'] if coords_given[k]][0]
+                            lon_name = [
+                                k for k in ["ra", "gl", "lon"] if coords_given[k]
+                            ][0]
                             raise ValueError(
                                 f"All values in {lon_name} must be Longitude objects"
                             )
@@ -671,7 +684,9 @@ class SkyModel(UVBase):
                     # throwing an error.
                     for val in lat:
                         if not isinstance(val, (Latitude)):
-                            lat_name = [k for k in ['dec', 'b', 'lat'] if coords_given[k]][0]
+                            lat_name = [
+                                k for k in ["dec", "gb", "lat"] if coords_given[k]
+                            ][0]
                             raise ValueError(
                                 f"All values in {lat_name} must be Latitude objects"
                             )
@@ -967,12 +982,17 @@ class SkyModel(UVBase):
         return True
 
     def __getattr__(self, name):
-        """For handling references to ra/dec/l/b etc."""
+        """Handle references to frame coordinates (ra/dec/gl/gb, etc.)."""
         if hasattr(self, "_frame"):
             comp_dict = self._frame_inst.get_representation_component_names()
+            # Naming for galactic is different from astropy:
+            if name == "gl":
+                name = "l"
+            if name == "gb":
+                name = "b"
             if name in comp_dict:
                 lonlat = comp_dict[name]
-                return getattr(self, lonlat)    # Should return either lon or lat.
+                return getattr(self, lonlat)  # Should return either lon or lat.
 
         # Error if attribute not found
         return self.__getattribute__(name)

@@ -3654,22 +3654,38 @@ def test_write_clobber(mock_point_skies, tmpdir):
 
 # TODO -- Also check with healpix init
 @pytest.mark.parametrize(
-    ("coord_kwds", 'err_msg', 'exp_frame'),
+    ("coord_kwds", "err_msg", "exp_frame"),
     [
-        ({'ra': Longitude('1d'), 'dec': Latitude('1d')}, None, 'icrs'),
-        ({'l': Longitude('1d'), 'b': Latitude('1d')}, None, 'galactic'),
-        ({'ra': Longitude('1d'), 'b': Latitude('1d')}, "Invalid input coordinate combination", None),
-        ({'lon': Longitude('1d'), 'lat': Latitude('1d'), 'frame': 'icrs'}, None, 'icrs'),
-        ({'lon': Longitude('1d'), 'lat': Latitude('1d'), 'frame': 'picture'}, "Invalid frame name" , None),
-        ({'lon': Longitude('1d'), 'lat': Latitude('1d'), 'frame': None}, "The 'frame' keyword must" , None),
-    ]
+        ({"ra": Longitude("1d"), "dec": Latitude("1d")}, None, "icrs"),
+        ({"gl": Longitude("1d"), "gb": Latitude("1d")}, None, "galactic"),
+        (
+            {"ra": Longitude("1d"), "b": Latitude("1d")},
+            "Invalid input coordinate combination",
+            None,
+        ),
+        (
+            {"lon": Longitude("1d"), "lat": Latitude("1d"), "frame": "icrs"},
+            None,
+            "icrs",
+        ),
+        (
+            {"lon": Longitude("1d"), "lat": Latitude("1d"), "frame": "picture"},
+            "Invalid frame name",
+            None,
+        ),
+        (
+            {"lon": Longitude("1d"), "lat": Latitude("1d"), "frame": None},
+            "The 'frame' keyword must",
+            None,
+        ),
+    ],
 )
 def test_skymodel_init_with_frame(coord_kwds, err_msg, exp_frame):
-    names = ['src']
+    names = ["src"]
     stokes = np.zeros((4, 1, 1)) * units.Jy
-    coord_kwds['name'] = names
-    coord_kwds['stokes'] = stokes
-    coord_kwds['spectral_type'] = 'flat'
+    coord_kwds["name"] = names
+    coord_kwds["stokes"] = stokes
+    coord_kwds["spectral_type"] = "flat"
 
     if err_msg is not None:
         with pytest.raises(ValueError, match=err_msg):
@@ -3677,12 +3693,23 @@ def test_skymodel_init_with_frame(coord_kwds, err_msg, exp_frame):
     else:
         sky = SkyModel(**coord_kwds)
         assert sky.frame == exp_frame
+        if exp_frame == "galactic":
+            assert sky.lon == sky.gl
+            assert sky.lat == sky.gb
+        if exp_frame == "icrs":
+            assert sky.lon == sky.ra
+            assert sky.lat == sky.dec
 
 
 def test_skymodel_init_galactic_warning():
     with pytest.warns(
-        UserWarning,
-        match="Warning: Galactic coordinates l and b were given, but"
+        UserWarning, match="Warning: Galactic coordinates l and b were given, but"
     ):
-        SkyModel(name=['src'], l=Longitude('1d'), b=Latitude('1d'),
-                stokes=np.zeros((4, 1, 1)), spectral_type='flat', frame='icrs')
+        SkyModel(
+            name=["src"],
+            l=Longitude("1d"),
+            b=Latitude("1d"),
+            stokes=np.zeros((4, 1, 1)),
+            spectral_type="flat",
+            frame="icrs",
+        )
