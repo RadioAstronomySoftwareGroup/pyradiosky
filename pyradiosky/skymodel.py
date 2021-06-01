@@ -207,16 +207,16 @@ class SkyModel(UVBase):
     def __init__(
         self,
         name=None,
-        lon=None,
-        lat=None,
-        spectral_type=None,
         ra=None,
         dec=None,
+        stokes=None,
+        spectral_type=None,
+        freq_array=None,
+        lon=None,
+        lat=None,
         gl=None,
         gb=None,
         frame=None,
-        stokes=None,
-        freq_array=None,
         reference_frequency=None,
         spectral_index=None,
         component_type=None,
@@ -485,7 +485,6 @@ class SkyModel(UVBase):
 
         # handle old parameter order
         # (use to be: name, ra, dec, stokes, freq_array, spectral_type)
-        # (now it's name, lon, lat, spectral_type, ra, dec, gl, gb, frame, stokes...)
         if isinstance(spectral_type, (np.ndarray, list, float, Quantity)):
             warnings.warn(
                 "The input parameters to SkyModel.__init__ have changed. Please "
@@ -604,8 +603,10 @@ class SkyModel(UVBase):
 
         if np.any(np.concatenate((args_set_req, arg_set_opt))):
             if not np.all(args_set_req):
+                isset = [k for k, v in zip(req_args, args_set_req) if v]
                 raise ValueError(
                     f"If initializing with values, all of {req_args} must be set."
+                    f" Received: {isset}"
                 )
 
             if name is not None:
@@ -4102,6 +4103,12 @@ class SkyModel(UVBase):
                 check_extra=check_extra, run_check_acceptability=run_check_acceptability
             )
 
+        if (self.frame is None) or (self.frame != "icrs"):
+            raise ValueError(
+                "SkyModel must be in ICRS to write to skyh5 format. "
+                f"Current frame is {self.frame}."
+            )
+
         if self.history is None:
             self.history = self.pyradiosky_version_str
         else:
@@ -4145,12 +4152,6 @@ class SkyModel(UVBase):
                 param = getattr(self, par)
                 val = param.value
                 parname = param.name
-
-                if (self.frame is None) or (self.frame != "icrs"):
-                    raise ValueError(
-                        "SkyModel must be in ICRS to write to skyh5 format. "
-                        f"Current frame is {self.frame}."
-                    )
 
                 if parname == "lon":
                     parname = "ra"

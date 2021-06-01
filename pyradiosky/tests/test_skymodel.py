@@ -3470,6 +3470,15 @@ def test_skyh5_read_errors_healpix(healpix_disk_new, param, value, errormsg, tmp
         SkyModel.from_skyh5(testfile)
 
 
+def test_skyh5_write_error(healpix_disk_new, tmpdir):
+    sky = healpix_disk_new
+
+    sky.frame = "galactic"
+
+    with pytest.raises(ValueError, match="SkyModel must be in ICRS"):
+        sky.write_skyh5(tmpdir.join("testfile.skyh5"))
+
+
 def test_skyh5_read_errors_oldstyle_healpix():
     with pytest.raises(
         ValueError, match="This is an old 'healvis' style healpix HDF5 file"
