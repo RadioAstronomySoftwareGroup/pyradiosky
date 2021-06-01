@@ -491,13 +491,8 @@ class SkyModel(UVBase):
                 "update the call. This will become an error in version 0.2.0.",
                 category=DeprecationWarning,
             )
-            stokes = spectral_type
-            freqs_use = ra
-            spectral_type = dec
-            ra = lon
-            dec = lat
-            lon = None
-            lat = None
+            freqs_use = spectral_type
+            spectral_type = freq_array
 
             if spectral_type == "flat" and np.asarray(freqs_use).size == 1:
                 reference_frequency = np.zeros(self.Ncomponents) + freqs_use[0]
