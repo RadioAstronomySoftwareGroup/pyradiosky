@@ -960,6 +960,17 @@ def test_healpix_to_point_errors(zenith_skymodel):
         zenith_skymodel.point_to_healpix()
 
 
+def test_healpix_to_point_source_cuts(healpix_disk_new):
+    """
+    This tests that `self.name` is set as a numpy ndarray, not a list, in
+    `healpix_to_point`.  If `self.name` is a list the indexing in
+    `source_cuts` will raise a TypeError.
+    """
+    skyobj = healpix_disk_new
+    skyobj.healpix_to_point()
+    skyobj.source_cuts(max_flux=0.9 * skyobj.stokes[0].max())
+
+
 def test_update_position_errors(zenith_skymodel, time_location):
     time, array_location = time_location
     with pytest.raises(ValueError, match=("time must be an astropy Time object.")):
