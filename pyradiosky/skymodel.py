@@ -991,7 +991,7 @@ class SkyModel(UVBase):
             self.coherency_radec * astropy_healpix.nside_to_pixel_area(self.nside)
         )
         name_use = ["nside" + str(self.nside) + "_" + str(ind) for ind in self.hpx_inds]
-        self.name = name_use
+        self.name = np.array(name_use)
 
         if to_jy:
             self.kelvin_to_jansky()
