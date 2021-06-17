@@ -3058,6 +3058,16 @@ class SkyModel(UVBase):
             init_params["stokes"] = dgrp["stokes"] * units.Unit(
                 dgrp["stokes"].attrs["unit"]
             )
+            # frame is a new parameter, check if it exists and try to read
+            # otherwise default to ICRS (the old assumed frame.)
+            if "frame" not in header:
+                warnings.warn(
+                    "No frame available in this file, assuming 'icrs'. "
+                    "Consider re-writing this file to ensure future compatility."
+                )
+                init_params["frame"] = "icrs"
+            else:
+                init_params["frame"] = header["frame"][()].tobytes().decode("utf8")
 
         self.__init__(**init_params)
 
@@ -4152,12 +4162,6 @@ class SkyModel(UVBase):
                 check_extra=check_extra, run_check_acceptability=run_check_acceptability
             )
 
-        if (self.frame is None) or (self.frame != "icrs"):
-            raise ValueError(
-                "SkyModel must be in ICRS to write to skyh5 format. "
-                f"Current frame is {self.frame}."
-            )
-
         if self.history is None:
             self.history = self.pyradiosky_version_str
         else:
@@ -4185,6 +4189,7 @@ class SkyModel(UVBase):
                 "_spectral_type",
                 "_lon",
                 "_lat",
+                "_frame",
                 "_history",
                 "_name",
                 "_nside",
