@@ -3,13 +3,15 @@
 # Licensed under the 3-clause BSD License
 
 import os
-import fileinput
 import re
+import fileinput
 
+import copy
 import h5py
 import pytest
-import numpy as np
+import scipy.io
 import warnings
+import numpy as np
 from astropy import units
 from astropy.units import Quantity
 from astropy.coordinates import (
@@ -20,9 +22,9 @@ from astropy.coordinates import (
     Longitude,
     Latitude,
     Galactic,
+    ICRS,
 )
 from astropy.time import Time, TimeDelta
-import scipy.io
 import pyuvdata.tests as uvtest
 import pyuvdata.utils as uvutils
 
@@ -3723,3 +3725,70 @@ def test_skymodel_init_galactic_warning():
             spectral_type="flat",
             frame="icrs",
         )
+
+
+def test_skymodel_transform_unsupported_frame(zenith_skymodel):
+    with pytest.raises(
+        ValueError, match="Supplied frame GCRS is not supported at this time."
+    ):
+        zenith_skymodel.transform_to("gcrs")
+
+
+def test_skymodel_tranform_frame(zenith_skymodel, zenith_skycoord):
+    zenith_skymodel.transform_to("galactic")
+    zenith_skycoord = zenith_skycoord.transform_to("galactic")
+
+    assert zenith_skymodel.frame == "galactic"
+    assert units.allclose(zenith_skymodel.gl, zenith_skycoord.l)
+    assert units.allclose(zenith_skymodel.gb, zenith_skycoord.b)
+
+
+def test_skymodel_tranform_frame_roundtrip(zenith_skymodel, zenith_skycoord):
+    original_sky = copy.deepcopy(zenith_skymodel)
+
+    zenith_skymodel.transform_to("galactic")
+    zenith_skycoord = zenith_skycoord.transform_to("galactic")
+
+    assert zenith_skymodel.frame == "galactic"
+    assert units.allclose(zenith_skymodel.gl, zenith_skycoord.l)
+    assert units.allclose(zenith_skymodel.gb, zenith_skycoord.b)
+    zenith_skymodel.transform_to("icrs")
+
+    assert zenith_skymodel == original_sky
+
+
+def test_skymodel_transform_astropy_healpix_import(zenith_skymodel):
+    try:
+        import astropy_healpix
+
+        astropy_healpix.nside_to_npix(2 ** 3)
+    except ImportError:
+        errstr = "The astropy-healpix module must be installed to use HEALPix methods"
+
+        # spoof a healpix type to get the error only
+        zenith_skymodel.component_type == "healpix"
+        with pytest.raises(ImportError, match=errstr):
+            zenith_skymodel.transform_to("galactic")
+
+
+def test_skymodel_transform_healpix_indices(healpix_disk_new):
+    astropy_healpix = pytest.importorskip("astropy_healpix")
+    sky_obj = healpix_disk_new
+    old_inds = sky_obj.hpx_inds
+    sky_obj.transform_to("galactic")
+
+    hpx_icrs = astropy_healpix.HEALPix(
+        nside=sky_obj.nside,
+        order=sky_obj.hpx_order,
+        frame=ICRS(),
+    )
+    hpx_galactic = astropy_healpix.HEALPix(
+        nside=sky_obj.nside,
+        order=sky_obj.hpx_order,
+        frame=Galactic(),
+    )
+    icrs_coords = hpx_icrs.healpix_to_skycoord(old_inds)
+    galactic_inds = hpx_galactic.skycoord_to_healpix(icrs_coords)
+
+    assert not np.array_equal(old_inds, sky_obj.hpx_inds)
+    assert np.array_equal(sky_obj.hpx_inds, galactic_inds)

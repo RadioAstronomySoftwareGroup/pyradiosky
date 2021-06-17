@@ -17,6 +17,8 @@ from astropy.coordinates import (
     Latitude,
     Longitude,
     frame_transform_graph,
+    Galactic,
+    ICRS,
 )
 from astropy.time import Time
 import astropy.units as units
@@ -1070,6 +1072,58 @@ class SkyModel(UVBase):
             warnings.filterwarnings("ignore", message="lon is no longer")
             warnings.filterwarnings("ignore", message="lat is no longer")
             return super(SkyModel, self).copy()
+
+    def transform_to(self, frame):
+        """Transform to a difference coordinate frame using underlying Astropy function.
+
+        This function is a thin wrapper on astropy.coordinates.SkyCoord.transform_to
+        please refer to that function for full documentation.
+
+        Parameters
+        ----------
+        frame : str, `BaseCoordinateFrame` class or instance.
+            The frame to transform this coordinate into.
+            Currently frame must be one of ["galactic", "icrs"].
+
+
+        """
+        # let astropy coordinates do the checking for correctness on frames first
+        # this is a little cheaty since it will convert to frames we do not yet
+        # support but allows us not to have to do input frame validation again.
+        coords = SkyCoord(self.lon, self.lat, frame=self.frame).transform_to(frame)
+
+        frame = coords.frame
+
+        if not isinstance(frame, (Galactic, ICRS)):
+            raise ValueError(
+                f"Supplied frame {frame.__class__.__name__} is not supported at "
+                "this time. Only 'galactic' and 'icrs' frames are currently supported.",
+            )
+        comp_dict = coords.frame.get_representation_component_names()
+        inv_dict = {val: key for key, val in comp_dict.items()}
+
+        self.lon = getattr(coords, inv_dict["lon"])
+        self.lat = getattr(coords, inv_dict["lat"])
+        self._frame_inst = frame
+        self._frame.value = frame.name
+
+        if self.component_type == "healpix":
+            try:
+                import astropy_healpix
+            except ImportError as e:
+                raise ImportError(
+                    "The astropy-healpix module must be installed to use HEALPix methods"
+                ) from e
+            # In a new frame, the heaplix index numbers will change,
+            # make a healpix object in the new frame to find the correct indices.
+            hp_obj = astropy_healpix.HEALPix(
+                nside=self.nside,
+                order=self.hpx_order,
+                frame=self._frame_inst,
+            )
+            self.hpx_inds = hp_obj.skycoord_to_healpix(coords)
+
+        return
 
     def kelvin_to_jansky(self):
         """
