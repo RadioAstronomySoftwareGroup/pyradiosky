@@ -3756,7 +3756,7 @@ def test_skymodel_transform_astropy_healpix_import(zenith_skymodel):
         errstr = "The astropy-healpix module must be installed to use HEALPix methods"
 
         # spoof a healpix type to get the error only
-        zenith_skymodel.component_type == "healpix"
+        zenith_skymodel.component_type = "healpix"
         with pytest.raises(ImportError, match=errstr):
             zenith_skymodel.transform_to("galactic")
 
