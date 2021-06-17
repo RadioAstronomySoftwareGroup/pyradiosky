@@ -3472,15 +3472,6 @@ def test_skyh5_read_errors_healpix(healpix_disk_new, param, value, errormsg, tmp
         SkyModel.from_skyh5(testfile)
 
 
-def test_skyh5_write_error(healpix_disk_new, tmpdir):
-    sky = healpix_disk_new
-
-    sky.frame = "galactic"
-
-    with pytest.raises(ValueError, match="SkyModel must be in ICRS"):
-        sky.write_skyh5(tmpdir.join("testfile.skyh5"))
-
-
 def test_skyh5_read_errors_oldstyle_healpix():
     with pytest.raises(
         ValueError, match="This is an old 'healvis' style healpix HDF5 file"
@@ -3792,3 +3783,34 @@ def test_skymodel_transform_healpix_indices(healpix_disk_new):
 
     assert not np.array_equal(old_inds, sky_obj.hpx_inds)
     assert np.array_equal(sky_obj.hpx_inds, galactic_inds)
+
+
+@pytest.mark.parametrize("frame", ["icrs", "galactic"])
+def test_skyh5_write_frames(healpix_disk_new, tmpdir, frame):
+    sky = healpix_disk_new
+
+    sky.frame = frame
+    outfile = tmpdir.join("testfile.skyh5")
+    sky.write_skyh5(outfile)
+
+    new_sky = SkyModel.from_skyh5(outfile)
+    assert new_sky.frame == frame
+
+
+def test_skyh5_write_read_no_frame(healpix_disk_new, tmpdir):
+    sky = healpix_disk_new
+
+    outfile = tmpdir.join("testfile.skyh5")
+    sky.write_skyh5(outfile)
+
+    with h5py.File(outfile, "a") as h5file:
+        header = h5file["/Header"]
+        assert header["frame"][()].tobytes().decode("utf-8") == "icrs"
+        del header["frame"]
+
+    with uvtest.check_warnings(
+        UserWarning, match="No frame available in this file, assuming 'icrs'."
+    ):
+        new_sky = SkyModel.from_skyh5(outfile)
+
+    assert new_sky.frame == "icrs"
