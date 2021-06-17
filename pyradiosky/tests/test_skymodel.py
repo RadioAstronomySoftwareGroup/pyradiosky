@@ -3524,7 +3524,7 @@ def test_healpix_coordinate_init_override(healpix_icrs):
     hp_obj, coords_icrs, stokes, freq = healpix_icrs
 
     with check_warnings(
-        UserWarning, "Input lon and lat parameters are being used instead of"
+        UserWarning, "Input ra and dec parameters are being used instead of"
     ):
         skymod = SkyModel(
             ra=coords_icrs.ra,
@@ -3547,8 +3547,9 @@ def test_healpix_coordinate_init_override_lists(healpix_icrs):
         UserWarning, "Input lon and lat parameters are being used instead of"
     ):
         skymod = SkyModel(
-            ra=list(coords_icrs.ra),
-            dec=list(coords_icrs.dec),
+            lon=list(coords_icrs.ra),
+            lat=list(coords_icrs.dec),
+            frame="icrs",
             stokes=stokes,
             spectral_type="full",
             freq_array=freq,
@@ -3569,10 +3570,8 @@ def test_healpix_coordinate_init_no_override(healpix_icrs):
         hp_obj.nside,
     )
 
-    with check_warnings(
-        UserWarning, "Either the lon or lat was attempted to be initialized without"
-    ):
-        skymod = SkyModel(
+    with pytest.raises(ValueError, "Invalid input coordinate combination"):
+        SkyModel(
             ra=coords_icrs.ra,
             stokes=stokes,
             spectral_type="full",
@@ -3586,7 +3585,6 @@ def test_healpix_coordinate_init_no_override(healpix_icrs):
     assert np.array_equal(skymod_ra, hp_ra)
     assert np.array_equal(skymod_dec, hp_dec)
 
-
 @pytest.mark.parametrize(
     "param,val,err_msg",
     [
@@ -3595,7 +3593,7 @@ def test_healpix_coordinate_init_no_override(healpix_icrs):
     ],
 )
 @pytest.mark.filterwarnings(
-    "ignore:Input lon and lat parameters are being used instead of"
+    "ignore:Input ra and dec parameters are being used instead of"
 )
 def test_healpix_init_override_errors(healpix_icrs, param, val, err_msg):
     astropy_healpix = pytest.importorskip("astropy_healpix")
@@ -3654,6 +3652,7 @@ def test_write_clobber(mock_point_skies, tmpdir):
 
     assert sky3 == sky
     assert sky3 != sky2
+
 
 # TODO -- Also check with healpix init
 @pytest.mark.parametrize(

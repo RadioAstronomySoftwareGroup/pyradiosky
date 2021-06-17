@@ -634,9 +634,11 @@ class SkyModel(UVBase):
                     self.frame = "icrs"
 
                 self.Ncomponents = self.hpx_inds.size
-                if lon is not None and dec is not None:
+                if lon is not None and lat is not None:
+                    lon_name = [k for k in ["ra", "gl", "lon"] if coords_given[k]][0]
+                    lat_name = [k for k in ["dec", "gb", "lat"] if coords_given[k]][0]
                     warnings.warn(
-                        "Input lon and lat parameters are being used instead of "
+                        f"Input {lon_name} and {lat_name} parameters are being used instead of "
                         "the default healpix coordinates. These coordinates will "
                         "not necessarily line up with healpix pixel indicies. "
                         "If you are intentionally trying to overwrite healpix "
@@ -649,8 +651,9 @@ class SkyModel(UVBase):
                         # throwing an error.
                         for val in lon:
                             if not isinstance(val, (Longitude)):
+
                                 raise ValueError(
-                                    "All values in lon must be Longitude objects"
+                                    f"All values in {lon_name} must be Longitude objects"
                                 )
                         lon = Longitude(lon)
                     self.lon = np.atleast_1d(lon)
@@ -659,9 +662,9 @@ class SkyModel(UVBase):
                         # Longitude they are silently converted to Longitude rather than
                         # throwing an error.
                         for val in lat:
-                            if not isinstance(lat, (Latitude)):
+                            if not isinstance(val, (Latitude)):
                                 raise ValueError(
-                                    "All values in lat must be Latitude objects"
+                                    f"All values in {lat_name} must be Latitude objects"
                                 )
                         lat = Latitude(lat)
                     self.lat = np.atleast_1d(lat)
@@ -674,6 +677,13 @@ class SkyModel(UVBase):
                             "given to overwrite healpix coordinates or neither. "
                             "Proceeding with the default healpix coordinates"
                         )
+                    lon, lat = astropy_healpix.healpix_to_lonlat(
+                        hpx_inds,
+                        nside,
+                        order=self.hpx_order,
+                    )
+                    self.lon = lon
+                    self.lat = lat
 
             else:
                 self.Ncomponents = self.name.size
