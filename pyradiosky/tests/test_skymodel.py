@@ -3570,7 +3570,7 @@ def test_healpix_coordinate_init_no_override(healpix_icrs):
         hp_obj.nside,
     )
 
-    with pytest.raises(ValueError, "Invalid input coordinate combination"):
+    with pytest.raises(ValueError, match="Invalid input coordinate combination"):
         SkyModel(
             ra=coords_icrs.ra,
             stokes=stokes,
@@ -3808,7 +3808,11 @@ def test_skyh5_write_read_no_frame(healpix_disk_new, tmpdir):
         del header["frame"]
 
     with uvtest.check_warnings(
-        UserWarning, match="No frame available in this file, assuming 'icrs'."
+        UserWarning,
+        match=[
+            "No frame available in this file, assuming 'icrs'.",
+            "Input lon and lat parameters are being used instead of the default healpix coordinates",
+        ],
     ):
         new_sky = SkyModel.from_skyh5(outfile)
 
