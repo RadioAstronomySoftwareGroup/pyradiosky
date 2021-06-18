@@ -91,7 +91,7 @@ jobs:
           # pytest --pyargs pyradiosky --cov=pyradiosky --cov-config=../.coveragerc --cov-report xml:../coverage.xml --junitxml=../test-reports/xunit.xml
           # cd ..
 
-      - uses: codecov/codecov-action@master
+      - uses: codecov/codecov-action@v1.5.2
         if: success()
         with:
           token: ${{secrets.CODECOV_TOKEN}} #required
@@ -139,7 +139,7 @@ jobs:
         run: |
           python -m pytest -v --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml --junitxml=test-reports/xunit.xml
 
-      - uses: codecov/codecov-action@master
+      - uses: codecov/codecov-action@v1.5.2
         if: success()
         with:
           token: ${{secrets.CODECOV_TOKEN}} #required
