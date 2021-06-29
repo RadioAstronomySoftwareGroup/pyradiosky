@@ -3000,10 +3000,19 @@ class SkyModel(UVBase):
                     if parname not in header:
                         continue
 
-                if parname == "lat":
-                    dset = header["dec"]
-                elif parname == "lon":
-                    dset = header["ra"]
+                if parname in ["lon", "lat"]:
+                    if parname not in header:
+                        warnings.warn(
+                            f"Parameter {parname} not found in skyh5 file. "
+                            "This skyh5 file was written by an older version of pyradiosky. "
+                            "Consdier re-writing this file to ensure future compatibility"
+                        )
+                        if parname == "lat":
+                            dset = header["dec"]
+                        elif parname == "lon":
+                            dset = header["ra"]
+                    else:
+                        dset = header[parname]
                 else:
                     dset = header[parname]
 
@@ -4209,11 +4218,6 @@ class SkyModel(UVBase):
                 param = getattr(self, par)
                 val = param.value
                 parname = param.name
-
-                if parname == "lon":
-                    parname = "ra"
-                if parname == "lat":
-                    parname = "dec"
 
                 # Skip if parameter is unset.
                 if val is None:
