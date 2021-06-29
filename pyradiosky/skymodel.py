@@ -2941,10 +2941,6 @@ class SkyModel(UVBase):
             downselecting data on this object (the default is True, meaning the
             acceptable range check will be done).
 
-        Notes
-        -----
-        skyh5 only support ICRS RA/Dec coordinates at this time.
-
         """
         with h5py.File(filename, "r") as fileobj:
             if "/Header" not in fileobj:
