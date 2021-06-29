@@ -2950,6 +2950,8 @@ class SkyModel(UVBase):
                     "is deprecated and will be removed in version 0.3.0."
                 )
 
+        init_params = {}
+
         with h5py.File(filename, "r") as fileobj:
 
             # extract header information
