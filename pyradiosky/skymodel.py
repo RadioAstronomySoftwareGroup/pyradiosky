@@ -2988,7 +2988,6 @@ class SkyModel(UVBase):
                 "_beam_amp",
                 "_extended_model_group",
             ]
-            init_params = {"frame": "icrs"}
 
             for par in header_params:
                 param = getattr(self, par)
@@ -4158,10 +4157,6 @@ class SkyModel(UVBase):
             Option to check acceptable range of the values of parameters after
             downselecting data on this object (the default is True, meaning the
             acceptable range check will be done).
-
-        Notes
-        -----
-        Assumes
         """
         if run_check:
             self.check(
