@@ -221,11 +221,13 @@ def healpix_disk_old():
 @pytest.fixture(scope="function")
 def healpix_disk_new():
     pytest.importorskip("astropy_healpix")
-
     with uvtest.check_warnings(
         UserWarning,
         match=[
-            "Input ra and dec parameters are being used instead of the default",
+            "Parameter lon not found in skyh5 file. ",
+            "Parameter lat not found in skyh5 file. ",
+            "No frame available in this file. ",
+            "Input lon and lat parameters are being used instead of the default",
         ],
     ):
         sky = SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "healpix_disk.skyh5"))
