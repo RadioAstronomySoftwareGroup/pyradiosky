@@ -744,8 +744,9 @@ def test_skymodel_deprecated(time_location):
     with pytest.warns(
         DeprecationWarning,
         match=(
-            "Future equality does not pass, probably because the frequencies "
-            "were not checked"
+            re.escape(
+                "Future equality does not pass, because parameters ['reference_frequency']"
+            )
         ),
     ):
         assert source_new == source_old
@@ -888,7 +889,8 @@ def test_jansky_to_kelvin_loop(spec_type):
     assert skyobj3 == skyobj2
 
 
-def test_jansky_to_kelvin_loop_healpix(healpix_data, healpix_disk_new):
+@pytest.mark.filterwarnings("ignore:Input ra and dec parameters are being used instead")
+def test_jansky_to_kelvin_loop_healpix(healpix_disk_new):
     skyobj = healpix_disk_new
 
     stokes_expected = np.zeros_like(skyobj.stokes.value) * units.Jy / units.sr
@@ -934,7 +936,8 @@ def test_jansky_to_kelvin_errors(zenith_skymodel):
         zenith_skymodel.kelvin_to_jansky()
 
 
-def test_healpix_to_point_loop(healpix_data, healpix_disk_new):
+@pytest.mark.filterwarnings("ignore:Input ra and dec parameters are being used instead")
+def test_healpix_to_point_loop(healpix_disk_new):
     skyobj = healpix_disk_new
 
     skyobj2 = skyobj.copy()
@@ -955,11 +958,12 @@ def test_healpix_to_point_errors(zenith_skymodel):
     with pytest.raises(
         ValueError,
         match="This method can only be called if component_type is 'point' and "
-        "the nside and hpx_inds parameters are set.",
+        "the nside, hpx_order and hpx_inds parameters are set.",
     ):
         zenith_skymodel.point_to_healpix()
 
 
+@pytest.mark.filterwarnings("ignore:Input ra and dec parameters are being used instead")
 def test_healpix_to_point_source_cuts(healpix_disk_new):
     """
     This tests that `self.name` is set as a numpy ndarray, not a list, in
@@ -1306,6 +1310,7 @@ def test_polarized_source_smooth_visibilities():
         assert np.all(imag_stokes == 0)
 
 
+@pytest.mark.filterwarnings("ignore:Input ra and dec parameters are being used instead")
 @pytest.mark.parametrize(
     "comp_type, spec_type",
     [
@@ -1484,6 +1489,7 @@ def test_concat_optional_params(param):
     assert skyobj_new == skyobj_full
 
 
+@pytest.mark.filterwarnings("ignore:Input ra and dec parameters are being used instead")
 @pytest.mark.parametrize("comp_type", ["point", "healpix"])
 def test_concat_overlap_errors(comp_type, healpix_disk_new):
     if comp_type == "point":
@@ -1506,6 +1512,7 @@ def test_concat_overlap_errors(comp_type, healpix_disk_new):
         skyobj1.concat(skyobj2)
 
 
+@pytest.mark.filterwarnings("ignore:Input ra and dec parameters are being used instead")
 def test_concat_compatibility_errors(healpix_disk_new, time_location):
     skyobj_gleam_subband = SkyModel.from_gleam_catalog(
         GLEAM_vot, spectral_type="subband"
@@ -1664,8 +1671,9 @@ def test_order_healpix_to_sky(healpix_data, hpx_order):
             assert sky.hpx_order == hpx_order
 
 
+@pytest.mark.filterwarnings("ignore:Input ra and dec parameters are being used instead")
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
-def test_healpix_recarray_loop(healpix_data, healpix_disk_new):
+def test_healpix_recarray_loop(healpix_disk_new):
 
     skyobj = healpix_disk_new
     skyarr = skyobj.to_recarray()
@@ -2796,6 +2804,7 @@ def test_text_catalog_loop_other_freqs(tmp_path, freq_mult):
     assert skyobj == skyobj2
 
 
+@pytest.mark.filterwarnings("ignore:Input ra and dec parameters are being used instead")
 def test_write_text_catalog_error(tmp_path, healpix_disk_new):
     fname = os.path.join(tmp_path, "temp_cat.txt")
 
@@ -3003,6 +3012,7 @@ def test_skyh5_file_loop_gleam(spec_type, tmpdir):
     assert sky2 == sky
 
 
+@pytest.mark.filterwarnings("ignore:Input ra and dec parameters are being used instead")
 @pytest.mark.parametrize("history", [None, "test"])
 def test_skyh5_file_loop_healpix(healpix_disk_new, history, tmpdir):
     sky = healpix_disk_new
@@ -3022,6 +3032,7 @@ def test_skyh5_file_loop_healpix(healpix_disk_new, history, tmpdir):
     assert sky2 == sky
 
 
+@pytest.mark.filterwarnings("ignore:Input ra and dec parameters are being used instead")
 def test_skyh5_file_loop_healpix_cut_sky(healpix_disk_new, tmpdir):
     sky = healpix_disk_new
 
@@ -3036,6 +3047,7 @@ def test_skyh5_file_loop_healpix_cut_sky(healpix_disk_new, tmpdir):
     assert sky2 == sky
 
 
+@pytest.mark.filterwarnings("ignore:Input ra and dec parameters are being used instead")
 def test_skyh5_file_loop_healpix_to_point(healpix_disk_new, tmpdir):
     sky = healpix_disk_new
 
@@ -3076,6 +3088,7 @@ def test_skyh5_read_errors(mock_point_skies, param, value, errormsg, tmpdir):
         SkyModel.from_skyh5(testfile)
 
 
+@pytest.mark.filterwarnings("ignore:Input ra and dec parameters are being used instead")
 @pytest.mark.parametrize(
     "param,value,errormsg",
     [
@@ -3125,7 +3138,9 @@ def test_hpx_ordering():
     npix = 12 * nside ** 2
     stokes = np.zeros((4, 1, npix)) * units.K
 
-    with pytest.raises(ValueError, match="order must be 'nested' or 'ring'"):
+    with pytest.raises(
+        ValueError, match=re.escape("hpx_order must be one of ['ring', 'nested']")
+    ):
         sky = SkyModel(
             hpx_inds=np.arange(npix),
             nside=nside,

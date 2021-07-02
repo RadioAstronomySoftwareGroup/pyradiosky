@@ -177,10 +177,12 @@ class SkyModel(UVBase):
             self._name.required = False
             self._hpx_inds.required = True
             self._nside.required = True
+            self._hpx_order.required = True
         else:
             self._name.required = True
             self._hpx_inds.required = False
             self._nside.required = False
+            self._hpx_order.required = False
 
     def __init__(
         self,
@@ -528,7 +530,10 @@ class SkyModel(UVBase):
                 self.hpx_order = str(hpx_order).lower()
 
                 # Ensure that the value can be used in healpix_to_lonlat below.
-                self._hpx_order.check_acceptability()
+                if not self._hpx_order.check_acceptability()[0]:
+                    raise ValueError(
+                        f"hpx_order must be one of {self._hpx_order.acceptable_vals}"
+                    )
 
             if self.component_type == "healpix":
                 try:
@@ -879,13 +884,23 @@ class SkyModel(UVBase):
             )
 
         if not equal:
-            warnings.warn(
-                "Future equality does not pass, probably because the "
-                "frequencies were not checked in the deprecated equality checking. "
-                "This will become an error in version 0.2.0",
-                category=DeprecationWarning,
-            )
             equal = super(SkyModel, self).__eq__(other, check_extra=False)
+
+            if equal:
+                # required params are equal, extras are not but check_extra is turned on.
+                # Issue future warning!
+                unequal_name_list = []
+                for param in self.extra():
+                    this_param = getattr(self, param)
+                    other_param = getattr(other, param)
+                    if this_param != other_param:
+                        unequal_name_list.append(this_param.name)
+
+                warnings.warn(
+                    f"Future equality does not pass, because parameters {unequal_name_list} "
+                    "are not equal. This will become an error in version 0.2.0",
+                    category=DeprecationWarning,
+                )
 
         return equal
 
@@ -1033,7 +1048,10 @@ class SkyModel(UVBase):
         self.coherency_radec = (
             self.coherency_radec * astropy_healpix.nside_to_pixel_area(self.nside)
         )
-        name_use = ["nside" + str(self.nside) + "_" + str(ind) for ind in self.hpx_inds]
+        name_use = [
+            "nside" + str(self.nside) + "_" + self.hpx_order + "_" + str(ind)
+            for ind in self.hpx_inds
+        ]
         self.name = np.array(name_use)
 
         if to_jy:
@@ -1080,10 +1098,11 @@ class SkyModel(UVBase):
             self.component_type != "point"
             or self.nside is None
             or self.hpx_inds is None
+            or self.hpx_order is None
         ):
             raise ValueError(
                 "This method can only be called if component_type is 'point' and "
-                "the nside and hpx_inds parameters are set."
+                "the nside, hpx_order and hpx_inds parameters are set."
             )
 
         try:
@@ -2221,8 +2240,10 @@ class SkyModel(UVBase):
         )
 
         if ids[0].startswith("nside"):
-            self.nside = int(ids[0][len("nside") : ids[0].find("_")])
-            self.hpx_inds = np.array([int(name[name.find("_") + 1 :]) for name in ids])
+            name_parts = ids[0].split("_")
+            self.nside = int(name_parts[0][len("nside") :])
+            self.hpx_order = name_parts[1]
+            self.hpx_inds = np.array([int(name[name.rfind("_") + 1 :]) for name in ids])
             self.point_to_healpix(
                 run_check=run_check,
                 check_extra=check_extra,
@@ -2290,6 +2311,7 @@ class SkyModel(UVBase):
                 "_history",
                 "_name",
                 "_nside",
+                "_hpx_order",
                 "_hpx_inds",
                 "_freq_array",
                 "_reference_frequency",
@@ -2303,6 +2325,7 @@ class SkyModel(UVBase):
                 "_name",
                 "_nside",
                 "_hpx_inds",
+                "_hpx_order",
                 "_freq_array",
                 "_reference_frequency",
                 "_spectral_index",
@@ -3499,6 +3522,7 @@ class SkyModel(UVBase):
                 "_history",
                 "_name",
                 "_nside",
+                "_hpx_order",
                 "_hpx_inds",
                 "_freq_array",
                 "_reference_frequency",
