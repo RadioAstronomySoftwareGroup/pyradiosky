@@ -1852,6 +1852,7 @@ def test_healpix_import_err(zenith_skymodel):
 
         zenith_skymodel.nside = 32
         zenith_skymodel.hpx_inds = 0
+        zenith_skymodel.hpx_order = "ring"
         with pytest.raises(ImportError, match=errstr):
             zenith_skymodel.point_to_healpix()
 
