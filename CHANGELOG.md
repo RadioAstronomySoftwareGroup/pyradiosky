@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.1.2] - 2021-07-06
+
 ### Added
 - Ability to overwrite default ra/dec when importing a healpix map
 - `clobber` keyword to allow overwriting of skyh5 files
