@@ -10,6 +10,7 @@
 - A new optional parameters `stokes_error` to track errors on the fluxes reported by catalogs.
 
 ### Fixed
+- Fix bug in writing skyh5 files with composite stokes units (e.g. Jy/sr)
 - Fix bugs causing healpix ordering to not be round tripped properly.
 - Some bugs related to writing & reading skyh5 files after converting object using `healpix_to_point` method.
 
