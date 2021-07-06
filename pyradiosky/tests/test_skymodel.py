@@ -3077,6 +3077,31 @@ def test_skyh5_file_loop_healpix_to_point(healpix_disk_new, tmpdir):
     assert sky2 == sky
 
 
+def test_skyh5_units(tmpdir):
+    # this test checks that write_skyh5 doesn't error with composite stokes units
+    Ncomponents = 5
+    stokes = np.zeros((4, 1, 5))
+    stokes = Quantity(stokes, "Jy/sr")
+    freq_array = Quantity([182000000], "Hz")
+
+    sky = SkyModel(
+        component_type="healpix",
+        spectral_type="flat",
+        stokes=stokes,
+        freq_array=freq_array,
+        hpx_inds=np.arange(1, Ncomponents + 1),
+        hpx_order="nested",
+        nside=128,
+    )
+
+    filename = str(tmpdir.join("testfile.skyh5"))
+    sky.write_skyh5(filename)
+
+    sky2 = SkyModel.from_skyh5(filename)
+
+    assert sky2 == sky
+
+
 @pytest.mark.parametrize(
     "param,value,errormsg",
     [
