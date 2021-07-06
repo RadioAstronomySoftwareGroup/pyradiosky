@@ -3077,7 +3077,9 @@ def test_skyh5_file_loop_healpix_to_point(healpix_disk_new, tmpdir):
     assert sky2 == sky
 
 
+@pytest.mark.filterwarnings("ignore:Input ra and dec parameters are being used instead")
 def test_skyh5_units(tmpdir):
+    pytest.importorskip("astropy_healpix")
     # this test checks that write_skyh5 doesn't error with composite stokes units
     Ncomponents = 5
     stokes = np.zeros((4, 1, 5))
