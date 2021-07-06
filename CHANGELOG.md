@@ -4,12 +4,13 @@
 
 ### Added
 - Ability to overwrite default ra/dec when importing a healpix map
-- `clobbler` keyword to allow overwriting of skyh5 files
+- `clobber` keyword to allow overwriting of skyh5 files
 - Support for ring / nested healpix ordering.
 - New `SkyModel.concat` method to support concatenating catalogs.
 - A new optional parameters `stokes_error` to track errors on the fluxes reported by catalogs.
 
 ### Fixed
+- Fix bugs causing healpix ordering to not be round tripped properly.
 - Some bugs related to writing & reading skyh5 files after converting object using `healpix_to_point` method.
 
 ## [0.1.1] - 2021-02-17
