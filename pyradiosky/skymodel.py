@@ -3548,12 +3548,8 @@ class SkyModel(UVBase):
                         angtype = "latitude"
                     elif isinstance(val, Longitude):
                         angtype = "longitude"
-                    if isinstance(val.unit, units.Unit):
-                        unit = val.unit.name
-                    else:
-                        # Composite units (like Jy/sr) do not have a name attribute.
-                        # Use `str` instead.
-                        unit = str(val.unit)
+                    # Use `str` to ensure this works for Composite units as well.
+                    unit = str(val.unit)
                     val = val.value
 
                 try:
@@ -3584,12 +3580,8 @@ class SkyModel(UVBase):
                 dtype=self.stokes.dtype,
                 chunks=True,
             )
-            if isinstance(self.stokes.unit, units.Unit):
-                dgrp["stokes"].attrs["unit"] = self.stokes.unit.name
-            else:
-                # Composite units (like Jy/sr) do not have a name attribute.
-                # Use `str` instead.
-                dgrp["stokes"].attrs["unit"] = str(self.stokes.unit)
+            # Use `str` to ensure this works for Composite units (e.g. Jy/sr) as well.
+            dgrp["stokes"].attrs["unit"] = str(self.stokes.unit)
 
     def write_healpix_hdf5(self, filename):
         """
