@@ -1097,6 +1097,12 @@ class SkyModel(UVBase):
 
 
         """
+        if self.component_type == "healpix":
+            raise ValueError(
+                "Direct coordinate transformation between frames is not implemented"
+                " for `healpix` type catalogs. Please use the `healpix_interp_transform` "
+                "to transform to a new frame and interpolate to the new pixel centers."
+            )
         # let astropy coordinates do the checking for correctness on frames first
         # this is a little cheaty since it will convert to frames we do not yet
         # support but allows us not to have to do input frame validation again.
@@ -1117,23 +1123,26 @@ class SkyModel(UVBase):
         self._frame_inst = frame
         self._frame.value = frame.name
 
-        if self.component_type == "healpix":
-            try:
-                import astropy_healpix
-            except ImportError as e:
-                raise ImportError(
-                    "The astropy-healpix module must be installed to use HEALPix methods"
-                ) from e
-            # In a new frame, the heaplix index numbers will change,
-            # make a healpix object in the new frame to find the correct indices.
-            hp_obj = astropy_healpix.HEALPix(
-                nside=self.nside,
-                order=self.hpx_order,
-                frame=self._frame_inst,
-            )
-            self.hpx_inds = hp_obj.skycoord_to_healpix(coords)
-
         return
+
+    def healpix_interp_transform(self, frame):
+        """Transform a HEALPix map to a new frame and interp to new pixel centers.
+
+        This method is only available for a healpix type sky model.
+        Computes the pixel centers for a HEALPix map in the new frame,
+        then interpolates the old map using `astropy_healpix.interpolate_bilinear_skycoord`.
+
+        Current implementation is equal to using a healpy.Rotator class to 1 part in 10^-5
+        (e.g `numpy.allclose(healpy_rotated_map, interpolate_bilinear_skycoord, rtol=1e-5) is True`).
+
+
+        Parameters
+        ----------
+        frame : str, `BaseCoordinateFrame` class or instance.
+            The frame to transform this coordinate into.
+            Currently frame must be one of ["galactic", "icrs"].
+        """
+        return NotImplementedError
 
     def kelvin_to_jansky(self):
         """
