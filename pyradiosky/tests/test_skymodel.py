@@ -22,7 +22,6 @@ from astropy.coordinates import (
     Longitude,
     Latitude,
     Galactic,
-    ICRS,
 )
 from astropy.time import Time, TimeDelta
 import pyuvdata.tests as uvtest
@@ -3763,27 +3762,11 @@ def test_skymodel_transform_astropy_healpix_import(zenith_skymodel):
             zenith_skymodel.transform_to("galactic")
 
 
-def test_skymodel_transform_healpix_indices(healpix_disk_new):
-    astropy_healpix = pytest.importorskip("astropy_healpix")
+def test_skymodel_transform_healpix_error(healpix_disk_new):
+    pytest.importorskip("astropy_healpix")
     sky_obj = healpix_disk_new
-    old_inds = sky_obj.hpx_inds
-    sky_obj.transform_to("galactic")
-
-    hpx_icrs = astropy_healpix.HEALPix(
-        nside=sky_obj.nside,
-        order=sky_obj.hpx_order,
-        frame=ICRS(),
-    )
-    hpx_galactic = astropy_healpix.HEALPix(
-        nside=sky_obj.nside,
-        order=sky_obj.hpx_order,
-        frame=Galactic(),
-    )
-    icrs_coords = hpx_icrs.healpix_to_skycoord(old_inds)
-    galactic_inds = hpx_galactic.skycoord_to_healpix(icrs_coords)
-
-    assert not np.array_equal(old_inds, sky_obj.hpx_inds)
-    assert np.array_equal(sky_obj.hpx_inds, galactic_inds)
+    with pytest.raises(ValueError, match="Direct coordinate transformation"):
+        sky_obj.transform_to("galactic")
 
 
 @pytest.mark.parametrize("frame", ["icrs", "galactic"])
