@@ -290,6 +290,37 @@ def assign_hpx_data():
     del sky
 
 
+@pytest.fixture(scope="session")
+def healpix_gsm_galactic():
+    pytest.importorskip("astropy_healpix")
+    with uvtest.check_warnings(
+        UserWarning,
+        match=[
+            "Input lon and lat parameters are being used instead of the default",
+        ],
+    ):
+        sky = SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "gsm_galactic.skyh5"))
+    yield sky
+
+    del sky
+
+
+@pytest.fixture(scope="session")
+def healpix_gsm_icrs():
+    pytest.importorskip("astropy_healpix")
+    with uvtest.check_warnings(
+        UserWarning,
+        match=[
+            "Input lon and lat parameters are being used instead of the default",
+        ],
+    ):
+        sky = SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "gsm_icrs.skyh5"))
+
+    yield sky
+
+    del sky
+
+
 def test_set_spectral_params(zenith_skymodel):
 
     with pytest.warns(
@@ -3748,20 +3779,6 @@ def test_skymodel_tranform_frame_roundtrip(zenith_skymodel, zenith_skycoord):
     assert zenith_skymodel == original_sky
 
 
-def test_skymodel_transform_astropy_healpix_import(zenith_skymodel):
-    try:
-        import astropy_healpix
-
-        astropy_healpix.nside_to_npix(2 ** 3)
-    except ImportError:
-        errstr = "The astropy-healpix module must be installed to use HEALPix methods"
-
-        # spoof a healpix type to get the error only
-        zenith_skymodel.component_type = "healpix"
-        with pytest.raises(ImportError, match=errstr):
-            zenith_skymodel.transform_to("galactic")
-
-
 def test_skymodel_transform_healpix_error(healpix_disk_new):
     pytest.importorskip("astropy_healpix")
     sky_obj = healpix_disk_new
@@ -3802,3 +3819,35 @@ def test_skyh5_write_read_no_frame(healpix_disk_new, tmpdir):
         new_sky = SkyModel.from_skyh5(outfile)
 
     assert new_sky.frame == "icrs"
+
+
+def test_skymodel_transform_healpix(healpix_gsm_galactic, healpix_gsm_icrs):
+    pytest.importorskip("astropy_healpix")
+    sky_obj = healpix_gsm_galactic
+    sky_obj.healpix_interp_transform("icrs")
+
+    assert sky_obj == healpix_gsm_icrs
+
+
+def test_skymodel_healpix_transform_unsupported_frame(healpix_gsm_galactic):
+    with pytest.raises(
+        ValueError, match="Supplied frame GCRS is not supported at this time."
+    ):
+        healpix_gsm_galactic.healpix_interp_transform("gcrs")
+
+
+def test_skymod_transform_healpix_point_error(zenith_skymodel):
+    with pytest.raises(ValueError, match="Healpix frame interpolation is not valid"):
+        zenith_skymodel.healpix_interp_transform("galactic")
+
+
+def test_skymod_healpix_transform_import_error(healpix_gsm_galactic):
+    try:
+        import astropy_healpix
+
+        astropy_healpix.nside_to_npix(2 ** 3)
+    except ImportError:
+        errstr = "The astropy-healpix module must be installed to use HEALPix methods"
+
+        with pytest.raises(ImportError, match=errstr):
+            healpix_gsm_galactic.transform_to("icrs")

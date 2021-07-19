@@ -1099,7 +1099,7 @@ class SkyModel(UVBase):
         """
         if self.component_type == "healpix":
             raise ValueError(
-                "Direct coordinate transformation between frames is not implemented"
+                "Direct coordinate transformation between frames is not valid"
                 " for `healpix` type catalogs. Please use the `healpix_interp_transform` "
                 "to transform to a new frame and interpolate to the new pixel centers."
             )
@@ -1125,12 +1125,24 @@ class SkyModel(UVBase):
 
         return
 
-    def healpix_interp_transform(self, frame):
+    def healpix_interp_transform(
+        self,
+        frame,
+        run_check=True,
+        check_extra=True,
+        run_check_acceptability=True,
+    ):
         """Transform a HEALPix map to a new frame and interp to new pixel centers.
 
         This method is only available for a healpix type sky model.
         Computes the pixel centers for a HEALPix map in the new frame,
         then interpolates the old map using `astropy_healpix.interpolate_bilinear_skycoord`.
+
+        Conversion with this method may take some time as it must iterate over every
+        frequency and stokes parameter individually.
+
+        Currently no polarization fixing is performed by this method.
+        There may be Q <--> U rotation induced by this method.
 
         Current implementation is equal to using a healpy.Rotator class to 1 part in 10^-5
         (e.g `numpy.allclose(healpy_rotated_map, interpolate_bilinear_skycoord, rtol=1e-5) is True`).
@@ -1141,8 +1153,112 @@ class SkyModel(UVBase):
         frame : str, `BaseCoordinateFrame` class or instance.
             The frame to transform this coordinate into.
             Currently frame must be one of ["galactic", "icrs"].
+        run_check : bool
+            Option to check for the existence and proper shapes of parameters
+            after downselecting data on this object (the default is True,
+            meaning the check will be run).
+        check_extra : bool
+            Option to check optional parameters as well as required ones (the
+            default is True, meaning the optional parameters will be checked).
+        run_check_acceptability : bool
+            Option to check acceptable range of the values of parameters after
+            downselecting data on this object (the default is True, meaning the
+            acceptable range check will be done).
         """
-        return NotImplementedError
+        if self.component_type != "healpix":
+            raise ValueError(
+                "Healpix frame interpolation is not valid for point source catalogs."
+            )
+        try:
+            import astropy_healpix
+        except ImportError as e:
+            raise ImportError(
+                "The astropy-healpix module must be installed to use HEALPix methods"
+            ) from e
+
+        #  quickly check the validity of the transformation using a dummy SkyCoord object.
+        coords = SkyCoord(0, 0, unit="rad", frame=self.frame)
+
+        # we will need the starting frame for some interpolation later
+        old_frame = coords.frame
+
+        coords = coords.transform_to(frame)
+
+        frame = coords.frame
+
+        if not isinstance(frame, (Galactic, ICRS)):
+            raise ValueError(
+                f"Supplied frame {frame.__class__.__name__} is not supported at "
+                "this time. Only 'galactic' and 'icrs' frames are currently supported.",
+            )
+
+        hp_obj_new = astropy_healpix.HEALPix(
+            nside=self.nside,
+            order=self.hpx_order,
+            frame=frame,
+        )
+        hp_obj_old = astropy_healpix.HEALPix(
+            nside=self.nside,
+            order=self.hpx_order,
+            frame=old_frame,
+        )
+
+        # It is not immediately obvious how many unique pixels the output
+        # array will have. Initialize a full healpix map, then we will downselect
+        # later to only valid pixels.
+        out_stokes = units.Quantity(
+            np.zeros((4, self.Nfreqs, hp_obj_new.npix)), unit=self.stokes.unit
+        )
+        # Need the coordinates of the pixel centers in the new frame
+        # then we will use these to interpolate for each freq/stokes
+        new_pixel_locs = hp_obj_new.healpix_to_skycoord(np.arange(hp_obj_new.npix))
+
+        for stokes_ind in range(4):
+            for freq_ind in range(self.Nfreqs):
+                masked_old_frame = np.ma.zeros(hp_obj_new.npix).astype(
+                    self.stokes.dtype
+                )
+                # Default every pixel to masked, then unmask ones we have data for
+                masked_old_frame.mask = np.ones(masked_old_frame.size).astype(bool)
+                masked_old_frame.mask[self.hpx_inds] = False
+
+                masked_old_frame[self.hpx_inds] = self.stokes[
+                    stokes_ind, freq_ind
+                ].value
+
+                masked_new_frame = hp_obj_old.interpolate_bilinear_skycoord(
+                    new_pixel_locs,
+                    masked_old_frame,
+                )
+
+                out_stokes[stokes_ind, freq_ind] = units.Quantity(
+                    masked_new_frame.data,
+                    unit=self.stokes.unit,
+                )
+
+        # Each frequency/stokes combination should have the same input pixels
+        # and rotations, therefore the output mask should be equivalent.
+        self.hpx_inds = np.nonzero(~masked_new_frame.mask)[0]
+        self.stokes = out_stokes[:, :, self.hpx_inds]
+        # the number of components can change when making this transformation!
+        self.Ncomponents = self.stokes.shape[2]
+
+        comp_dict = new_pixel_locs.frame.get_representation_component_names()
+        inv_dict = {val: key for key, val in comp_dict.items()}
+        self.lon = getattr(new_pixel_locs, inv_dict["lon"])[self.hpx_inds]
+        self.lat = getattr(new_pixel_locs, inv_dict["lat"])[self.hpx_inds]
+
+        self._frame_inst = frame
+        self._frame.value = frame.name
+        # recalculate the coherency now that we are in the new frame
+        self.coherency_radec = skyutils.stokes_to_coherency(self.stokes)
+
+        if run_check:
+            self.check(
+                check_extra=check_extra, run_check_acceptability=run_check_acceptability
+            )
+
+        return
 
     def kelvin_to_jansky(self):
         """
