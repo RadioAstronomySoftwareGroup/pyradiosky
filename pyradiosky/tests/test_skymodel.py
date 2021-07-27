@@ -3841,13 +3841,15 @@ def test_skymod_transform_healpix_point_error(zenith_skymodel):
         zenith_skymodel.healpix_interp_transform("galactic")
 
 
-def test_skymod_healpix_transform_import_error(healpix_gsm_galactic):
+def test_skymod_healpix_transform_import_error(zenith_skycoord):
     try:
         import astropy_healpix
 
         astropy_healpix.nside_to_npix(2 ** 3)
     except ImportError:
+        # spoof to get into healpix component without actually having healpix installed
+        zenith_skycoord.component_type = "healpix"
         errstr = "The astropy-healpix module must be installed to use HEALPix methods"
 
         with pytest.raises(ImportError, match=errstr):
-            healpix_gsm_galactic.transform_to("icrs")
+            zenith_skycoord.transform_to("icrs")
