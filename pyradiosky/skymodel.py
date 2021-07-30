@@ -4,8 +4,8 @@
 """Define SkyModel class and helper functions."""
 
 import warnings
-
 import os
+
 import h5py
 import numpy as np
 from scipy.linalg import orthogonal_procrustes as ortho_procr
@@ -15,15 +15,11 @@ from astropy.time import Time
 import astropy.units as units
 from astropy.units import Quantity
 from astropy.io import votable
+
 from pyuvdata.uvbase import UVBase
 from pyuvdata.parameter import UVParameter
 import pyuvdata.utils as uvutils
-
-try:
-    from pyuvdata.uvbeam.cst_beam import CSTBeam
-except ImportError:  # pragma: no cover
-    # backwards compatility for older pyuvdata versions
-    from pyuvdata.cst_beam import CSTBeam
+from pyuvdata.uvbeam.cst_beam import CSTBeam
 
 from . import utils as skyutils
 from . import spherical_coords_transforms as sct
@@ -446,7 +442,7 @@ class SkyModel(UVBase):
         # initialize the underlying UVBase properties
         super(SkyModel, self).__init__()
 
-        # String to add to history of any files written with this version of pyuvdata
+        # String to add to history of any files written with this version of pyradiosky
         self.pyradiosky_version_str = (
             "  Read/written with pyradiosky version: " + __version__ + "."
         )
@@ -712,6 +708,15 @@ class SkyModel(UVBase):
 
             if self.Ncomponents == 1:
                 self.stokes = self.stokes.reshape(4, self.Nfreqs, 1)
+
+            stokes_eshape = self._stokes.expected_shape(self)
+            if self.stokes.shape != stokes_eshape:
+                # Check this here to give a clear error. Otherwise this shape
+                # propagates to coherency_radec and gives a confusing error message.
+                raise ValueError(
+                    "stokes is not the correct shape. stokes shape is "
+                    f"{self.stokes.shape}, expected shape is {stokes_eshape}."
+                )
 
             if stokes_error is not None:
                 self.stokes_error = stokes_error

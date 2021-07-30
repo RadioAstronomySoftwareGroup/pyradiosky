@@ -646,6 +646,16 @@ def test_skymodel_init_errors(zenith_skycoord):
             freq_array=[1e8] * units.Hz,
         )
 
+    with pytest.raises(ValueError, match=("stokes is not the correct shape.")):
+        SkyModel(
+            name=["icrs_zen0", "icrs_zen0", "icrs_zen0"],
+            ra=[ra] * 3,
+            dec=[dec] * 3,
+            stokes=[1.0, 0, 0, 0] * units.Jy,
+            spectral_type="flat",
+            freq_array=[1e8] * units.Hz,
+        )
+
     with pytest.raises(
         ValueError, match=("For point component types, the coherency_radec")
     ):
