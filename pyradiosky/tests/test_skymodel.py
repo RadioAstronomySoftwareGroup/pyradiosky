@@ -3853,3 +3853,13 @@ def test_skymod_healpix_transform_import_error(zenith_skycoord):
 
         with pytest.raises(ImportError, match=errstr):
             zenith_skycoord.transform_to("icrs")
+
+
+def test_healpix_transform_polarized_error(healpix_gsm_galactic):
+    # assign some bogus data to stokes Q
+    healpix_gsm_galactic.stokes[1] = healpix_gsm_galactic.stokes[0]
+    with pytest.raises(
+        NotImplementedError,
+        match="Healpix map transformations are currently not implemented for",
+    ):
+        healpix_gsm_galactic.healpix_interp_transform("ICRS")
