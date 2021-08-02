@@ -3852,7 +3852,7 @@ def test_skymod_healpix_transform_import_error(zenith_skycoord):
         errstr = "The astropy-healpix module must be installed to use HEALPix methods"
 
         with pytest.raises(ImportError, match=errstr):
-            zenith_skycoord.transform_to("icrs")
+            zenith_skycoord.healpix_interp_transform("icrs")
 
 
 def test_healpix_transform_polarized_error(healpix_gsm_galactic):
