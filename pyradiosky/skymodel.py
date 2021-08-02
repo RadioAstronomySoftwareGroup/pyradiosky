@@ -1142,7 +1142,8 @@ class SkyModel(UVBase):
         frequency and stokes parameter individually.
 
         Currently no polarization fixing is performed by this method.
-        There may be Q <--> U rotation induced by this method.
+        As a result, it does not support transformatoins for Polarization catalogs
+        since this would induce a Q <--> U rotation.
 
         Current implementation is equal to using a healpy.Rotator class to 1 part in 10^-5
         (e.g `numpy.allclose(healpy_rotated_map, interpolate_bilinear_skycoord, rtol=1e-5) is True`).
@@ -1176,6 +1177,11 @@ class SkyModel(UVBase):
                 "The astropy-healpix module must be installed to use HEALPix methods"
             ) from e
 
+        if np.any(self.stokes[1:] != units.Quantity(0, unit=self.stokes.unit)):
+            raise NotImplementedError(
+                "Healpix map transformations are currently not implemented for catalogs "
+                "with polarization information."
+            )
         #  quickly check the validity of the transformation using a dummy SkyCoord object.
         coords = SkyCoord(0, 0, unit="rad", frame=self.frame)
 
@@ -1214,6 +1220,10 @@ class SkyModel(UVBase):
         new_pixel_locs = hp_obj_new.healpix_to_skycoord(np.arange(hp_obj_new.npix))
 
         for stokes_ind in range(4):
+            # We haven't implemented a Q+iU rotation fix yet.
+            if stokes_ind > 0:
+                continue
+
             for freq_ind in range(self.Nfreqs):
                 masked_old_frame = np.ma.zeros(hp_obj_new.npix).astype(
                     self.stokes.dtype
