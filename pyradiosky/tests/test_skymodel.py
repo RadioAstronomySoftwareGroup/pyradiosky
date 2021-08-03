@@ -952,19 +952,25 @@ def test_healpix_to_point_loop(healpix_disk_new):
     skyobj2 = skyobj.copy()
     skyobj2.healpix_to_point()
 
-    skyobj2.point_to_healpix()
+    with uvtest.check_warnings(
+        DeprecationWarning,
+        match="This method is deprecated and will be removed in version 0.3.0.",
+    ):
+        skyobj2.point_to_healpix()
 
     assert skyobj == skyobj2
 
 
 def test_healpix_to_point_loop_ordering(healpix_disk_new):
     skyobj = healpix_disk_new
+    skyobj.ra = None
+    skyobj.dec = None
 
     skyobj2 = skyobj.copy()
     skyobj2.hpx_order = "nested"
     skyobj2.healpix_to_point()
 
-    skyobj2.point_to_healpix()
+    skyobj2._point_to_healpix()
 
     assert skyobj != skyobj2
 
@@ -981,7 +987,7 @@ def test_healpix_to_point_errors(zenith_skymodel):
         match="This method can only be called if component_type is 'point' and "
         "the nside, hpx_order and hpx_inds parameters are set.",
     ):
-        zenith_skymodel.point_to_healpix()
+        zenith_skymodel._point_to_healpix()
 
 
 def test_healpix_to_point_source_cuts(healpix_disk_new):
@@ -3268,10 +3274,11 @@ def test_healpix_coordinate_init_no_override(healpix_icrs):
             nside=hp_obj.nside,
             hpx_inds=np.arange(hp_obj.npix),
         )
+    skymod_ra, skymod_dec = skymod.get_ra_dec()
 
-    assert not np.array_equal(skymod.ra, coords_icrs.ra)
-    assert np.array_equal(skymod.ra, hp_ra)
-    assert np.array_equal(skymod.dec, hp_dec)
+    assert not np.array_equal(skymod_ra, coords_icrs.ra)
+    assert np.array_equal(skymod_ra, hp_ra)
+    assert np.array_equal(skymod_dec, hp_dec)
 
 
 @pytest.mark.parametrize(

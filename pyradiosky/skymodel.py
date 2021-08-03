@@ -175,11 +175,15 @@ class SkyModel(UVBase):
 
         if component_type == "healpix":
             self._name.required = False
+            self._ra.required = False
+            self._dec.required = False
             self._hpx_inds.required = True
             self._nside.required = True
             self._hpx_order.required = True
         else:
             self._name.required = True
+            self._ra.required = True
+            self._dec.required = True
             self._hpx_inds.required = False
             self._nside.required = False
             self._hpx_order.required = False
@@ -220,7 +224,10 @@ class SkyModel(UVBase):
         )
         self._Nfreqs = UVParameter("Nfreqs", description=desc, expected_type=int)
 
-        desc = "Right ascension of components in ICRS coordinates. shape (Ncomponents,)"
+        desc = (
+            "Right ascension of components in ICRS coordinates, not required for "
+            "Healpix component_type. shape (Ncomponents,)"
+        )
         self._ra = UVParameter(
             "ra",
             description=desc,
@@ -229,7 +236,10 @@ class SkyModel(UVBase):
             tols=angle_tol,
         )
 
-        desc = "Declination of components in ICRS coordinates. shape (Ncomponents,)"
+        desc = (
+            "Declination of components in ICRS coordinates, not required for "
+            "Healpix component_type. shape (Ncomponents,)"
+        )
         self._dec = UVParameter(
             "dec",
             description=desc,
@@ -536,13 +546,6 @@ class SkyModel(UVBase):
                     )
 
             if self.component_type == "healpix":
-                try:
-                    import astropy_healpix
-                except ImportError as e:
-                    raise ImportError(
-                        "The astropy-healpix module must be installed to use HEALPix methods"
-                    ) from e
-
                 if self.hpx_order is None:
                     self.hpx_order = "ring"
 
@@ -587,13 +590,6 @@ class SkyModel(UVBase):
                             "given to overwrite healpix coordinates or neither. "
                             "Proceeding with the default healpix coordinates"
                         )
-                    ra, dec = astropy_healpix.healpix_to_lonlat(
-                        hpx_inds,
-                        nside,
-                        order=self.hpx_order,
-                    )
-                    self.ra = ra
-                    self.dec = dec
 
             else:
                 self.Ncomponents = self.name.size
@@ -775,6 +771,17 @@ class SkyModel(UVBase):
         self._set_spectral_type_params(spectral_type)
 
     @property
+    def ncomponent_length_params(self):
+        """Iterate over ncomponent length paramters."""
+        param_list = []
+        for param in self:
+            attr = getattr(self, param)
+            if attr.form == ("Ncomponents",):
+                param_list.append(param)
+        for param in param_list:
+            yield param
+
+    @property
     def _time_position_params(self):
         """List of strings giving the time & position specific parameters."""
         return [
@@ -863,7 +870,7 @@ class SkyModel(UVBase):
         equal = super(SkyModel, self).__eq__(other, check_extra=check_extra)
 
         # Issue deprecation warning if ra/decs aren't close to future_angle_tol levels
-        if not units.quantity.allclose(
+        if self.ra is not None and not units.quantity.allclose(
             self.ra, other.ra, rtol=0, atol=self.future_angle_tol
         ):
             warnings.warn(
@@ -873,7 +880,7 @@ class SkyModel(UVBase):
                 category=DeprecationWarning,
             )
 
-        if not units.quantity.allclose(
+        if self.dec is not None and not units.quantity.allclose(
             self.dec, other.dec, rtol=0, atol=self.future_angle_tol
         ):
             warnings.warn(
@@ -998,6 +1005,32 @@ class SkyModel(UVBase):
 
         self.coherency_radec = skyutils.stokes_to_coherency(self.stokes)
 
+    def get_ra_dec(self):
+        """
+        Retrieve ra and dec values for components.
+
+        This is mostly useful for healpix objects where the ra, dec values are not
+        stored on the object (only the healpix inds are stored, which can be converted
+        to ra/dec using this method).
+
+        """
+        if self.component_type == "healpix":
+            try:
+                import astropy_healpix
+            except ImportError as e:
+                raise ImportError(
+                    "The astropy-healpix module must be installed to use HEALPix "
+                    "methods"
+                ) from e
+            ra, dec = astropy_healpix.healpix_to_lonlat(
+                self.hpx_inds,
+                self.nside,
+                order=self.hpx_order,
+            )
+            return ra, dec
+        else:
+            return self.ra, self.dec
+
     def healpix_to_point(
         self,
         to_jy=True,
@@ -1043,6 +1076,7 @@ class SkyModel(UVBase):
                 "The astropy-healpix module must be installed to use HEALPix methods"
             ) from e
 
+        self.ra, self.dec = self.get_ra_dec()
         self._set_component_type_params("point")
         self.stokes = self.stokes * astropy_healpix.nside_to_pixel_area(self.nside)
         self.coherency_radec = (
@@ -1062,7 +1096,7 @@ class SkyModel(UVBase):
                 check_extra=check_extra, run_check_acceptability=run_check_acceptability
             )
 
-    def point_to_healpix(
+    def _point_to_healpix(
         self,
         to_k=True,
         run_check=True,
@@ -1071,6 +1105,11 @@ class SkyModel(UVBase):
     ):
         """
         Convert a point component_type object to a healpix component_type.
+
+        This method only works for objects that were originally healpix objects but
+        were converted to `point` component type using `healpix_to_point`. This
+        method undoes that conversion.
+        It does NOT assign general point components to a healpix grid.
 
         Requires that the `hpx_inds` and `nside` parameters are set on the object.
         Divide by the pixel area and optionally convert to K.
@@ -1118,6 +1157,277 @@ class SkyModel(UVBase):
             self.coherency_radec / astropy_healpix.nside_to_pixel_area(self.nside)
         )
         self.name = None
+
+        if to_k:
+            self.jansky_to_kelvin()
+
+        if run_check:
+            self.check(
+                check_extra=check_extra, run_check_acceptability=run_check_acceptability
+            )
+
+    def point_to_healpix(
+        self,
+        to_k=True,
+        run_check=True,
+        check_extra=True,
+        run_check_acceptability=True,
+    ):
+        """
+        Convert a point component_type object to a healpix component_type.
+
+        Deprecated. Use `assign_to_healpix` to assign point components to a healpix
+        grid. Use `_point_to_healpix` to undo a `healpix_to_point` conversion.
+
+        This method only works for objects that were originally healpix objects but
+        were converted to `point` component type using `healpix_to_point`. This
+        method undoes that conversion.
+        It does NOT assign general point components to a healpix grid.
+
+        Requires that the `hpx_inds` and `nside` parameters are set on the object.
+        Divide by the pixel area and optionally convert to K.
+        This method is provided as a convenience for users to be able to undo
+        the `healpix_to_point` method.
+
+        Parameters
+        ----------
+        to_k : bool
+            Option to convert to K compatible units.
+        run_check : bool
+            Option to check for the existence and proper shapes of parameters
+            after downselecting data on this object (the default is True,
+            meaning the check will be run).
+        check_extra : bool
+            Option to check optional parameters as well as required ones (the
+            default is True, meaning the optional parameters will be checked).
+        run_check_acceptability : bool
+            Option to check acceptable range of the values of parameters after
+            downselecting data on this object (the default is True, meaning the
+            acceptable range check will be done).
+
+        """
+        warnings.warn(
+            "This method is deprecated and will be removed in version 0.3.0. Please "
+            "use `assign_to_healpix` to assign point components to a healpix "
+            "grid. Use `_point_to_healpix` to undo a `healpix_to_point` conversion.",
+            category=DeprecationWarning,
+        )
+
+        self._point_to_healpix(
+            to_k=to_k,
+            run_check=run_check,
+            check_extra=check_extra,
+            run_check_acceptability=run_check_acceptability,
+        )
+
+    def assign_to_healpix(
+        self,
+        nside,
+        order="ring",
+        to_k=True,
+        full_sky=False,
+        run_check=True,
+        check_extra=True,
+        run_check_acceptability=True,
+    ):
+        """
+        Assign point components to their nearest pixel in a healpix grid.
+
+        Also divide by the pixel area and optionally convert to K.
+        This effectively converts point sources to diffuse pixels in a healpix map.
+        Whether or not this is a good assumption depends on the nside and the
+        resolution of the telescope, so it should be used with care, but it is
+        provided here as a convenience.
+
+        Note that the time and position specific parameters [time, telescope_location,
+        alt_az, pos_lmn and above_horizon] will be set to None as part of this method.
+        They can be recalculated afterwards if desired using the `update_positions`
+        method.
+
+        Parameters
+        ----------
+        nside : int
+            nside of healpix map to convert to.
+        order : str
+            Order convention of healpix map to convert to, either "ring" or "nested".
+        to_k : bool
+            Option to convert to K compatible units.
+        full_sky : bool
+            Option to create a full sky healpix map with zeros in the stokes array
+            for pixels with no sources assigned to them. If False only pixels with
+            sources mapped to them will be included in the object.
+        run_check : bool
+            Option to check for the existence and proper shapes of parameters
+            after downselecting data on this object (the default is True,
+            meaning the check will be run).
+        check_extra : bool
+            Option to check optional parameters as well as required ones (the
+            default is True, meaning the optional parameters will be checked).
+        run_check_acceptability : bool
+            Option to check acceptable range of the values of parameters after
+            downselecting data on this object (the default is True, meaning the
+            acceptable range check will be done).
+
+        """
+        if self.component_type != "point":
+            raise ValueError(
+                "This method can only be called if component_type is 'point'."
+            )
+
+        try:
+            import astropy_healpix
+        except ImportError as e:
+            raise ImportError(
+                "The astropy-healpix module must be installed to use HEALPix methods"
+            ) from e
+
+        # clear time & position specific parameters
+        self.clear_time_position_specific_params()
+
+        # `skycoord_to_healpix` should be used in the future when we support any
+        # astropy frame. For now using `lonlat_to_healpix`.
+        hpx_obj = astropy_healpix.HEALPix(nside, order=order)
+        hpx_inds = hpx_obj.lonlat_to_healpix(self.ra, self.dec)
+
+        self._set_component_type_params("healpix")
+        self.nside = nside
+        self.hpx_order = order
+        # now check for duplicates. If they exist, sum the flux in them
+        # if other parameters have variable values, raise appropriate errors
+        if self.hpx_inds.size > np.unique(self.hpx_inds).size:
+            ind_dict = {}
+            for ind in self.hpx_inds:
+                if ind in ind_dict.keys():
+                    pass
+                ind_dict[ind] = np.nonzero(self.hpx_inds == ind)[0]
+                for param in self.ncomponent_length_params:
+                    attr = getattr(self, param)
+                    if attr.value is not None:
+                        param_name = attr.name
+                        if param in ["_reference_frequency", "_spectra_index"]:
+                            if np.unique(attr.value[ind_dict[ind]]).size > 1:
+                                raise ValueError(
+                                    "Multiple components map to a single healpix pixel "
+                                    f"and the {param_name} varies among them. Consider "
+                                    "using the `at_frequencies` method first or a "
+                                    "larger nside."
+                                )
+                        else:
+                            if np.unique(attr.value[ind_dict[ind]]).size > 1:
+                                raise ValueError(
+                                    "Multiple components map to a single healpix pixel "
+                                    f"and the {param_name} varies among them."
+                                    "Consider using a larger nside."
+                                )
+                if self.beam_amp is not None:
+                    test_beam_amp = self.beam_amp[
+                        :, :, ind_dict[ind]
+                    ] - np.broadcast_to(
+                        self.beam_amp[:, :, 0], (4, self.Nfreqs, ind_dict[ind].size)
+                    )
+                    if np.any(np.nonzero(test_beam_amp)):
+                        raise ValueError(
+                            "Multiple components map to a single healpix pixel and "
+                            "the beam_amp varies among them. "
+                            "Consider using a larger nside."
+                        )
+            new_hpx_inds = ind_dict.keys()
+            new_stokes = np.zeros(
+                (4, self.Nfreqs, new_hpx_inds.size), dtype=self.stokes.dtype
+            )
+            new_coherency = np.zeros(
+                (2, 2, self.Nfreqs, new_hpx_inds.size), dtype=self.coherency_radec.dtype
+            )
+            if self.stokes_error is not None:
+                new_stokes_error = np.zeros(
+                    (4, self.Nfreqs, new_hpx_inds.size), dtype=self.stokes_error.dtype
+                )
+            for ind in new_hpx_inds:
+                new_stokes[:, :, ind] = np.sum(self.stokes[:, :, ind_dict[ind]], axis=2)
+                new_coherency[:, :, :, ind] = np.sum(
+                    self.coherency_radec[:, :, ind_dict[ind]], axis=3
+                )
+                if self.stokes_error is not None:
+                    # add errors in quadrature
+                    new_stokes_error[:, :, ind] = np.sqrt(
+                        np.sum(self.stokes_error[:, :, ind_dict[ind]] ** 2, axis=2)
+                    )
+
+            self.Ncomponents = new_hpx_inds.size
+            self.hpx_inds = new_hpx_inds
+            self.stokes = new_stokes / astropy_healpix.nside_to_pixel_area(self.nside)
+            self.coherency_radec = new_coherency / astropy_healpix.nside_to_pixel_area(
+                self.nside
+            )
+        else:
+            self.hpx_inds = hpx_inds
+            self.stokes = self.stokes / astropy_healpix.nside_to_pixel_area(self.nside)
+            self.coherency_radec = (
+                self.coherency_radec / astropy_healpix.nside_to_pixel_area(self.nside)
+            )
+        self.name = None
+        self.ra = None
+        self.dec = None
+
+        if full_sky and self.Ncomponents < hpx_obj.npix:
+            # add in zero flux pixels
+            new_inds = np.array(
+                set(np.arange(hpx_obj.npix)).difference(set(self.hpx_inds))
+            )
+            n_new = new_inds.size
+            if self.stokes_error is not None:
+                new_stokes_error = np.zeros(
+                    (4, self.Nfreqs, n_new), dtype=self.stokes.dtype
+                )
+            else:
+                new_stokes_error = None
+            if self.reference_frequency is not None:
+                new_reference_frequency = np.full(
+                    n_new, np.median(self.reference_frequency)
+                )
+            else:
+                new_reference_frequency = None
+            if self.spectral_index is not None:
+                new_spectral_index = np.full(n_new, np.median(self.spectral_index))
+            else:
+                new_spectral_index = None
+            if self.beam_amp is not None:
+                new_beam_amp = np.zeros((4, self.Nfreqs, n_new), dtype=self.beam_amp)
+            else:
+                new_beam_amp = None
+            if self.extended_model_group is not None:
+                new_extmod = np.full(n_new, "")
+            else:
+                new_extmod = None
+
+            new_obj = SkyModel(
+                component_type="healpix",
+                nside=self.nside,
+                order=self.order,
+                spectral_type=self.spectral_type,
+                freq_array=self.freq_array,
+                hpx_inds=new_inds,
+                stokes=np.zeros((4, self.Nfreqs, n_new), dtype=self.stokes.dtype),
+                stokes_error=new_stokes_error,
+                reference_frequency=new_reference_frequency,
+                spectral_index=new_spectral_index,
+                beam_amp=new_beam_amp,
+                extended_model_group=new_extmod,
+            )
+            self.concat(new_obj)
+
+        # sort in order of hpx_inds:
+        sort_order = np.argsort(self.hpx_inds)
+        self.hpx_inds = self.hpx_inds[sort_order]
+        self.stokes = self.stokes[:, :, sort_order]
+        self.coherency_radec = self.coherency_radec[:, :, :, sort_order]
+        if self.stokes_error is not None:
+            self.stokes_error = self.stokes_error[:, :, sort_order]
+        for param in self.ncomponent_length_params:
+            attr = getattr(self, param)
+            param_name = attr.name
+            if attr.value is not None:
+                setattr(self, param_name, attr.value[sort_order])
 
         if to_k:
             self.jansky_to_kelvin()
@@ -1250,7 +1560,9 @@ class SkyModel(UVBase):
         self.time = time
         self.telescope_location = telescope_location
 
-        skycoord_use = SkyCoord(self.ra, self.dec, frame="icrs")
+        ra, dec = self.get_ra_dec()
+
+        skycoord_use = SkyCoord(ra, dec, frame="icrs")
         if isinstance(self.telescope_location, MoonLocation):
             source_altaz = skycoord_use.transform_to(
                 LunarTopo(obstime=self.time, location=self.telescope_location)
@@ -1568,7 +1880,7 @@ class SkyModel(UVBase):
             compatibility_params.append("_freq_array")
 
         if this.component_type == "healpix":
-            compatibility_params.append("_nside")
+            compatibility_params.extend(["_nside", "_hpx_order"])
 
         time_pos_params = ["_" + name for name in this._time_position_params]
         if clear_time_position:
@@ -1610,8 +1922,28 @@ class SkyModel(UVBase):
                 )
             this.name = np.concatenate((this.name, other.name))
 
-        this.ra = np.concatenate((this.ra, other.ra))
-        this.dec = np.concatenate((this.dec, other.dec))
+        if this.component_type == "healpix":
+            if this.ra is not None:
+                if other.ra is None:
+                    warnings.warn(
+                        "This object has ra values, other object does not, "
+                        "setting ra to None. "
+                    )
+                    this.ra = None
+                else:
+                    this.ra = np.concatenate((this.ra, other.ra))
+            if this.dec is not None:
+                if other.dec is None:
+                    warnings.warn(
+                        "This object has dec values, other object does not, "
+                        "setting dec to None. "
+                    )
+                    this.dec = None
+                else:
+                    this.dec = np.concatenate((this.dec, other.dec))
+        else:
+            this.ra = np.concatenate((this.ra, other.ra))
+            this.dec = np.concatenate((this.dec, other.dec))
         this.stokes = np.concatenate((this.stokes, other.stokes), axis=2)
         this.coherency_radec = np.concatenate(
             (this.coherency_radec, other.coherency_radec), axis=3
@@ -1818,30 +2150,22 @@ class SkyModel(UVBase):
             raise ValueError("Select would result in an empty object.")
 
         skyobj.Ncomponents = new_ncomponents
-        if skyobj.name is not None:
-            skyobj.name = skyobj.name[component_inds]
-        if skyobj.hpx_inds is not None:
-            skyobj.hpx_inds = skyobj.hpx_inds[component_inds]
-        skyobj.ra = skyobj.ra[component_inds]
-        skyobj.dec = skyobj.dec[component_inds]
-        if skyobj.reference_frequency is not None:
-            skyobj.reference_frequency = skyobj.reference_frequency[component_inds]
-        if skyobj.spectral_index is not None:
-            skyobj.spectral_index = skyobj.spectral_index[component_inds]
+        for param in skyobj.ncomponent_length_params:
+            attr = getattr(skyobj, param)
+            param_name = attr.name
+            if attr.value is not None:
+                setattr(skyobj, param_name, attr.value[component_inds])
+
         skyobj.stokes = skyobj.stokes[:, :, component_inds]
         skyobj.coherency_radec = skyobj.coherency_radec[:, :, :, component_inds]
         if skyobj.stokes_error is not None:
             skyobj.stokes_error = skyobj.stokes_error[:, :, component_inds]
         if skyobj.beam_amp is not None:
             skyobj.beam_amp = skyobj.beam_amp[:, :, component_inds]
-        if skyobj.extended_model_group is not None:
-            skyobj.extended_model_group = skyobj.extended_model_group[component_inds]
         if skyobj.alt_az is not None:
             skyobj.alt_az = skyobj.alt_az[:, component_inds]
         if skyobj.pos_lmn is not None:
             skyobj.pos_lmn = skyobj.pos_lmn[:, component_inds]
-        if skyobj.above_horizon is not None:
-            skyobj.above_horizon = skyobj.above_horizon[component_inds]
 
         if run_check:
             skyobj.check(
@@ -2117,7 +2441,7 @@ class SkyModel(UVBase):
         )
 
         if original_comp_type == "healpix":
-            self.point_to_healpix()
+            self._point_to_healpix()
         if original_units_k:
             self.jansky_to_kelvin()
 
@@ -2244,7 +2568,7 @@ class SkyModel(UVBase):
             self.nside = int(name_parts[0][len("nside") :])
             self.hpx_order = name_parts[1]
             self.hpx_inds = np.array([int(name[name.rfind("_") + 1 :]) for name in ids])
-            self.point_to_healpix(
+            self._point_to_healpix(
                 run_check=run_check,
                 check_extra=check_extra,
                 run_check_acceptability=run_check_acceptability,
@@ -2323,6 +2647,8 @@ class SkyModel(UVBase):
 
             optional_params = [
                 "_name",
+                "_ra",
+                "_dec",
                 "_nside",
                 "_hpx_inds",
                 "_hpx_order",
@@ -3923,15 +4249,12 @@ def healpix_to_sky(hpmap, indices, freqs, hpx_order="ring"):
 
     nside = int(astropy_healpix.npix_to_nside(hpmap.shape[-1]))
 
-    ra, dec = astropy_healpix.healpix_to_lonlat(indices, nside, order=hpx_order)
     freq = Quantity(freqs, "hertz")
 
     stokes = Quantity(np.zeros((4, len(freq), len(indices))), "K")
     stokes[0] = hpmap * units.K
 
     sky = SkyModel(
-        ra=ra,
-        dec=dec,
         stokes=stokes,
         spectral_type="full",
         freq_array=freq,
