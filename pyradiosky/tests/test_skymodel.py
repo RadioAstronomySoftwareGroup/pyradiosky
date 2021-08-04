@@ -2118,7 +2118,7 @@ def test_healpix_import_err(zenith_skymodel):
             zenith_skymodel._point_to_healpix()
 
         with pytest.raises(ImportError, match=errstr):
-            zenith_skymodel.assign_to_healpix()
+            zenith_skymodel.assign_to_healpix(32)
 
         zenith_skymodel._set_component_type_params("healpix")
         with pytest.raises(ImportError, match=errstr):
