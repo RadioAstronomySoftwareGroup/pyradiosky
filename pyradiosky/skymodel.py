@@ -720,7 +720,7 @@ class SkyModel(UVBase):
                     self.stokes_error = self.stokes_error.reshape(4, self.Nfreqs, 1)
 
             if extended_model_group is not None:
-                self.extended_model_group = extended_model_group
+                self.extended_model_group = np.atleast_1d(extended_model_group)
 
             if beam_amp is not None:
                 self.beam_amp = beam_amp
@@ -778,11 +778,9 @@ class SkyModel(UVBase):
     @property
     def ncomponent_length_params(self):
         """Iterate over ncomponent length paramters."""
-        param_list = []
-        for param in self:
-            attr = getattr(self, param)
-            if attr.form == ("Ncomponents",):
-                param_list.append(param)
+        param_list = (
+            param for param in self if getattr(self, param).form == ("Ncomponents",)
+        )
         for param in param_list:
             yield param
 
@@ -1162,6 +1160,8 @@ class SkyModel(UVBase):
             self.coherency_radec / astropy_healpix.nside_to_pixel_area(self.nside)
         )
         self.name = None
+        self.ra = None
+        self.dec = None
 
         if to_k:
             self.jansky_to_kelvin()
@@ -1231,6 +1231,8 @@ class SkyModel(UVBase):
         order="ring",
         to_k=True,
         full_sky=False,
+        sort=True,
+        inplace=False,
         run_check=True,
         check_extra=True,
         run_check_acceptability=True,
@@ -1261,6 +1263,11 @@ class SkyModel(UVBase):
             Option to create a full sky healpix map with zeros in the stokes array
             for pixels with no sources assigned to them. If False only pixels with
             sources mapped to them will be included in the object.
+        inplace : bool
+            Option to do the change in place on the object rather than return a new
+            object.
+        sort : bool
+            Option to sort the object in order of the healpix indicies.
         run_check : bool
             Option to check for the existence and proper shapes of parameters
             after downselecting data on this object (the default is True,
@@ -1286,49 +1293,51 @@ class SkyModel(UVBase):
                 "The astropy-healpix module must be installed to use HEALPix methods"
             ) from e
 
+        sky = self if inplace else self.copy()
+
         # clear time & position specific parameters
-        self.clear_time_position_specific_params()
+        sky.clear_time_position_specific_params()
 
         # `skycoord_to_healpix` should be used in the future when we support any
         # astropy frame. For now using `lonlat_to_healpix`.
         hpx_obj = astropy_healpix.HEALPix(nside, order=order)
-        hpx_inds = hpx_obj.lonlat_to_healpix(self.ra, self.dec)
+        hpx_inds = hpx_obj.lonlat_to_healpix(sky.ra, sky.dec)
 
-        self._set_component_type_params("healpix")
-        self.nside = nside
-        self.hpx_order = order
+        sky._set_component_type_params("healpix")
+        sky.nside = nside
+        sky.hpx_order = order
         # now check for duplicates. If they exist, sum the flux in them
         # if other parameters have variable values, raise appropriate errors
-        if self.hpx_inds.size > np.unique(self.hpx_inds).size:
+        if hpx_inds.size > np.unique(hpx_inds).size:
             ind_dict = {}
-            for ind in self.hpx_inds:
+            first_inds = []
+            for ind in hpx_inds:
                 if ind in ind_dict.keys():
-                    pass
-                ind_dict[ind] = np.nonzero(self.hpx_inds == ind)[0]
-                for param in self.ncomponent_length_params:
-                    attr = getattr(self, param)
+                    continue
+                ind_dict[ind] = np.nonzero(hpx_inds == ind)[0]
+                first_inds.append(ind_dict[ind][0])
+                for param in sky.ncomponent_length_params:
+                    attr = getattr(sky, param)
                     if attr.value is not None:
-                        param_name = attr.name
-                        if param in ["_reference_frequency", "_spectra_index"]:
-                            if np.unique(attr.value[ind_dict[ind]]).size > 1:
+                        if np.unique(attr.value[ind_dict[ind]]).size > 1:
+                            param_name = attr.name
+                            if param in ["_spectral_index", "_reference_frequency"]:
                                 raise ValueError(
                                     "Multiple components map to a single healpix pixel "
                                     f"and the {param_name} varies among them. Consider "
                                     "using the `at_frequencies` method first or a "
                                     "larger nside."
                                 )
-                        else:
-                            if np.unique(attr.value[ind_dict[ind]]).size > 1:
+                            elif param not in ["_ra", "_dec", "_name"]:
                                 raise ValueError(
                                     "Multiple components map to a single healpix pixel "
                                     f"and the {param_name} varies among them."
                                     "Consider using a larger nside."
                                 )
-                if self.beam_amp is not None:
-                    test_beam_amp = self.beam_amp[
-                        :, :, ind_dict[ind]
-                    ] - np.broadcast_to(
-                        self.beam_amp[:, :, 0], (4, self.Nfreqs, ind_dict[ind].size)
+                if sky.beam_amp is not None:
+                    test_beam_amp = sky.beam_amp[:, :, ind_dict[ind]] - np.broadcast_to(
+                        sky.beam_amp[:, :, 0, np.newaxis],
+                        (4, sky.Nfreqs, ind_dict[ind].size),
                     )
                     if np.any(np.nonzero(test_beam_amp)):
                         raise ValueError(
@@ -1336,111 +1345,157 @@ class SkyModel(UVBase):
                             "the beam_amp varies among them. "
                             "Consider using a larger nside."
                         )
-            new_hpx_inds = ind_dict.keys()
-            new_stokes = np.zeros(
-                (4, self.Nfreqs, new_hpx_inds.size), dtype=self.stokes.dtype
+            first_inds = np.asarray(first_inds)
+            new_hpx_inds = np.array(list(ind_dict.keys()))
+
+            new_stokes = Quantity(
+                np.zeros((4, sky.Nfreqs, new_hpx_inds.size), dtype=sky.stokes.dtype),
+                unit=sky.stokes.unit,
             )
-            new_coherency = np.zeros(
-                (2, 2, self.Nfreqs, new_hpx_inds.size), dtype=self.coherency_radec.dtype
+            new_coherency = Quantity(
+                np.zeros(
+                    (2, 2, sky.Nfreqs, new_hpx_inds.size),
+                    dtype=sky.coherency_radec.dtype,
+                ),
+                unit=sky.coherency_radec.unit,
             )
-            if self.stokes_error is not None:
-                new_stokes_error = np.zeros(
-                    (4, self.Nfreqs, new_hpx_inds.size), dtype=self.stokes_error.dtype
+            if sky.stokes_error is not None:
+                new_stokes_error = Quantity(
+                    np.zeros(
+                        (4, sky.Nfreqs, new_hpx_inds.size), dtype=sky.stokes_error.dtype
+                    ),
+                    unit=sky.stokes_error.unit,
                 )
-            for ind in new_hpx_inds:
-                new_stokes[:, :, ind] = np.sum(self.stokes[:, :, ind_dict[ind]], axis=2)
-                new_coherency[:, :, :, ind] = np.sum(
-                    self.coherency_radec[:, :, ind_dict[ind]], axis=3
+
+            for ind_num, hpx_ind in enumerate(new_hpx_inds.tolist()):
+                new_stokes[:, :, ind_num] = np.sum(
+                    sky.stokes[:, :, ind_dict[hpx_ind]], axis=2
                 )
-                if self.stokes_error is not None:
+                new_coherency[:, :, :, ind_num] = np.sum(
+                    sky.coherency_radec[:, :, :, ind_dict[hpx_ind]], axis=3
+                )
+                if sky.stokes_error is not None:
                     # add errors in quadrature
-                    new_stokes_error[:, :, ind] = np.sqrt(
-                        np.sum(self.stokes_error[:, :, ind_dict[ind]] ** 2, axis=2)
+                    new_stokes_error[:, :, ind_num] = np.sqrt(
+                        np.sum(sky.stokes_error[:, :, ind_dict[hpx_ind]] ** 2, axis=2)
                     )
-
-            self.Ncomponents = new_hpx_inds.size
-            self.hpx_inds = new_hpx_inds
-            self.stokes = new_stokes / astropy_healpix.nside_to_pixel_area(self.nside)
-            self.coherency_radec = new_coherency / astropy_healpix.nside_to_pixel_area(
-                self.nside
+            sky.Ncomponents = new_hpx_inds.size
+            sky.hpx_inds = new_hpx_inds
+            sky.stokes = new_stokes / astropy_healpix.nside_to_pixel_area(sky.nside)
+            sky.coherency_radec = new_coherency / astropy_healpix.nside_to_pixel_area(
+                sky.nside
             )
+            if sky.stokes_error is not None:
+                sky.stokes_error = (
+                    new_stokes_error / astropy_healpix.nside_to_pixel_area(sky.nside)
+                )
+
+            # just take the first value for the rest of the parameters because we've
+            # already verified that they don't vary among the components that map to
+            # each pixel
+            for param in sky.ncomponent_length_params:
+                if param in ["_ra", "_dec", "_name", "_hpx_inds"]:
+                    continue
+                attr = getattr(sky, param)
+                if attr.value is not None:
+                    setattr(sky, attr.name, attr.value[first_inds])
+
+            if sky.beam_amp is not None:
+                sky.beam_amp = sky.beam_amp[:, :, first_inds]
+
         else:
-            self.hpx_inds = hpx_inds
-            self.stokes = self.stokes / astropy_healpix.nside_to_pixel_area(self.nside)
-            self.coherency_radec = (
-                self.coherency_radec / astropy_healpix.nside_to_pixel_area(self.nside)
+            sky.hpx_inds = hpx_inds
+            sky.stokes = sky.stokes / astropy_healpix.nside_to_pixel_area(sky.nside)
+            sky.coherency_radec = (
+                sky.coherency_radec / astropy_healpix.nside_to_pixel_area(sky.nside)
             )
-        self.name = None
-        self.ra = None
-        self.dec = None
+            if sky.stokes_error is not None:
+                sky.stokes_error = (
+                    sky.stokes_error / astropy_healpix.nside_to_pixel_area(sky.nside)
+                )
+        sky.name = None
+        sky.ra = None
+        sky.dec = None
 
-        if full_sky and self.Ncomponents < hpx_obj.npix:
+        if full_sky and sky.Ncomponents < hpx_obj.npix:
             # add in zero flux pixels
             new_inds = np.array(
-                set(np.arange(hpx_obj.npix)).difference(set(self.hpx_inds))
+                list(set(np.arange(hpx_obj.npix)).difference(set(sky.hpx_inds)))
             )
             n_new = new_inds.size
-            if self.stokes_error is not None:
-                new_stokes_error = np.zeros(
-                    (4, self.Nfreqs, n_new), dtype=self.stokes.dtype
+            if sky.stokes_error is not None:
+                new_stokes_error = Quantity(
+                    np.zeros((4, sky.Nfreqs, n_new), dtype=sky.stokes.dtype),
+                    unit=sky.stokes_error.unit,
                 )
             else:
                 new_stokes_error = None
-            if self.reference_frequency is not None:
-                new_reference_frequency = np.full(
-                    n_new, np.median(self.reference_frequency)
+            if sky.reference_frequency is not None:
+                new_reference_frequency = Quantity(
+                    np.full(n_new, np.median(sky.reference_frequency)),
+                    unit=sky.reference_frequency.unit,
                 )
             else:
                 new_reference_frequency = None
-            if self.spectral_index is not None:
-                new_spectral_index = np.full(n_new, np.median(self.spectral_index))
+            if sky.spectral_index is not None:
+                new_spectral_index = np.full(n_new, np.median(sky.spectral_index))
             else:
                 new_spectral_index = None
-            if self.beam_amp is not None:
-                new_beam_amp = np.zeros((4, self.Nfreqs, n_new), dtype=self.beam_amp)
+            if sky.beam_amp is not None:
+                new_beam_amp = np.zeros(
+                    (4, sky.Nfreqs, n_new), dtype=sky.beam_amp.dtype
+                )
             else:
                 new_beam_amp = None
-            if self.extended_model_group is not None:
+            if sky.extended_model_group is not None:
                 new_extmod = np.full(n_new, "")
             else:
                 new_extmod = None
 
+            new_stokes = Quantity(
+                np.zeros((4, sky.Nfreqs, n_new), dtype=sky.stokes.dtype),
+                unit=sky.stokes.unit,
+            )
             new_obj = SkyModel(
                 component_type="healpix",
-                nside=self.nside,
-                order=self.order,
-                spectral_type=self.spectral_type,
-                freq_array=self.freq_array,
+                nside=sky.nside,
+                hpx_order=sky.hpx_order,
+                spectral_type=sky.spectral_type,
+                freq_array=sky.freq_array,
                 hpx_inds=new_inds,
-                stokes=np.zeros((4, self.Nfreqs, n_new), dtype=self.stokes.dtype),
+                stokes=new_stokes,
                 stokes_error=new_stokes_error,
                 reference_frequency=new_reference_frequency,
                 spectral_index=new_spectral_index,
                 beam_amp=new_beam_amp,
                 extended_model_group=new_extmod,
             )
-            self.concat(new_obj)
+            sky.concat(new_obj)
 
-        # sort in order of hpx_inds:
-        sort_order = np.argsort(self.hpx_inds)
-        self.hpx_inds = self.hpx_inds[sort_order]
-        self.stokes = self.stokes[:, :, sort_order]
-        self.coherency_radec = self.coherency_radec[:, :, :, sort_order]
-        if self.stokes_error is not None:
-            self.stokes_error = self.stokes_error[:, :, sort_order]
-        for param in self.ncomponent_length_params:
-            attr = getattr(self, param)
-            param_name = attr.name
-            if attr.value is not None:
-                setattr(self, param_name, attr.value[sort_order])
+        if sort:
+            # sort in order of hpx_inds:
+            sort_order = np.argsort(sky.hpx_inds)
+            sky.hpx_inds = sky.hpx_inds[sort_order]
+            sky.stokes = sky.stokes[:, :, sort_order]
+            sky.coherency_radec = sky.coherency_radec[:, :, :, sort_order]
+            if sky.stokes_error is not None:
+                sky.stokes_error = sky.stokes_error[:, :, sort_order]
+            for param in sky.ncomponent_length_params:
+                attr = getattr(sky, param)
+                param_name = attr.name
+                if attr.value is not None:
+                    setattr(sky, param_name, attr.value[sort_order])
 
         if to_k:
-            self.jansky_to_kelvin()
+            sky.jansky_to_kelvin()
 
         if run_check:
-            self.check(
+            sky.check(
                 check_extra=check_extra, run_check_acceptability=run_check_acceptability
             )
+
+        if not inplace:
+            return sky
 
     def at_frequencies(
         self, freqs, inplace=True, freq_interp_kind="cubic", run_check=True, atol=None
@@ -1953,6 +2008,49 @@ class SkyModel(UVBase):
         this.coherency_radec = np.concatenate(
             (this.coherency_radec, other.coherency_radec), axis=3
         )
+        if this.stokes_error is not None and other.stokes_error is not None:
+            this.stokes_error = np.concatenate(
+                (this.stokes_error, other.stokes_error), axis=2
+            )
+        elif this.stokes_error is not None:
+            warnings.warn(
+                "This object has stokes_error values, other object does not. "
+                "Filling missing values with NaNs."
+            )
+            this.stokes_error = np.concatenate(
+                (
+                    this.stokes_error,
+                    Quantity(
+                        np.full(
+                            (4, other.Nfreqs, other.Ncomponents),
+                            None,
+                            dtype=this.stokes_error.dtype,
+                        ),
+                        unit=this.stokes_error.unit,
+                    ),
+                ),
+                axis=2,
+            )
+        elif other.stokes_error is not None:
+            warnings.warn(
+                "This object does not have stokes_error values, other object does. "
+                "Filling missing values with NaNs."
+            )
+            this.stokes_error = np.concatenate(
+                (
+                    Quantity(
+                        np.full(
+                            (4, this.Nfreqs, this.Ncomponents),
+                            None,
+                            dtype=other.stokes_error.dtype,
+                        ),
+                        unit=other.stokes_error.unit,
+                    ),
+                    other.stokes_error,
+                ),
+                axis=2,
+            )
+
         if this.spectral_type == "spectral_index":
             this.reference_frequency = np.concatenate(
                 (this.reference_frequency, other.reference_frequency)
@@ -2009,7 +2107,7 @@ class SkyModel(UVBase):
         elif this.extended_model_group is not None:
             warnings.warn(
                 "This object has extended_model_group values, other object does not. "
-                "Filling missing values with zeros."
+                "Filling missing values with empty strings."
             )
             this.extended_model_group = np.concatenate(
                 (
@@ -2022,7 +2120,7 @@ class SkyModel(UVBase):
         elif other.extended_model_group is not None:
             warnings.warn(
                 "This object does not have extended_model_group values, other object does. "
-                "Filling missing values with zeros."
+                "Filling missing values with empty strings."
             )
             this.extended_model_group = np.concatenate(
                 (
