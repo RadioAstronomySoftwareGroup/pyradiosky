@@ -2096,10 +2096,14 @@ def test_healpix_import_err(zenith_skymodel):
         with pytest.raises(ImportError, match=errstr):
             skymodel.healpix_to_sky(hpmap, inds, freqs)
 
+        sky = SkyModel(
+            nside=8,
+            hpx_inds=[0],
+            stokes=Quantity([1.0, 0.0, 0.0, 0.0], unit=units.K),
+            spectral_type="flat",
+        )
         with pytest.raises(ImportError, match=errstr):
-            SkyModel(
-                nside=8, hpx_inds=[0], stokes=[1.0, 0.0, 0.0, 0.0], spectral_type="flat"
-            )
+            sky.get_ra_dec()
 
         with pytest.raises(ImportError, match=errstr):
             SkyModel.from_healpix_hdf5(os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5"))
@@ -2111,7 +2115,10 @@ def test_healpix_import_err(zenith_skymodel):
         zenith_skymodel.hpx_inds = 0
         zenith_skymodel.hpx_order = "ring"
         with pytest.raises(ImportError, match=errstr):
-            zenith_skymodel.point_to_healpix()
+            zenith_skymodel._point_to_healpix()
+
+        with pytest.raises(ImportError, match=errstr):
+            zenith_skymodel.assign_to_healpix()
 
         zenith_skymodel._set_component_type_params("healpix")
         with pytest.raises(ImportError, match=errstr):
