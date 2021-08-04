@@ -243,8 +243,9 @@ def assign_hpx_data():
     pytest.importorskip("astropy_healpix")
     import astropy_healpix
 
-    hpx_inds = [25]
-    nside = 256
+    nside = 32
+    pix_num = 25
+    hpx_inds = [pix_num]
     ra, dec = astropy_healpix.healpix_to_lonlat(
         hpx_inds,
         nside,
@@ -283,7 +284,7 @@ def assign_hpx_data():
         extended_model_group=extended_group,
     )
 
-    yield sky
+    yield nside, pix_num, sky
 
     del sky
 
@@ -1043,9 +1044,7 @@ def test_healpix_to_point_loop_ordering(healpix_disk_new):
 def test_assign_to_healpix(assign_hpx_data):
     import astropy_healpix
 
-    sky = assign_hpx_data
-
-    nside = 256
+    nside, pix_num, sky = assign_hpx_data
 
     sky_hpx = sky.assign_to_healpix(nside)
 
@@ -1053,7 +1052,7 @@ def test_assign_to_healpix(assign_hpx_data):
     hpx_area = astropy_healpix.nside_to_pixel_area(nside)
 
     assert sky_hpx.Ncomponents == 1
-    assert sky_hpx.hpx_inds[0] == 25
+    assert sky_hpx.hpx_inds[0] == pix_num
 
     assert np.allclose(
         sky_hpx.stokes[0, 0, 0],
@@ -1074,47 +1073,67 @@ def test_assign_to_healpix(assign_hpx_data):
     )
 
 
-def test_assign_to_healpix_fullsky(assign_hpx_data):
+@pytest.mark.parametrize("spectral_type", ["subband", "spectral_index"])
+def test_assign_to_healpix_fullsky(assign_hpx_data, spectral_type):
     import astropy_healpix
 
-    sky = assign_hpx_data
+    nside, pix_num, sky = assign_hpx_data
+    jy_to_ksr_conv_factor = skyutils.jy_to_ksr(sky.freq_array[0])
 
-    nside = 256
+    if spectral_type != "subband":
+        sky.spectral_type = "spectral_index"
+        sky.reference_frequency = Quantity(
+            [sky.freq_array[0], sky.freq_array[0]], unit=units.MHz
+        )
+        sky.spectral_index = np.array([-0.8, -0.8])
+        sky.freq_array = None
+        sky.stokes_error = None
+        sky.beam_amp = None
+        sky.extended_model_group = None
 
     sky_hpx = sky.assign_to_healpix(nside, full_sky=True)
 
-    jy_to_ksr_conv_factor = skyutils.jy_to_ksr(sky.freq_array[0])
     hpx_area = astropy_healpix.nside_to_pixel_area(nside)
 
     assert sky_hpx.Ncomponents == astropy_healpix.nside_to_npix(nside)
 
     assert np.allclose(
-        sky_hpx.stokes[0, 0, 25],
+        sky_hpx.stokes[0, 0, pix_num],
         4.5 * units.Jy * jy_to_ksr_conv_factor / hpx_area,
     )
     assert np.allclose(
-        sky_hpx.stokes[1, 0, 25],
+        sky_hpx.stokes[1, 0, pix_num],
         0.5 * units.Jy * jy_to_ksr_conv_factor / hpx_area,
     )
 
     assert not np.any(np.nonzero(sky_hpx.stokes[:, :, :25]))
     assert not np.any(np.nonzero(sky_hpx.stokes[:, :, 26:]))
 
-    assert np.allclose(
-        sky_hpx.stokes_error[0, 0, 25],
-        np.sqrt(0.15 ** 2 + 0.25 ** 2) * units.Jy * jy_to_ksr_conv_factor / hpx_area,
-    )
-    assert np.allclose(
-        sky_hpx.stokes_error[1, 0, 25],
-        0.2 * units.Jy * jy_to_ksr_conv_factor / hpx_area,
-    )
-    assert not np.any(np.nonzero(sky_hpx.stokes_error[:, :, :25]))
-    assert not np.any(np.nonzero(sky_hpx.stokes_error[:, :, 26:]))
+    if spectral_type == "subband":
+        assert np.allclose(
+            sky_hpx.stokes_error[0, 0, pix_num],
+            np.sqrt(0.15 ** 2 + 0.25 ** 2)
+            * units.Jy
+            * jy_to_ksr_conv_factor
+            / hpx_area,
+        )
+        assert np.allclose(
+            sky_hpx.stokes_error[1, 0, pix_num],
+            0.2 * units.Jy * jy_to_ksr_conv_factor / hpx_area,
+        )
+        assert not np.any(np.nonzero(sky_hpx.stokes_error[:, :, :25]))
+        assert not np.any(np.nonzero(sky_hpx.stokes_error[:, :, 26:]))
 
 
 def test_assign_to_healpix_errors(assign_hpx_data):
-    sky = assign_hpx_data
-    nside = 256
+    nside, _, sky = assign_hpx_data
+
+    sky2 = sky.copy()
+    sky2.assign_to_healpix(nside, inplace=True)
+    with pytest.raises(
+        ValueError, match="This method can only be called if component_type is 'point'."
+    ):
+        sky2.assign_to_healpix(nside)
 
     sky.spectral_type = "spectral_index"
     sky.reference_frequency = Quantity([150, 150], unit=units.MHz)
@@ -1168,7 +1187,9 @@ def test_assign_to_healpix_gleam_simple(spec_type):
     pytest.importorskip("astropy_healpix")
     import astropy_healpix
 
-    sky = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type=spec_type)
+    sky = SkyModel.from_gleam_catalog(
+        GLEAM_vot, spectral_type=spec_type, with_error=True
+    )
 
     nside = 1024
     hpx_sky = sky.assign_to_healpix(nside, sort=False, to_k=False)
@@ -1189,7 +1210,9 @@ def test_assign_to_healpix_gleam_multi(spec_type):
     """
     pytest.importorskip("astropy_healpix")
 
-    skyobj_full = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type=spec_type)
+    skyobj_full = SkyModel.from_gleam_catalog(
+        GLEAM_vot, spectral_type=spec_type, with_error=True
+    )
 
     nside = 256
     if spec_type == "spectral_index":
@@ -1627,10 +1650,27 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
 
 
 @pytest.mark.parametrize(
-    "param", ["reference_frequency", "extended_model_group", "beam_amp", "stokes_error"]
+    "param",
+    [
+        "reference_frequency",
+        "extended_model_group",
+        "beam_amp",
+        "stokes_error",
+        "ra",
+        "dec",
+        "name",
+    ],
 )
-def test_concat_optional_params(param):
-    if param == "stokes_error":
+def test_concat_optional_params(param, healpix_disk_new):
+    if param in ["ra", "dec", "name"]:
+        skyobj_full = healpix_disk_new
+        if param in ["ra", "dec"]:
+            skyobj_full.ra, skyobj_full.dec = skyobj_full.get_ra_dec()
+        else:
+            skyobj_full.name = np.array(
+                ["hpx" + str(ind) for ind in skyobj_full.hpx_inds]
+            )
+    elif param == "stokes_error":
         skyobj_full = SkyModel.from_gleam_catalog(
             GLEAM_vot, spectral_type="flat", with_error=True
         )
@@ -1652,9 +1692,14 @@ def test_concat_optional_params(param):
         component_inds=np.arange(skyobj_full.Ncomponents // 2, skyobj_full.Ncomponents),
         inplace=False,
     )
+
     with uvtest.check_warnings(UserWarning, f"This object does not have {param}"):
         skyobj_new = skyobj1.concat(skyobj2, inplace=False)
-    assert getattr(skyobj_new, param) is not None
+
+    if param not in ["ra", "dec", "name"]:
+        assert getattr(skyobj_new, param) is not None
+    else:
+        assert getattr(skyobj_new, param) is None
     skyobj_new.history = skyobj_full.history
 
     assert getattr(skyobj_new, "_" + param) != getattr(skyobj_full, "_" + param)
@@ -1676,7 +1721,7 @@ def test_concat_optional_params(param):
                 skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
             ].tolist()
         )
-    else:
+    elif param not in ["ra", "dec", "name"]:
         assert np.allclose(
             getattr(skyobj_new, param)[
                 :, :, skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
@@ -1691,7 +1736,7 @@ def test_concat_optional_params(param):
         ).all()
     elif param == "extended_model_group":
         assert np.all(getattr(skyobj_new, param)[: skyobj_full.Ncomponents // 2] == "")
-    else:
+    elif param not in ["ra", "dec", "name"]:
         assert np.isnan(
             getattr(skyobj_new, param)[:, :, : skyobj_full.Ncomponents // 2]
         ).all()
@@ -1705,7 +1750,11 @@ def test_concat_optional_params(param):
     setattr(skyobj2, param, None)
     with uvtest.check_warnings(UserWarning, f"This object has {param}"):
         skyobj_new = skyobj1.concat(skyobj2, inplace=False)
-    assert getattr(skyobj_new, param) is not None
+
+    if param not in ["ra", "dec", "name"]:
+        assert getattr(skyobj_new, param) is not None
+    else:
+        assert getattr(skyobj_new, param) is None
     skyobj_new.history = skyobj_full.history
 
     assert getattr(skyobj_new, "_" + param) != getattr(skyobj_full, "_" + param)
@@ -1720,7 +1769,7 @@ def test_concat_optional_params(param):
             == getattr(skyobj_full, param)[: skyobj_full.Ncomponents // 2].tolist()
         )
 
-    else:
+    elif param not in ["ra", "dec", "name"]:
         assert np.allclose(
             getattr(skyobj_new, param)[:, :, : skyobj_full.Ncomponents // 2],
             getattr(skyobj_full, param)[:, :, : skyobj_full.Ncomponents // 2],
@@ -1739,7 +1788,7 @@ def test_concat_optional_params(param):
             ]
             == ""
         )
-    else:
+    elif param not in ["ra", "dec", "name"]:
         assert np.isnan(
             getattr(skyobj_new, param)[
                 :, :, skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents

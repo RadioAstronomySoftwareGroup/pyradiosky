@@ -1978,24 +1978,22 @@ class SkyModel(UVBase):
             this.name = np.concatenate((this.name, other.name))
 
         if this.component_type == "healpix":
-            if this.ra is not None:
-                if other.ra is None:
+            for param_name in ["ra", "dec", "name"]:
+                this_val = getattr(this, param_name)
+                other_val = getattr(other, param_name)
+                if this_val is not None and other_val is not None:
+                    setattr(this, param_name, np.concatenate((this_val, other_val)))
+                elif this_val is not None:
                     warnings.warn(
-                        "This object has ra values, other object does not, "
-                        "setting ra to None. "
+                        f"This object has {param_name} values, other object does not, "
+                        f"setting {param_name} to None. "
                     )
-                    this.ra = None
-                else:
-                    this.ra = np.concatenate((this.ra, other.ra))
-            if this.dec is not None:
-                if other.dec is None:
+                    setattr(this, param_name, None)
+                elif other_val is not None:
                     warnings.warn(
-                        "This object has dec values, other object does not, "
-                        "setting dec to None. "
+                        f"This object does not have {param_name} values, other object "
+                        f"does, setting {param_name} to None. "
                     )
-                    this.dec = None
-                else:
-                    this.dec = np.concatenate((this.dec, other.dec))
         else:
             this.ra = np.concatenate((this.ra, other.ra))
             this.dec = np.concatenate((this.dec, other.dec))
