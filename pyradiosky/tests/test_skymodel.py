@@ -229,6 +229,60 @@ def healpix_disk_new():
     ):
         sky = SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "healpix_disk.skyh5"))
 
+    # these should not be set (the file is old)
+    sky.ra = None
+    sky.dec = None
+
+    yield sky
+
+    del sky
+
+
+@pytest.fixture
+def assign_hpx_data():
+    pytest.importorskip("astropy_healpix")
+    import astropy_healpix
+
+    hpx_inds = [25]
+    nside = 256
+    ra, dec = astropy_healpix.healpix_to_lonlat(
+        hpx_inds,
+        nside,
+        order="ring",
+    )
+    ras_use = Longitude(ra + Angle([-0.01, 0.01], unit=units.degree))
+    decs_use = Latitude(dec + Angle([-0.01, 0.01], unit=units.degree))
+    stokes = Quantity(np.zeros((4, 1, 2)), unit=units.Jy)
+    stokes[0, 0, 0] = 1.5 * units.Jy
+    stokes[1, 0, 0] = 0.5 * units.Jy
+    stokes[0, 0, 1] = 3 * units.Jy
+
+    stokes_error = Quantity(np.zeros((4, 1, 2)), unit=units.Jy)
+    stokes_error[0, 0, 0] = 0.15 * units.Jy
+    stokes_error[1, 0, 0] = 0.2 * units.Jy
+    stokes_error[0, 0, 1] = 0.25 * units.Jy
+
+    beam_amp = np.zeros((4, 1, 2))
+    beam_amp[0, :, :] = 0.97
+    beam_amp[1, :, :] = 0.96
+    beam_amp[2, :, :] = 0.6
+    beam_amp[3, :, :] = 0.5
+
+    extended_group = ["extsrc1", "extsrc1"]
+
+    sky = SkyModel(
+        component_type="point",
+        name=["src1", "src2"],
+        ra=ras_use,
+        dec=decs_use,
+        stokes=stokes,
+        spectral_type="subband",
+        freq_array=Quantity([150], unit=units.MHz),
+        stokes_error=stokes_error,
+        beam_amp=beam_amp,
+        extended_model_group=extended_group,
+    )
+
     yield sky
 
     del sky
@@ -946,25 +1000,36 @@ def test_jansky_to_kelvin_errors(zenith_skymodel):
         zenith_skymodel.kelvin_to_jansky()
 
 
-def test_healpix_to_point_loop(healpix_disk_new):
+@pytest.mark.parametrize("order", ["ring", "nested"])
+@pytest.mark.parametrize("to_jy", [True, False])
+@pytest.mark.parametrize("to_k", [True, False])
+@pytest.mark.parametrize("undo_method", ["point_to_healpix", "assign_to_healpix"])
+def test_healpix_to_point_loop(healpix_disk_new, order, to_jy, to_k, undo_method):
     skyobj = healpix_disk_new
 
-    skyobj2 = skyobj.copy()
-    skyobj2.healpix_to_point()
+    if order == "nested":
+        skyobj.hpx_order = "nested"
 
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match="This method is deprecated and will be removed in version 0.3.0.",
-    ):
-        skyobj2.point_to_healpix()
+    skyobj2 = skyobj.copy()
+    skyobj2.healpix_to_point(to_jy=to_jy)
+
+    if undo_method == "point_to_healpix":
+        with uvtest.check_warnings(
+            DeprecationWarning,
+            match="This method is deprecated and will be removed in version 0.3.0.",
+        ):
+            skyobj2.point_to_healpix(to_k=to_k)
+    else:
+        skyobj2.assign_to_healpix(skyobj.nside, order=order, inplace=True, to_k=to_k)
+
+    if to_jy and not to_k:
+        skyobj.kelvin_to_jansky()
 
     assert skyobj == skyobj2
 
 
 def test_healpix_to_point_loop_ordering(healpix_disk_new):
     skyobj = healpix_disk_new
-    skyobj.ra = None
-    skyobj.dec = None
 
     skyobj2 = skyobj.copy()
     skyobj2.hpx_order = "nested"
@@ -973,6 +1038,169 @@ def test_healpix_to_point_loop_ordering(healpix_disk_new):
     skyobj2._point_to_healpix()
 
     assert skyobj != skyobj2
+
+
+def test_assign_to_healpix(assign_hpx_data):
+    import astropy_healpix
+
+    sky = assign_hpx_data
+
+    nside = 256
+
+    sky_hpx = sky.assign_to_healpix(nside)
+
+    jy_to_ksr_conv_factor = skyutils.jy_to_ksr(sky.freq_array[0])
+    hpx_area = astropy_healpix.nside_to_pixel_area(nside)
+
+    assert sky_hpx.Ncomponents == 1
+    assert sky_hpx.hpx_inds[0] == 25
+
+    assert np.allclose(
+        sky_hpx.stokes[0, 0, 0],
+        4.5 * units.Jy * jy_to_ksr_conv_factor / hpx_area,
+    )
+    assert np.allclose(
+        sky_hpx.stokes[1, 0, 0],
+        0.5 * units.Jy * jy_to_ksr_conv_factor / hpx_area,
+    )
+
+    assert np.allclose(
+        sky_hpx.stokes_error[0, 0, 0],
+        np.sqrt(0.15 ** 2 + 0.25 ** 2) * units.Jy * jy_to_ksr_conv_factor / hpx_area,
+    )
+    assert np.allclose(
+        sky_hpx.stokes_error[1, 0, 0],
+        0.2 * units.Jy * jy_to_ksr_conv_factor / hpx_area,
+    )
+
+
+def test_assign_to_healpix_fullsky(assign_hpx_data):
+    import astropy_healpix
+
+    sky = assign_hpx_data
+
+    nside = 256
+
+    sky_hpx = sky.assign_to_healpix(nside, full_sky=True)
+
+    jy_to_ksr_conv_factor = skyutils.jy_to_ksr(sky.freq_array[0])
+    hpx_area = astropy_healpix.nside_to_pixel_area(nside)
+
+    assert sky_hpx.Ncomponents == astropy_healpix.nside_to_npix(nside)
+
+    assert np.allclose(
+        sky_hpx.stokes[0, 0, 25],
+        4.5 * units.Jy * jy_to_ksr_conv_factor / hpx_area,
+    )
+    assert np.allclose(
+        sky_hpx.stokes[1, 0, 25],
+        0.5 * units.Jy * jy_to_ksr_conv_factor / hpx_area,
+    )
+
+    assert not np.any(np.nonzero(sky_hpx.stokes[:, :, :25]))
+    assert not np.any(np.nonzero(sky_hpx.stokes[:, :, 26:]))
+
+    assert np.allclose(
+        sky_hpx.stokes_error[0, 0, 25],
+        np.sqrt(0.15 ** 2 + 0.25 ** 2) * units.Jy * jy_to_ksr_conv_factor / hpx_area,
+    )
+    assert np.allclose(
+        sky_hpx.stokes_error[1, 0, 25],
+        0.2 * units.Jy * jy_to_ksr_conv_factor / hpx_area,
+    )
+    assert not np.any(np.nonzero(sky_hpx.stokes_error[:, :, :25]))
+    assert not np.any(np.nonzero(sky_hpx.stokes_error[:, :, 26:]))
+
+
+def test_assign_to_healpix_errors(assign_hpx_data):
+    sky = assign_hpx_data
+    nside = 256
+
+    sky.spectral_type = "spectral_index"
+    sky.reference_frequency = Quantity([150, 150], unit=units.MHz)
+    sky.spectral_index = np.array([-0.8, -0.6])
+
+    with pytest.raises(
+        ValueError,
+        match="Multiple components map to a single healpix pixel and the "
+        "spectral_index varies",
+    ):
+        sky.assign_to_healpix(nside)
+
+    sky.reference_frequency = Quantity([150, 120], unit=units.MHz)
+    sky.spectral_index = np.array([-0.8, -0.8])
+
+    with pytest.raises(
+        ValueError,
+        match="Multiple components map to a single healpix pixel and the "
+        "reference_frequency varies",
+    ):
+        sky.assign_to_healpix(nside)
+
+    sky.reference_frequency = Quantity([150, 150], unit=units.MHz)
+    sky.beam_amp[0, 0, 1] = 0.98
+
+    with pytest.raises(
+        ValueError,
+        match="Multiple components map to a single healpix pixel and the "
+        "beam_amp varies",
+    ):
+        sky.assign_to_healpix(nside)
+
+    sky.beam_amp[0, 0, 1] = 0.97
+    sky.extended_model_group = np.array(["extsrc1", "extsrc2"])
+
+    with pytest.raises(
+        ValueError,
+        match="Multiple components map to a single healpix pixel and the "
+        "extended_model_group varies",
+    ):
+        sky.assign_to_healpix(nside)
+
+
+@pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index"])
+def test_assign_to_healpix_gleam_simple(spec_type):
+    """
+    Test that a 50 component GLEAM catalog can be assigned to small healpix pixels.
+
+    Use a large nside so each source maps to its own pixel.
+    """
+    pytest.importorskip("astropy_healpix")
+    import astropy_healpix
+
+    sky = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type=spec_type)
+
+    nside = 1024
+    hpx_sky = sky.assign_to_healpix(nside, sort=False, to_k=False)
+
+    sky.stokes = sky.stokes / astropy_healpix.nside_to_pixel_area(nside)
+
+    assert hpx_sky._stokes == sky._stokes
+
+
+@pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index"])
+def test_assign_to_healpix_gleam_multi(spec_type):
+    """
+    Test that a 50 component GLEAM catalog can be assigned to large healpix pixels.
+
+    Use a small nside so some sources map to the same pixels. This just tests that
+    it errors with varying spectral indices but doesn't error with flat or subband
+    spectral types.
+    """
+    pytest.importorskip("astropy_healpix")
+
+    skyobj_full = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type=spec_type)
+
+    nside = 256
+    if spec_type == "spectral_index":
+        with pytest.raises(
+            ValueError,
+            match="Multiple components map to a single healpix pixel and the "
+            "spectral_index varies",
+        ):
+            skyobj_full.assign_to_healpix(nside, inplace=True)
+    else:
+        skyobj_full.assign_to_healpix(nside, inplace=True)
 
 
 def test_healpix_to_point_errors(zenith_skymodel):
@@ -1347,7 +1575,9 @@ def test_polarized_source_smooth_visibilities():
 )
 def test_concat(comp_type, spec_type, healpix_disk_new):
     if comp_type == "point":
-        skyobj_full = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type=spec_type)
+        skyobj_full = SkyModel.from_gleam_catalog(
+            GLEAM_vot, spectral_type=spec_type, with_error=True
+        )
     else:
         skyobj_full = healpix_disk_new
 
@@ -1397,10 +1627,15 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
 
 
 @pytest.mark.parametrize(
-    "param", ["reference_frequency", "extended_model_group", "beam_amp"]
+    "param", ["reference_frequency", "extended_model_group", "beam_amp", "stokes_error"]
 )
 def test_concat_optional_params(param):
-    skyobj_full = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type="flat")
+    if param == "stokes_error":
+        skyobj_full = SkyModel.from_gleam_catalog(
+            GLEAM_vot, spectral_type="flat", with_error=True
+        )
+    else:
+        skyobj_full = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type="flat")
 
     if param == "extended_model_group":
         skyobj_full.extended_model_group = skyobj_full.name
