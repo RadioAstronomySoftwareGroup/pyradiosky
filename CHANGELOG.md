@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Added
+- The `get_ra_dec` method which computes the values from `hpx_inds` on healpix objects
+and just returns the parameter values on point objects.
+- The `assign_to_healpix` method to assign point component objects to a healpix grid
+(using the nearest neighbor approach).
+
+### Changed
+- `ra` and `dec` are no longer required parameters on healpix objects (since that
+information is encoded in the `hpx_inds` parameter). When objects are initialized as
+healpix objects the `ra` and `dec` parameters are no longer populated.
+- `point_to_healpix` has been renamed to `_point_to_healpix` because it's only intended
+to be used internally to undo the `healpix_to_point` method.
+
+### Deprecated
+- The `point_to_healpix` method.
+
 ## [0.1.2] - 2021-07-06
 
 ### Added
