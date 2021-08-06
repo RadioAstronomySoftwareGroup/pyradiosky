@@ -2161,14 +2161,13 @@ def test_healpix_import_err(zenith_skymodel):
         with pytest.raises(ImportError, match=errstr):
             skymodel.healpix_to_sky(hpmap, inds, freqs)
 
-        sky = SkyModel(
-            nside=8,
-            hpx_inds=[0],
-            stokes=Quantity([1.0, 0.0, 0.0, 0.0], unit=units.K),
-            spectral_type="flat",
-        )
         with pytest.raises(ImportError, match=errstr):
-            sky.get_ra_dec()
+            SkyModel(
+                nside=8,
+                hpx_inds=[0],
+                stokes=Quantity([1.0, 0.0, 0.0, 0.0], unit=units.K),
+                spectral_type="flat",
+            )
 
         with pytest.raises(ImportError, match=errstr):
             SkyModel.from_healpix_hdf5(os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5"))
