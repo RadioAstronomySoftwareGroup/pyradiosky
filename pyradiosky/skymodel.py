@@ -741,6 +741,31 @@ class SkyModel(UVBase):
 
             self.check()
 
+    def __getattribute__(self, name):
+        """Provide ra and dec for healpix objects with deprecation warnings."""
+        if name == "ra" and not self._ra.required and self._ra.value is None:
+            warnings.warn(
+                "ra is no longer a required parameter on Healpix objects and the "
+                "value is currently None. Use `get_ra_dec` to get the ra and dec "
+                "values for Healpix components. Starting in version 0.3.0 this call "
+                "will return None.",
+                category=DeprecationWarning,
+            )
+            ra, _ = self.get_ra_dec()
+            return ra
+        elif name == "dec" and not self._dec.required and self._dec.value is None:
+            warnings.warn(
+                "dec is no longer a required parameter on Healpix objects and the "
+                "value is currently None. Use `get_ra_dec` to get the ra and dec "
+                "values for Healpix components. Starting in version 0.3.0 this call "
+                "will return None.",
+                category=DeprecationWarning,
+            )
+            _, dec = self.get_ra_dec()
+            return dec
+
+        return super().__getattribute__(name)
+
     def _set_spectral_type_params(self, spectral_type):
         """Set parameters depending on spectral_type."""
         self.spectral_type = spectral_type
@@ -778,11 +803,15 @@ class SkyModel(UVBase):
     @property
     def ncomponent_length_params(self):
         """Iterate over ncomponent length paramters."""
-        param_list = (
-            param for param in self if getattr(self, param).form == ("Ncomponents",)
-        )
-        for param in param_list:
-            yield param
+        # the filters below should be removed in version 0.3.0
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="ra is no longer")
+            warnings.filterwarnings("ignore", message="dec is no longer")
+            param_list = (
+                param for param in self if getattr(self, param).form == ("Ncomponents",)
+            )
+            for param in param_list:
+                yield param
 
     @property
     def _time_position_params(self):
@@ -849,9 +878,13 @@ class SkyModel(UVBase):
                 )
 
         # Run the basic check from UVBase
-        super(SkyModel, self).check(
-            check_extra=check_extra, run_check_acceptability=run_check_acceptability
-        )
+        # the filters below should be removed in version 0.3.0
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="ra is no longer")
+            warnings.filterwarnings("ignore", message="dec is no longer")
+            super(SkyModel, self).check(
+                check_extra=check_extra, run_check_acceptability=run_check_acceptability
+            )
 
         # make sure freq_array or reference_frequency if present is compatible with Hz
         if not (self.freq_array is None or self.freq_array.unit.is_equivalent("Hz")):
@@ -870,10 +903,14 @@ class SkyModel(UVBase):
     def __eq__(self, other, check_extra=True):
         """Check for equality, check for future equality."""
         # Run the basic __eq__ from UVBase
-        equal = super(SkyModel, self).__eq__(other, check_extra=check_extra)
+        # the filters below should be removed in version 0.3.0
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="ra is no longer")
+            warnings.filterwarnings("ignore", message="dec is no longer")
+            equal = super(SkyModel, self).__eq__(other, check_extra=check_extra)
 
         # Issue deprecation warning if ra/decs aren't close to future_angle_tol levels
-        if self.ra is not None and not units.quantity.allclose(
+        if self._ra.value is not None and not units.quantity.allclose(
             self.ra, other.ra, rtol=0, atol=self.future_angle_tol
         ):
             warnings.warn(
@@ -883,7 +920,7 @@ class SkyModel(UVBase):
                 category=DeprecationWarning,
             )
 
-        if self.dec is not None and not units.quantity.allclose(
+        if self._dec.value is not None and not units.quantity.allclose(
             self.dec, other.dec, rtol=0, atol=self.future_angle_tol
         ):
             warnings.warn(
@@ -894,7 +931,11 @@ class SkyModel(UVBase):
             )
 
         if not equal:
-            equal = super(SkyModel, self).__eq__(other, check_extra=False)
+            # the filters below should be removed in version 0.3.0
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message="ra is no longer")
+                warnings.filterwarnings("ignore", message="dec is no longer")
+                equal = super(SkyModel, self).__eq__(other, check_extra=False)
 
             if equal:
                 # required params are equal, extras are not but check_extra is turned on.
@@ -913,6 +954,14 @@ class SkyModel(UVBase):
                 )
 
         return equal
+
+    def copy(self):
+        """Overload this method to filter ra/dec warnings that shouldn't be issued."""
+        # this method should be removed in version 0.3.0
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="ra is no longer")
+            warnings.filterwarnings("ignore", message="dec is no longer")
+            return super(SkyModel, self).copy()
 
     def kelvin_to_jansky(self):
         """
@@ -1983,18 +2032,23 @@ class SkyModel(UVBase):
             this.name = np.concatenate((this.name, other.name))
 
         if this.component_type == "healpix":
-            for param_name in ["ra", "dec", "name"]:
-                this_val = getattr(this, param_name)
-                other_val = getattr(other, param_name)
-                if this_val is not None and other_val is not None:
-                    setattr(this, param_name, np.concatenate((this_val, other_val)))
-                elif this_val is not None:
+            for param in ["_ra", "_dec", "_name"]:
+                this_param = getattr(this, param)
+                other_param = getattr(other, param)
+                param_name = this_param.name
+                if this_param.value is not None and other_param.value is not None:
+                    setattr(
+                        this,
+                        param_name,
+                        np.concatenate((this_param.value, other_param.value)),
+                    )
+                elif this_param.value is not None:
                     warnings.warn(
                         f"This object has {param_name} values, other object does not, "
                         f"setting {param_name} to None. "
                     )
                     setattr(this, param_name, None)
-                elif other_val is not None:
+                elif other_param.value is not None:
                     warnings.warn(
                         f"This object does not have {param_name} values, other object "
                         f"does, setting {param_name} to None. "
