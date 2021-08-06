@@ -1699,7 +1699,13 @@ def test_concat_optional_params(param, healpix_disk_new):
     if param not in ["ra", "dec", "name"]:
         assert getattr(skyobj_new, param) is not None
     else:
-        assert getattr(skyobj_new, param) is None
+        assert (getattr(skyobj_new, "_" + param)).value is None
+        if param in ["ra", "dec"]:
+            with uvtest.check_warnings(
+                DeprecationWarning, f"{param} is no longer a required parameter"
+            ):
+                assert getattr(skyobj_new, param) is not None
+
     skyobj_new.history = skyobj_full.history
 
     assert getattr(skyobj_new, "_" + param) != getattr(skyobj_full, "_" + param)
@@ -1754,7 +1760,7 @@ def test_concat_optional_params(param, healpix_disk_new):
     if param not in ["ra", "dec", "name"]:
         assert getattr(skyobj_new, param) is not None
     else:
-        assert getattr(skyobj_new, param) is None
+        assert (getattr(skyobj_new, "_" + param)).value is None
     skyobj_new.history = skyobj_full.history
 
     assert getattr(skyobj_new, "_" + param) != getattr(skyobj_full, "_" + param)
