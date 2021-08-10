@@ -1380,7 +1380,7 @@ class SkyModel(UVBase):
                                 )
                 if sky.beam_amp is not None:
                     test_beam_amp = sky.beam_amp[:, :, ind_dict[ind]] - np.broadcast_to(
-                        sky.beam_amp[:, :, 0, np.newaxis],
+                        sky.beam_amp[:, :, ind_dict[ind][0], np.newaxis],
                         (4, sky.Nfreqs, ind_dict[ind].size),
                     )
                     if np.any(np.nonzero(test_beam_amp)):
@@ -1411,7 +1411,7 @@ class SkyModel(UVBase):
                     unit=sky.stokes_error.unit,
                 )
 
-            for ind_num, hpx_ind in enumerate(new_hpx_inds.tolist()):
+            for ind_num, hpx_ind in enumerate(new_hpx_inds):
                 new_stokes[:, :, ind_num] = np.sum(
                     sky.stokes[:, :, ind_dict[hpx_ind]], axis=2
                 )
@@ -2048,6 +2048,7 @@ class SkyModel(UVBase):
                         f"This object does not have {param_name} values, other object "
                         f"does, setting {param_name} to None. "
                     )
+                    setattr(this, param_name, None)
         else:
             this.ra = np.concatenate((this.ra, other.ra))
             this.dec = np.concatenate((this.dec, other.dec))

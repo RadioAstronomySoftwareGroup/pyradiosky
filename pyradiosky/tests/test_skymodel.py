@@ -108,8 +108,7 @@ def moonsky():
 
 @pytest.fixture
 def healpix_data():
-    pytest.importorskip("astropy_healpix")
-    import astropy_healpix
+    astropy_healpix = pytest.importorskip("astropy_healpix")
 
     nside = 32
     npix = astropy_healpix.nside_to_npix(nside)
@@ -240,8 +239,7 @@ def healpix_disk_new():
 
 @pytest.fixture
 def assign_hpx_data():
-    pytest.importorskip("astropy_healpix")
-    import astropy_healpix
+    astropy_healpix = pytest.importorskip("astropy_healpix")
 
     nside = 32
     pix_num = 25
@@ -1136,6 +1134,7 @@ def test_assign_to_healpix_errors(assign_hpx_data):
         sky2.assign_to_healpix(nside)
 
     sky.spectral_type = "spectral_index"
+    sky.freq_array = None
     sky.reference_frequency = Quantity([150, 150], unit=units.MHz)
     sky.spectral_index = np.array([-0.8, -0.6])
 
@@ -1184,8 +1183,7 @@ def test_assign_to_healpix_gleam_simple(spec_type):
 
     Use a large nside so each source maps to its own pixel.
     """
-    pytest.importorskip("astropy_healpix")
-    import astropy_healpix
+    astropy_healpix = pytest.importorskip("astropy_healpix")
 
     sky = SkyModel.from_gleam_catalog(
         GLEAM_vot, spectral_type=spec_type, with_error=True
@@ -2180,8 +2178,7 @@ def test_healpix_import_err(zenith_skymodel):
 
 
 def test_healpix_positions(tmp_path, time_location):
-    pytest.importorskip("astropy_healpix")
-    import astropy_healpix
+    astropy_healpix = pytest.importorskip("astropy_healpix")
 
     # write out a healpix file, read it back in check that it is as expected
     nside = 8
