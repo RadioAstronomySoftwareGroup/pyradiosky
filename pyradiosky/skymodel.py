@@ -193,15 +193,15 @@ class SkyModel(UVBase):
 
         if component_type == "healpix":
             self._name.required = False
-            self._ra.required = False
-            self._dec.required = False
+            self._lon.required = False
+            self._lat.required = False
             self._hpx_inds.required = True
             self._nside.required = True
             self._hpx_order.required = True
         else:
             self._name.required = True
-            self._ra.required = True
-            self._dec.required = True
+            self._lon.required = True
+            self._lat.required = True
             self._hpx_inds.required = False
             self._nside.required = False
             self._hpx_order.required = False
@@ -615,7 +615,7 @@ class SkyModel(UVBase):
             if hpx_order is not None:
                 self.hpx_order = str(hpx_order).lower()
 
-                # Ensure that the value can be used in healpix_to_lonlat below.
+                # Check healpix ordering scheme
                 if not self._hpx_order.check_acceptability()[0]:
                     raise ValueError(
                         f"hpx_order must be one of {self._hpx_order.acceptable_vals}"
@@ -632,58 +632,10 @@ class SkyModel(UVBase):
                         category=DeprecationWarning,
                     )
                     self.frame = "icrs"
+                    frame = frame_transform_graph.lookup_name(self.frame)()
+                    self._frame_inst = frame
 
                 self.Ncomponents = self.hpx_inds.size
-                if lon is not None and lat is not None:
-                    lon_name = [k for k in ["ra", "gl", "lon"] if coords_given[k]][0]
-                    lat_name = [k for k in ["dec", "gb", "lat"] if coords_given[k]][0]
-                    warnings.warn(
-                        f"Input {lon_name} and {lat_name} parameters are being used instead of "
-                        "the default healpix coordinates. These coordinates will "
-                        "not necessarily line up with healpix pixel indicies. "
-                        "If you are intentionally trying to overwrite healpix "
-                        "coordinates please ensure the pixel indices are properly "
-                        "updated."
-                    )
-                    if isinstance(lon, (list)):
-                        # Cannot just try converting to Longitude because if the values are
-                        # Latitudes they are silently converted to Longitude rather than
-                        # throwing an error.
-                        for val in lon:
-                            if not isinstance(val, (Longitude)):
-
-                                raise ValueError(
-                                    f"All values in {lon_name} must be Longitude objects"
-                                )
-                        lon = Longitude(lon)
-                    self.lon = np.atleast_1d(lon)
-                    if isinstance(lat, (list)):
-                        # Cannot just try converting to Latitude because if the values are
-                        # Longitude they are silently converted to Longitude rather than
-                        # throwing an error.
-                        for val in lat:
-                            if not isinstance(val, (Latitude)):
-                                raise ValueError(
-                                    f"All values in {lat_name} must be Latitude objects"
-                                )
-                        lat = Latitude(lat)
-                    self.lat = np.atleast_1d(lat)
-
-                else:
-                    if lon is not None or lat is not None:
-                        warnings.warn(
-                            "Either the lon or lat was attempted to be initialized "
-                            "without specifying the other. Either both need to be "
-                            "given to overwrite healpix coordinates or neither. "
-                            "Proceeding with the default healpix coordinates"
-                        )
-                    lon, lat = astropy_healpix.healpix_to_lonlat(
-                        hpx_inds,
-                        nside,
-                        order=self.hpx_order,
-                    )
-                    self.lon = lon
-                    self.lat = lat
 
             else:
                 self.Ncomponents = self.name.size
@@ -847,7 +799,7 @@ class SkyModel(UVBase):
 
     def __getattribute__(self, name):
         """Provide ra and dec for healpix objects with deprecation warnings."""
-        if name == "ra" and not self._ra.required and self._ra.value is None:
+        if name == "lon" and not self._lon.required and self._lon.value is None:
             warnings.warn(
                 "lon is no longer a required parameter on Healpix objects and the "
                 "value is currently None. Use `get_lon_lat` to get the lon and lat "
@@ -857,7 +809,7 @@ class SkyModel(UVBase):
             )
             lon, _ = self.get_lon_lat()
             return lon
-        elif name == "dec" and not self._dec.required and self._dec.value is None:
+        elif name == "lat" and not self._lat.required and self._lat.value is None:
             warnings.warn(
                 "lat is no longer a required parameter on Healpix objects and the "
                 "value is currently None. Use `get_lon_lat` to get the lon and lat "
@@ -909,8 +861,8 @@ class SkyModel(UVBase):
         """Iterate over ncomponent length paramters."""
         # the filters below should be removed in version 0.3.0
         with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message="ra is no longer")
-            warnings.filterwarnings("ignore", message="dec is no longer")
+            warnings.filterwarnings("ignore", message="lon is no longer")
+            warnings.filterwarnings("ignore", message="lat is no longer")
             param_list = (
                 param for param in self if getattr(self, param).form == ("Ncomponents",)
             )
@@ -984,8 +936,8 @@ class SkyModel(UVBase):
         # Run the basic check from UVBase
         # the filters below should be removed in version 0.3.0
         with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message="ra is no longer")
-            warnings.filterwarnings("ignore", message="dec is no longer")
+            warnings.filterwarnings("ignore", message="lon is no longer")
+            warnings.filterwarnings("ignore", message="lat is no longer")
             super(SkyModel, self).check(
                 check_extra=check_extra, run_check_acceptability=run_check_acceptability
             )
@@ -1381,13 +1333,19 @@ class SkyModel(UVBase):
                     "The astropy-healpix module must be installed to use HEALPix "
                     "methods"
                 ) from e
-            lon, lat = astropy_healpix.healpix_to_lonlat(
-                self.hpx_inds,
-                self.nside,
+            hp_obj = astropy_healpix.HEALPix(
+                nside=self.nside,
                 order=self.hpx_order,
                 frame=self._frame_inst,
             )
-            return lon, lat
+            coords = hp_obj.healpix_to_skycoord(
+                self.hpx_inds,
+            )
+
+            comp_dict = coords.frame.get_representation_component_names()
+            inv_dict = {val: key for key, val in comp_dict.items()}
+
+            return getattr(coords, inv_dict["lon"]), getattr(coords, inv_dict["lat"])
         else:
             return self.lon, self.lat
 
@@ -1517,8 +1475,8 @@ class SkyModel(UVBase):
             self.coherency_radec / astropy_healpix.nside_to_pixel_area(self.nside)
         )
         self.name = None
-        self.ra = None
-        self.dec = None
+        self.lon = None
+        self.lat = None
 
         if to_k:
             self.jansky_to_kelvin()
@@ -1586,6 +1544,7 @@ class SkyModel(UVBase):
         self,
         nside,
         order="ring",
+        frame=None,
         to_k=True,
         full_sky=False,
         sort=True,
@@ -1620,11 +1579,15 @@ class SkyModel(UVBase):
             Option to create a full sky healpix map with zeros in the stokes array
             for pixels with no sources assigned to them. If False only pixels with
             sources mapped to them will be included in the object.
+        sort : bool
+            Option to sort the object in order of the healpix indicies.
+        frame : str, `BaseCoordinateFrame` class or instance.
+            The frame of the input point source catalog.
+            This is optional if the frame attribute is set on the SkyModel object.
+            Currently frame must be one of ["galactic", "icrs"].
         inplace : bool
             Option to do the change in place on the object rather than return a new
             object.
-        sort : bool
-            Option to sort the object in order of the healpix indicies.
         run_check : bool
             Option to check for the existence and proper shapes of parameters
             after downselecting data on this object (the default is True,
@@ -1652,13 +1615,54 @@ class SkyModel(UVBase):
 
         sky = self if inplace else self.copy()
 
+        if frame is None:
+            if sky.frame is None and sky._frame_inst is None:
+                raise ValueError(
+                    "This method requires a coordinate frame but None was supplied "
+                    "and the SkyModel object has no frame attribute set. Please "
+                    "call this function with a specific frame."
+                )
+            elif sky.frame is not None and sky._frame_inst is None:
+                # this is an unexpected state where the frame name is set
+                # but the instance has been destroyed somehow.
+                # Use the name to rebuild the instance
+
+                # easiest way to do frame cheking is through making a dummy skycoord
+                coords = SkyCoord(0, 0, unit="deg", frame=self.frame)
+
+                frame = coords.frame
+                sky._frame_inst = frame
+            else:
+                # use the frame associated with the object already
+                frame = sky._frame_inst
+        else:
+            # easiest way to do frame cheking is through making a dummy skycoord
+            coords = SkyCoord(0, 0, unit="deg", frame=frame)
+
+            frame = coords.frame
+
+            if not isinstance(frame, (Galactic, ICRS)):
+                raise ValueError(
+                    f"Supplied frame {frame.__class__.__name__} is not supported at "
+                    "this time. Only 'galactic' and 'icrs' frames are currently supported.",
+                )
+
+            if sky.frame is not None:
+                if sky.frame.lower() != frame.name.lower():
+                    warnings.warn(
+                        f"Input parameter frame (value: {frame.name.lower()}) differs "
+                        f"from the frame attribute on this object (value: {self.frame.lower()}). "
+                        "Using input frame for coordinate calculations."
+                    )
+                    sky.frame = frame.name
+                    sky._frame_inst = frame
+
         # clear time & position specific parameters
         sky.clear_time_position_specific_params()
 
-        # `skycoord_to_healpix` should be used in the future when we support any
-        # astropy frame. For now using `lonlat_to_healpix`.
-        hpx_obj = astropy_healpix.HEALPix(nside, order=order)
-        hpx_inds = hpx_obj.lonlat_to_healpix(sky.ra, sky.dec)
+        hpx_obj = astropy_healpix.HEALPix(nside, order=order, frame=frame)
+        coords = SkyCoord(self.lon, self.lat, frame=frame)
+        hpx_inds = hpx_obj.skycoord_to_healpix(coords)
 
         sky._set_component_type_params("healpix")
         sky.nside = nside
@@ -1771,8 +1775,8 @@ class SkyModel(UVBase):
                     sky.stokes_error / astropy_healpix.nside_to_pixel_area(sky.nside)
                 )
         sky.name = None
-        sky.ra = None
-        sky.dec = None
+        sky.lon = None
+        sky.lat = None
 
         if full_sky and sky.Ncomponents < hpx_obj.npix:
             # add in zero flux pixels
@@ -1815,6 +1819,7 @@ class SkyModel(UVBase):
             )
             new_obj = SkyModel(
                 component_type="healpix",
+                frame=frame,
                 nside=sky.nside,
                 hpx_order=sky.hpx_order,
                 spectral_type=sky.spectral_type,
@@ -2363,8 +2368,8 @@ class SkyModel(UVBase):
                     )
                     setattr(this, param_name, None)
         else:
-            this.ra = np.concatenate((this.ra, other.ra))
-            this.dec = np.concatenate((this.dec, other.dec))
+            this.lon = np.concatenate((this.lon, other.lon))
+            this.lat = np.concatenate((this.lat, other.lat))
         this.stokes = np.concatenate((this.stokes, other.stokes), axis=2)
         this.coherency_radec = np.concatenate(
             (this.coherency_radec, other.coherency_radec), axis=3
@@ -2746,7 +2751,7 @@ class SkyModel(UVBase):
             lat_rad = np.radians(latitude_deg)
             buff = horizon_buffer
 
-            tans = np.tan(lat_rad) * np.tan(skyobj.dec.rad)
+            tans = np.tan(lat_rad) * np.tan(skyobj.lat.rad)
             nonrising = tans < -1
 
             comp_inds_to_keep = np.nonzero(~nonrising)[0]
@@ -2759,8 +2764,8 @@ class SkyModel(UVBase):
                     message="invalid value encountered",
                     category=RuntimeWarning,
                 )
-                rise_lst = skyobj.ra.rad - np.arccos((-1) * tans) - buff
-                set_lst = skyobj.ra.rad + np.arccos((-1) * tans) + buff
+                rise_lst = skyobj.lon.rad - np.arccos((-1) * tans) - buff
+                set_lst = skyobj.lon.rad + np.arccos((-1) * tans) + buff
 
                 rise_lst[rise_lst < 0] += 2 * np.pi
                 set_lst[set_lst < 0] += 2 * np.pi
@@ -2872,8 +2877,8 @@ class SkyModel(UVBase):
 
         arr = np.empty(self.Ncomponents, dtype=dt)
         arr["source_id"] = self.name
-        arr["ra_j2000"] = self.ra.deg
-        arr["dec_j2000"] = self.dec.deg
+        arr["ra_j2000"] = self.lon.deg
+        arr["dec_j2000"] = self.lat.deg
 
         for ii in range(4):
             if stokes_keep[ii]:
@@ -3133,6 +3138,12 @@ class SkyModel(UVBase):
                 # skip optional params if not present
                 if par in optional_params:
                     if parname not in header:
+                        continue
+
+                if header["component_type"][()].tobytes().decode("utf-8") == "healpix":
+                    # we can skip special handling for lon/lat for healpix models
+                    # these parameters are no long needed in healpix
+                    if parname in ["lon", "lat", "ra", "dec"]:
                         continue
 
                 if parname in ["lon", "lat"]:
