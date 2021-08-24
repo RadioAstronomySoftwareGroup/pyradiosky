@@ -27,8 +27,6 @@ from astropy.time import Time, TimeDelta
 import pyuvdata.tests as uvtest
 import pyuvdata.utils as uvutils
 
-from pyuvdata.tests import check_warnings
-
 from pyradiosky.data import DATA_PATH as SKY_DATA_PATH
 from pyradiosky import utils as skyutils
 from pyradiosky import skymodel, SkyModel
@@ -223,10 +221,7 @@ def healpix_disk_new():
     with uvtest.check_warnings(
         UserWarning,
         match=[
-            "Parameter lon not found in skyh5 file. ",
-            "Parameter lat not found in skyh5 file. ",
             "No frame available in this file. ",
-            "Input lon and lat parameters are being used instead of the default",
         ],
     ):
         sky = SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "healpix_disk.skyh5"))
@@ -293,13 +288,8 @@ def assign_hpx_data():
 @pytest.fixture(scope="session")
 def healpix_gsm_galactic():
     pytest.importorskip("astropy_healpix")
-    with uvtest.check_warnings(
-        UserWarning,
-        match=[
-            "Input lon and lat parameters are being used instead of the default",
-        ],
-    ):
-        sky = SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "gsm_galactic.skyh5"))
+    sky = SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "gsm_galactic.skyh5"))
+
     yield sky
 
     del sky
@@ -308,13 +298,7 @@ def healpix_gsm_galactic():
 @pytest.fixture(scope="session")
 def healpix_gsm_icrs():
     pytest.importorskip("astropy_healpix")
-    with uvtest.check_warnings(
-        UserWarning,
-        match=[
-            "Input lon and lat parameters are being used instead of the default",
-        ],
-    ):
-        sky = SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "gsm_icrs.skyh5"))
+    sky = SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "gsm_icrs.skyh5"))
 
     yield sky
 
@@ -1063,7 +1047,9 @@ def test_healpix_to_point_loop(healpix_disk_new, order, to_jy, to_k, undo_method
         ):
             skyobj2.point_to_healpix(to_k=to_k)
     else:
-        skyobj2.assign_to_healpix(skyobj.nside, order=order, inplace=True, to_k=to_k)
+        skyobj2.assign_to_healpix(
+            skyobj.nside, order=order, inplace=True, to_k=to_k, frame="icrs"
+        )
 
     if to_jy and not to_k:
         skyobj.kelvin_to_jansky()
@@ -1088,7 +1074,7 @@ def test_assign_to_healpix(assign_hpx_data):
 
     nside, pix_num, sky = assign_hpx_data
 
-    sky_hpx = sky.assign_to_healpix(nside)
+    sky_hpx = sky.assign_to_healpix(nside, frame="icrs")
 
     jy_to_ksr_conv_factor = skyutils.jy_to_ksr(sky.freq_array[0])
     hpx_area = astropy_healpix.nside_to_pixel_area(nside)
@@ -1133,7 +1119,7 @@ def test_assign_to_healpix_fullsky(assign_hpx_data, spectral_type):
         sky.beam_amp = None
         sky.extended_model_group = None
 
-    sky_hpx = sky.assign_to_healpix(nside, full_sky=True)
+    sky_hpx = sky.assign_to_healpix(nside, full_sky=True, frame="icrs")
 
     hpx_area = astropy_healpix.nside_to_pixel_area(nside)
 
@@ -1165,6 +1151,51 @@ def test_assign_to_healpix_fullsky(assign_hpx_data, spectral_type):
         )
         assert not np.any(np.nonzero(sky_hpx.stokes_error[:, :, :25]))
         assert not np.any(np.nonzero(sky_hpx.stokes_error[:, :, 26:]))
+
+
+@pytest.mark.parametrize(
+    "frame,err_type,err_msg",
+    [
+        (
+            None,
+            ValueError,
+            "This method requires a coordinate frame but None was supplied",
+        ),
+        ("gcrs", ValueError, "Supplied frame GCRS is not supported at this time."),
+    ],
+)
+def test_assign_to_healpix_frame_errors(assign_hpx_data, frame, err_type, err_msg):
+    nside, _, sky = assign_hpx_data
+    # null the frame info out for these tests
+    sky.frame = None
+    sky._frame_inst = None
+
+    with pytest.raises(
+        err_type,
+        match=err_msg,
+    ):
+        sky.assign_to_healpix(nside, frame=frame)
+
+
+def test_assign_to_healpix_frame_inst_none(assign_hpx_data):
+    nside, _, sky = assign_hpx_data
+    sky._frame_inst = None
+    assert sky.frame == "icrs"
+    sky.assign_to_healpix(nside, inplace=True)
+    assert sky._frame_inst.name == sky.frame
+
+
+def test_assign_healpix_frame_override_attribute(assign_hpx_data):
+    nside, _, sky = assign_hpx_data
+    sky.frame = "foobar"
+    assert sky.frame == "foobar"
+    warn_msg = (
+        "Input parameter frame (value: icrs) differs from the frame attribute "
+        "on this object (value: foobar"
+    )
+    with uvtest.check_warnings(UserWarning, warn_msg):
+        sky.assign_to_healpix(nside, frame="icrs", inplace=True)
+    assert sky.frame == "icrs"
 
 
 def test_assign_to_healpix_errors(assign_hpx_data):
@@ -1234,7 +1265,7 @@ def test_assign_to_healpix_gleam_simple(spec_type):
     )
 
     nside = 1024
-    hpx_sky = sky.assign_to_healpix(nside, sort=False, to_k=False)
+    hpx_sky = sky.assign_to_healpix(nside, sort=False, to_k=False, frame="icrs")
 
     sky.stokes = sky.stokes / astropy_healpix.nside_to_pixel_area(nside)
 
@@ -1263,9 +1294,9 @@ def test_assign_to_healpix_gleam_multi(spec_type):
             match="Multiple components map to a single healpix pixel and the "
             "spectral_index varies",
         ):
-            skyobj_full.assign_to_healpix(nside, inplace=True)
+            skyobj_full.assign_to_healpix(nside, inplace=True, frame="icrs")
     else:
-        skyobj_full.assign_to_healpix(nside, inplace=True)
+        skyobj_full.assign_to_healpix(nside, inplace=True, frame="icrs")
 
 
 def test_healpix_to_point_errors(zenith_skymodel):
@@ -1699,16 +1730,16 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
         "extended_model_group",
         "beam_amp",
         "stokes_error",
-        "ra",
-        "dec",
+        "lon",
+        "lat",
         "name",
     ],
 )
 def test_concat_optional_params(param, healpix_disk_new):
-    if param in ["ra", "dec", "name"]:
+    if param in ["lon", "lat", "name"]:
         skyobj_full = healpix_disk_new
-        if param in ["ra", "dec"]:
-            skyobj_full.ra, skyobj_full.dec = skyobj_full.get_lon_lat()
+        if param in ["lon", "lat"]:
+            skyobj_full.lon, skyobj_full.lat = skyobj_full.get_lon_lat()
         else:
             skyobj_full.name = np.array(
                 ["hpx" + str(ind) for ind in skyobj_full.hpx_inds]
@@ -1735,15 +1766,14 @@ def test_concat_optional_params(param, healpix_disk_new):
         component_inds=np.arange(skyobj_full.Ncomponents // 2, skyobj_full.Ncomponents),
         inplace=False,
     )
-
     with uvtest.check_warnings(UserWarning, f"This object does not have {param}"):
         skyobj_new = skyobj1.concat(skyobj2, inplace=False)
 
-    if param not in ["ra", "dec", "name"]:
+    if param not in ["lon", "lat", "name"]:
         assert getattr(skyobj_new, param) is not None
     else:
         assert (getattr(skyobj_new, "_" + param)).value is None
-        if param in ["ra", "dec"]:
+        if param in ["lon", "lat"]:
             with uvtest.check_warnings(
                 DeprecationWarning, f"{param} is no longer a required parameter"
             ):
@@ -1770,7 +1800,7 @@ def test_concat_optional_params(param, healpix_disk_new):
                 skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
             ].tolist()
         )
-    elif param not in ["ra", "dec", "name"]:
+    elif param not in ["lon", "lat", "name"]:
         assert np.allclose(
             getattr(skyobj_new, param)[
                 :, :, skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
@@ -1785,7 +1815,7 @@ def test_concat_optional_params(param, healpix_disk_new):
         ).all()
     elif param == "extended_model_group":
         assert np.all(getattr(skyobj_new, param)[: skyobj_full.Ncomponents // 2] == "")
-    elif param not in ["ra", "dec", "name"]:
+    elif param not in ["lon", "lat", "name"]:
         assert np.isnan(
             getattr(skyobj_new, param)[:, :, : skyobj_full.Ncomponents // 2]
         ).all()
@@ -1800,7 +1830,7 @@ def test_concat_optional_params(param, healpix_disk_new):
     with uvtest.check_warnings(UserWarning, f"This object has {param}"):
         skyobj_new = skyobj1.concat(skyobj2, inplace=False)
 
-    if param not in ["ra", "dec", "name"]:
+    if param not in ["lon", "lat", "name"]:
         assert getattr(skyobj_new, param) is not None
     else:
         assert (getattr(skyobj_new, "_" + param)).value is None
@@ -1818,7 +1848,7 @@ def test_concat_optional_params(param, healpix_disk_new):
             == getattr(skyobj_full, param)[: skyobj_full.Ncomponents // 2].tolist()
         )
 
-    elif param not in ["ra", "dec", "name"]:
+    elif param not in ["lon", "lat", "name"]:
         assert np.allclose(
             getattr(skyobj_new, param)[:, :, : skyobj_full.Ncomponents // 2],
             getattr(skyobj_full, param)[:, :, : skyobj_full.Ncomponents // 2],
@@ -1837,7 +1867,7 @@ def test_concat_optional_params(param, healpix_disk_new):
             ]
             == ""
         )
-    elif param not in ["ra", "dec", "name"]:
+    elif param not in ["lon", "lat", "name"]:
         assert np.isnan(
             getattr(skyobj_new, param)[
                 :, :, skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
@@ -3372,7 +3402,6 @@ def test_skyh5_file_loop_gleam(spec_type, tmpdir):
     assert sky2 == sky
 
 
-@pytest.mark.filterwarnings("ignore:Input ra and dec parameters are being used instead")
 @pytest.mark.parametrize("history", [None, "test"])
 def test_skyh5_file_loop_healpix(healpix_disk_new, history, tmpdir):
     sky = healpix_disk_new
@@ -3392,7 +3421,6 @@ def test_skyh5_file_loop_healpix(healpix_disk_new, history, tmpdir):
     assert sky2 == sky
 
 
-@pytest.mark.filterwarnings("ignore:Input ra and dec parameters are being used instead")
 def test_skyh5_file_loop_healpix_cut_sky(healpix_disk_new, tmpdir):
     sky = healpix_disk_new
 
@@ -3421,7 +3449,6 @@ def test_skyh5_file_loop_healpix_to_point(healpix_disk_new, tmpdir):
     assert sky2 == sky
 
 
-@pytest.mark.filterwarnings("ignore:Input ra and dec parameters are being used instead")
 def test_skyh5_units(tmpdir):
     pytest.importorskip("astropy_healpix")
     # this test checks that write_skyh5 doesn't error with composite stokes units
@@ -3550,110 +3577,6 @@ def test_hpx_ordering():
         spectral_type="flat",
     )
     assert sky.hpx_order == "nested"
-
-
-def test_healpix_coordinate_init_override(healpix_icrs):
-    hp_obj, coords_icrs, stokes, freq = healpix_icrs
-
-    with check_warnings(
-        UserWarning, "Input ra and dec parameters are being used instead of"
-    ):
-        skymod = SkyModel(
-            ra=coords_icrs.ra,
-            dec=coords_icrs.dec,
-            stokes=stokes,
-            spectral_type="full",
-            freq_array=freq,
-            nside=hp_obj.nside,
-            hpx_inds=np.arange(hp_obj.npix),
-        )
-
-    assert np.array_equal(skymod.ra, coords_icrs.ra)
-    assert np.array_equal(skymod.dec, coords_icrs.dec)
-
-
-def test_healpix_coordinate_init_override_lists(healpix_icrs):
-    hp_obj, coords_icrs, stokes, freq = healpix_icrs
-
-    with check_warnings(
-        UserWarning, "Input lon and lat parameters are being used instead of"
-    ):
-        skymod = SkyModel(
-            lon=list(coords_icrs.ra),
-            lat=list(coords_icrs.dec),
-            frame="icrs",
-            stokes=stokes,
-            spectral_type="full",
-            freq_array=freq,
-            nside=hp_obj.nside,
-            hpx_inds=np.arange(hp_obj.npix),
-        )
-
-    assert np.array_equal(skymod.ra, coords_icrs.ra)
-    assert np.array_equal(skymod.dec, coords_icrs.dec)
-
-
-def test_healpix_coordinate_init_no_override(healpix_icrs):
-    astropy_healpix = pytest.importorskip("astropy_healpix")
-    hp_obj, coords_icrs, stokes, freq = healpix_icrs
-
-    hp_ra, hp_dec = astropy_healpix.healpix_to_lonlat(
-        np.arange(hp_obj.npix),
-        hp_obj.nside,
-    )
-
-    with pytest.raises(ValueError, match="Invalid input coordinate combination"):
-        SkyModel(
-            ra=coords_icrs.ra,
-            stokes=stokes,
-            spectral_type="full",
-            freq_array=freq,
-            nside=hp_obj.nside,
-            hpx_inds=np.arange(hp_obj.npix),
-        )
-    skymod_ra, skymod_dec = skymod.get_lon_lat()
-
-    assert not np.array_equal(skymod_ra, coords_icrs.ra)
-    assert np.array_equal(skymod_ra, hp_ra)
-    assert np.array_equal(skymod_dec, hp_dec)
-
-@pytest.mark.parametrize(
-    "param,val,err_msg",
-    [
-        ("ra", 10, "All values in ra must be Longitude objects"),
-        ("dec", 10, "All values in dec must be Latitude objects"),
-    ],
-)
-@pytest.mark.filterwarnings(
-    "ignore:Input ra and dec parameters are being used instead of"
-)
-def test_healpix_init_override_errors(healpix_icrs, param, val, err_msg):
-    astropy_healpix = pytest.importorskip("astropy_healpix")
-    hp_obj, coords_icrs, stokes, freq = healpix_icrs
-
-    hp_ra, hp_dec = astropy_healpix.healpix_to_lonlat(
-        np.arange(hp_obj.npix),
-        hp_obj.nside,
-    )
-    ra, dec = coords_icrs.ra, coords_icrs.dec
-
-    ra = list(ra)
-    dec = list(dec)
-    if param == "ra":
-        ra[-1] = val
-    else:
-        dec[-1] = val
-
-    with pytest.raises(ValueError, match=err_msg):
-        SkyModel(
-            ra=ra,
-            dec=dec,
-            stokes=stokes,
-            spectral_type="full",
-            freq_array=freq,
-            nside=hp_obj.nside,
-            hpx_inds=np.arange(hp_obj.npix),
-        )
 
 
 def test_write_clobber_error(mock_point_skies, tmpdir):
@@ -3813,7 +3736,6 @@ def test_skyh5_write_read_no_frame(healpix_disk_new, tmpdir):
         UserWarning,
         match=[
             "No frame available in this file, assuming 'icrs'.",
-            "Input lon and lat parameters are being used instead of the default healpix coordinates",
         ],
     ):
         new_sky = SkyModel.from_skyh5(outfile)
