@@ -1094,7 +1094,7 @@ class SkyModel(UVBase):
         frequency and stokes parameter individually.
 
         Currently no polarization fixing is performed by this method.
-        As a result, it does not support transformations for Polarization catalogs
+        As a result, it does not support transformations for polarized catalogs
         since this would induce a Q <--> U rotation.
 
         Current implementation is equal to using a healpy.Rotator class to 1 part in 10^-5
