@@ -981,26 +981,26 @@ class SkyModel(UVBase):
             warnings.filterwarnings("ignore", message="lat is no longer")
             equal = super(SkyModel, self).__eq__(other, check_extra=check_extra)
 
-        # Issue deprecation warning if ra/decs aren't close to future_angle_tol levels
-        if self._lon.value is not None and not units.quantity.allclose(
-            self.lon, other.lon, rtol=0, atol=self.future_angle_tol
-        ):
-            warnings.warn(
-                "The _lon parameters are not within the future tolerance. "
-                f"Left is {self.lon}, right is {other.lon}. "
-                "This will become an error in version 0.2.0",
-                category=DeprecationWarning,
-            )
+            # Issue deprecation warning if ra/decs aren't close to future_angle_tol levels
+            if self._lon.value is not None and not units.quantity.allclose(
+                self.lon, other.lon, rtol=0, atol=self.future_angle_tol
+            ):
+                warnings.warn(
+                    "The _lon parameters are not within the future tolerance. "
+                    f"Left is {self.lon}, right is {other.lon}. "
+                    "This will become an error in version 0.2.0",
+                    category=DeprecationWarning,
+                )
 
-        if self._lat.value is not None and not units.quantity.allclose(
-            self.lat, other.lat, rtol=0, atol=self.future_angle_tol
-        ):
-            warnings.warn(
-                "The _lat parameters are not within the future tolerance. "
-                f"Left is {self.lat}, right is {other.lat}. "
-                "This will become an error in version 0.2.0",
-                category=DeprecationWarning,
-            )
+            if self._lat.value is not None and not units.quantity.allclose(
+                self.lat, other.lat, rtol=0, atol=self.future_angle_tol
+            ):
+                warnings.warn(
+                    "The _lat parameters are not within the future tolerance. "
+                    f"Left is {self.lat}, right is {other.lat}. "
+                    "This will become an error in version 0.2.0",
+                    category=DeprecationWarning,
+                )
 
         if not equal:
             # the filters below should be removed in version 0.3.0
