@@ -222,8 +222,6 @@ def healpix_disk_new():
         UserWarning,
         match=[
             "No frame available in this file. ",
-            "Parameter lon not found in skyh5 file.",
-            "Parameter lat not found in skyh5 file.",
         ],
     ):
         sky = SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "healpix_disk.skyh5"))
