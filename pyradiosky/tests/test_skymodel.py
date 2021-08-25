@@ -2279,6 +2279,7 @@ def test_healpix_positions(tmp_path, time_location):
             stokes=stokes * units.m,
             freq_array=freqs * units.Hz,
             spectral_type="full",
+            frame="icrs",
         )
 
     with pytest.raises(
@@ -2292,6 +2293,7 @@ def test_healpix_positions(tmp_path, time_location):
             stokes=stokes * units.K,
             freq_array=freqs * units.Hz,
             spectral_type="full",
+            frame="icrs",
         )
         skyobj.coherency_radec = skyobj.coherency_radec.value * units.m
         skyobj.check()
@@ -2307,6 +2309,7 @@ def test_healpix_positions(tmp_path, time_location):
             stokes=stokes,
             freq_array=freqs * units.Hz,
             spectral_type="full",
+            frame="icrs",
         )
 
     filename = os.path.join(tmp_path, "healpix_single.hdf5")
@@ -3465,6 +3468,7 @@ def test_skyh5_units(tmpdir):
         hpx_inds=np.arange(1, Ncomponents + 1),
         hpx_order="nested",
         nside=128,
+        frame="icrs",
     )
 
     filename = str(tmpdir.join("testfile.skyh5"))
@@ -3559,6 +3563,7 @@ def test_hpx_ordering():
             hpx_order="none",
             stokes=stokes,
             spectral_type="flat",
+            frame="icrs",
         )
 
     sky = SkyModel(
@@ -3567,6 +3572,7 @@ def test_hpx_ordering():
         hpx_order="Ring",
         stokes=stokes,
         spectral_type="flat",
+        frame="icrs",
     )
     assert sky.hpx_order == "ring"
     sky = SkyModel(
@@ -3575,6 +3581,7 @@ def test_hpx_ordering():
         hpx_order="NESTED",
         stokes=stokes,
         spectral_type="flat",
+        frame="icrs",
     )
     assert sky.hpx_order == "nested"
 
