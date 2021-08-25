@@ -1205,11 +1205,6 @@ class SkyModel(UVBase):
         # the number of components can change when making this transformation!
         self.Ncomponents = self.stokes.shape[2]
 
-        comp_dict = new_pixel_locs.frame.get_representation_component_names()
-        inv_dict = {val: key for key, val in comp_dict.items()}
-        self.lon = getattr(new_pixel_locs, inv_dict["lon"])[self.hpx_inds]
-        self.lat = getattr(new_pixel_locs, inv_dict["lat"])[self.hpx_inds]
-
         self._frame_inst = frame
         self._frame.value = frame.name
         # recalculate the coherency now that we are in the new frame
