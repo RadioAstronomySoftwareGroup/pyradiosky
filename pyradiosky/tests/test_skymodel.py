@@ -222,6 +222,8 @@ def healpix_disk_new():
         UserWarning,
         match=[
             "No frame available in this file. ",
+            "Parameter lon not found in skyh5 file.",
+            "Parameter lat not found in skyh5 file.",
         ],
     ):
         sky = SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "healpix_disk.skyh5"))
@@ -3785,3 +3787,16 @@ def test_healpix_transform_polarized_error(healpix_gsm_galactic):
         match="Healpix map transformations are currently not implemented for",
     ):
         healpix_gsm_galactic.healpix_interp_transform("ICRS")
+
+
+def test_old_skyh5_reading_ra_dec():
+    testfile = os.path.join(SKY_DATA_PATH, "old_skyh5_point_sources.skyh5")
+    with uvtest.check_warnings(
+        UserWarning,
+        match=[
+            "Parameter lon not found in skyh5 file.",
+            "Parameter lat not found in skyh5 file.",
+        ],
+    ):
+        sky = SkyModel.from_skyh5(testfile)
+    assert sky.check()
