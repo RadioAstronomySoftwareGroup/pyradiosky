@@ -627,7 +627,7 @@ class SkyModel(UVBase):
 
                 if self.frame is None:
                     warnings.warn(
-                        "In version 0.2.0, the frame keyword will be required for HEALPix maps. "
+                        "In version 0.3.0, the frame keyword will be required for HEALPix maps. "
                         "Defaulting to ICRS",
                         category=DeprecationWarning,
                     )

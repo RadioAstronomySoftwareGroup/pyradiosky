@@ -2041,10 +2041,16 @@ def test_order_healpix_to_sky(healpix_data, hpx_order):
     hmap_orig = np.zeros_like(inds)
     hmap_orig[healpix_data["ipix_disc"]] = healpix_data["npix"] - 1
     hmap_orig = np.repeat(hmap_orig[None, :], 10, axis=0)
-    with pytest.warns(
-        DeprecationWarning,
-        match="This function is deprecated, use `SkyModel.read_skyh5` or `SkyModel.read_healpix_hdf5` instead.",
-    ):
+
+    warn_msg = [
+        "This function is deprecated, use `SkyModel.read_skyh5` or `SkyModel.read_healpix_hdf5` instead.",
+        "In version 0.3.0, the frame keyword will be required for HEALPix maps.",
+    ]
+    # the none option doesn't issue the frame warning so drop it
+    if hpx_order == "none":
+        del warn_msg[-1]
+
+    with uvtest.check_warnings(DeprecationWarning, match=warn_msg):
         if hpx_order == "none":
             with pytest.raises(ValueError, match="order must be 'nested' or 'ring'"):
                 sky = skymodel.healpix_to_sky(
