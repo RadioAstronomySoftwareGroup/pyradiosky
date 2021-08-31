@@ -1080,6 +1080,8 @@ class SkyModel(UVBase):
     def healpix_interp_transform(
         self,
         frame,
+        full_sky=False,
+        inplace=True,
         run_check=True,
         check_extra=True,
         run_check_acceptability=True,
@@ -1106,6 +1108,12 @@ class SkyModel(UVBase):
         frame : str, `BaseCoordinateFrame` class or instance.
             The frame to transform this coordinate into.
             Currently frame must be one of ["galactic", "icrs"].
+        full_sky : bool
+            When True returns a full sky catalog even when some pixels are zero.
+            Defaults to False.
+        inplace : bool
+            Option to do the change in place on the object rather than return a new
+            object. Default to True
         run_check : bool
             Option to check for the existence and proper shapes of parameters
             after downselecting data on this object (the default is True,
@@ -1118,7 +1126,12 @@ class SkyModel(UVBase):
             downselecting data on this object (the default is True, meaning the
             acceptable range check will be done).
         """
-        if self.component_type != "healpix":
+        if inplace:
+            this = self
+        else:
+            this = self.copy()
+
+        if this.component_type != "healpix":
             raise ValueError(
                 "Healpix frame interpolation is not valid for point source catalogs."
             )
@@ -1129,13 +1142,13 @@ class SkyModel(UVBase):
                 "The astropy-healpix module must be installed to use HEALPix methods"
             ) from e
 
-        if np.any(self.stokes[1:] != units.Quantity(0, unit=self.stokes.unit)):
+        if np.any(this.stokes[1:] != units.Quantity(0, unit=this.stokes.unit)):
             raise NotImplementedError(
                 "Healpix map transformations are currently not implemented for catalogs "
                 "with polarization information."
             )
         #  quickly check the validity of the transformation using a dummy SkyCoord object.
-        coords = SkyCoord(0, 0, unit="rad", frame=self.frame)
+        coords = SkyCoord(0, 0, unit="rad", frame=this.frame)
 
         # we will need the starting frame for some interpolation later
         old_frame = coords.frame
@@ -1151,13 +1164,13 @@ class SkyModel(UVBase):
             )
 
         hp_obj_new = astropy_healpix.HEALPix(
-            nside=self.nside,
-            order=self.hpx_order,
+            nside=this.nside,
+            order=this.hpx_order,
             frame=frame,
         )
         hp_obj_old = astropy_healpix.HEALPix(
-            nside=self.nside,
-            order=self.hpx_order,
+            nside=this.nside,
+            order=this.hpx_order,
             frame=old_frame,
         )
 
@@ -1165,7 +1178,7 @@ class SkyModel(UVBase):
         # array will have. Initialize a full healpix map, then we will downselect
         # later to only valid pixels.
         out_stokes = units.Quantity(
-            np.zeros((4, self.Nfreqs, hp_obj_new.npix)), unit=self.stokes.unit
+            np.zeros((4, this.Nfreqs, hp_obj_new.npix)), unit=this.stokes.unit
         )
         # Need the coordinates of the pixel centers in the new frame
         # then we will use these to interpolate for each freq/stokes
@@ -1176,15 +1189,15 @@ class SkyModel(UVBase):
             if stokes_ind > 0:
                 continue
 
-            for freq_ind in range(self.Nfreqs):
+            for freq_ind in range(this.Nfreqs):
                 masked_old_frame = np.ma.zeros(hp_obj_new.npix).astype(
-                    self.stokes.dtype
+                    this.stokes.dtype
                 )
                 # Default every pixel to masked, then unmask ones we have data for
                 masked_old_frame.mask = np.ones(masked_old_frame.size).astype(bool)
-                masked_old_frame.mask[self.hpx_inds] = False
+                masked_old_frame.mask[this.hpx_inds] = False
 
-                masked_old_frame[self.hpx_inds] = self.stokes[
+                masked_old_frame[this.hpx_inds] = this.stokes[
                     stokes_ind, freq_ind
                 ].value
 
@@ -1195,25 +1208,29 @@ class SkyModel(UVBase):
 
                 out_stokes[stokes_ind, freq_ind] = units.Quantity(
                     masked_new_frame.data,
-                    unit=self.stokes.unit,
+                    unit=this.stokes.unit,
                 )
-
-        # Each frequency/stokes combination should have the same input pixels
-        # and rotations, therefore the output mask should be equivalent.
-        self.hpx_inds = np.nonzero(~masked_new_frame.mask)[0]
-        self.stokes = out_stokes[:, :, self.hpx_inds]
+        if not full_sky:
+            # Each frequency/stokes combination should have the same input pixels
+            # and rotations, therefore the output mask should be equivalent.
+            this.hpx_inds = np.nonzero(~masked_new_frame.mask)[0]
+        else:
+            this.hpx_inds = np.arange(hp_obj_new.npix)
+        this.stokes = out_stokes[:, :, this.hpx_inds]
         # the number of components can change when making this transformation!
-        self.Ncomponents = self.stokes.shape[2]
+        this.Ncomponents = this.stokes.shape[2]
 
-        self._frame_inst = frame
-        self._frame.value = frame.name
+        this._frame_inst = frame
+        this._frame.value = frame.name
         # recalculate the coherency now that we are in the new frame
-        self.coherency_radec = skyutils.stokes_to_coherency(self.stokes)
+        this.coherency_radec = skyutils.stokes_to_coherency(this.stokes)
 
         if run_check:
-            self.check(
+            this.check(
                 check_extra=check_extra, run_check_acceptability=run_check_acceptability
             )
+        if not inplace:
+            return this
 
         return
 

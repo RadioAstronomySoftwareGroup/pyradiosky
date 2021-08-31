@@ -3758,6 +3758,15 @@ def test_skymodel_transform_healpix(healpix_gsm_galactic, healpix_gsm_icrs):
     assert sky_obj == healpix_gsm_icrs
 
 
+def test_skymodel_transform_healpix_not_inplace(healpix_gsm_galactic, healpix_gsm_icrs):
+    pytest.importorskip("astropy_healpix")
+    sky_obj = healpix_gsm_galactic
+    new_obj = sky_obj.healpix_interp_transform("icrs", inplace=False)
+
+    assert new_obj != sky_obj
+    assert new_obj == healpix_gsm_icrs
+
+
 def test_skymodel_healpix_transform_unsupported_frame(healpix_gsm_galactic):
     with pytest.raises(
         ValueError, match="Supplied frame GCRS is not supported at this time."
@@ -3792,6 +3801,25 @@ def test_healpix_transform_polarized_error(healpix_gsm_galactic):
         match="Healpix map transformations are currently not implemented for",
     ):
         healpix_gsm_galactic.healpix_interp_transform("ICRS")
+
+
+def test_healpix_transform_full_sky(healpix_disk_new):
+    astropy_healpix = pytest.importorskip("astropy_healpix")
+    hp_obj = astropy_healpix.HEALPix(
+        nside=healpix_disk_new.nside,
+        order=healpix_disk_new.hpx_order,
+        frame=healpix_disk_new._frame_inst,
+    )
+
+    # randomly get rid of half the data
+    healpix_disk_new.select(
+        component_inds=np.arange(healpix_disk_new.Ncomponents)[::2],
+    )
+    assert healpix_disk_new.Ncomponents != hp_obj.npix
+
+    healpix_disk_new.healpix_interp_transform("galactic", full_sky=True)
+    # make sure we got a full sky map back
+    assert healpix_disk_new.Ncomponents == hp_obj.npix
 
 
 def test_old_skyh5_reading_ra_dec():
