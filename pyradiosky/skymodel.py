@@ -1053,7 +1053,9 @@ class SkyModel(UVBase):
             raise ValueError(
                 "Direct coordinate transformation between frames is not valid"
                 " for `healpix` type catalogs. Please use the `healpix_interp_transform` "
-                "to transform to a new frame and interpolate to the new pixel centers."
+                "to transform to a new frame and interpolate to the new pixel centers. "
+                "Alternatively, you can call `healpix_to_point` to convert the healpix map "
+                "to a point source catalog before calling this function."
             )
         # let astropy coordinates do the checking for correctness on frames first
         # this is a little cheaty since it will convert to frames we do not yet
