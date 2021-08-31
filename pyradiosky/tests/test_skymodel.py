@@ -285,7 +285,7 @@ def assign_hpx_data():
     del sky
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def healpix_gsm_galactic():
     pytest.importorskip("astropy_healpix")
     sky = SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "gsm_galactic.skyh5"))
@@ -295,7 +295,7 @@ def healpix_gsm_galactic():
     del sky
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def healpix_gsm_icrs():
     pytest.importorskip("astropy_healpix")
     sky = SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "gsm_icrs.skyh5"))
