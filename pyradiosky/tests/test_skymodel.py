@@ -4,9 +4,9 @@
 
 import os
 import re
+import copy
 import fileinput
 
-import copy
 import h5py
 import pytest
 import scipy.io

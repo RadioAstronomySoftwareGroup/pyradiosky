@@ -142,7 +142,7 @@ class SkyModel(UVBase):
         source latitude in Galactic coordinates, shape (Ncomponents,).
     frame : str
         Name of coordinates frame of source positions.
-        If ra/dec or l/b are provided, this will be set to `icrs` or `galactic` by default.
+        If ra/dec or gl/gb are provided, this will be set to `icrs` or `galactic` by default.
         Must be interpretable by `astropy.coordinates.frame_transform_graph.lookup_name()`.
         Required if keywords `lon` and `lat` are used.
     stokes : :class:`astropy.Quantity` or array_like of float (Deprecated)
@@ -1622,7 +1622,7 @@ class SkyModel(UVBase):
                 # but the instance has been destroyed somehow.
                 # Use the name to rebuild the instance
 
-                # easiest way to do frame cheking is through making a dummy skycoord
+                # easiest way to do frame checking is through making a dummy skycoord
                 coords = SkyCoord(0, 0, unit="deg", frame=self.frame)
 
                 frame = coords.frame
@@ -1631,7 +1631,7 @@ class SkyModel(UVBase):
                 # use the frame associated with the object already
                 frame = sky._frame_inst
         else:
-            # easiest way to do frame cheking is through making a dummy skycoord
+            # easiest way to do frame checking is through making a dummy skycoord
             coords = SkyCoord(0, 0, unit="deg", frame=frame)
 
             frame = coords.frame
@@ -3137,7 +3137,7 @@ class SkyModel(UVBase):
 
                 if header["component_type"][()].tobytes().decode("utf-8") == "healpix":
                     # we can skip special handling for lon/lat for healpix models
-                    # these parameters are no long needed in healpix
+                    # these parameters are no longer needed in healpix
                     if parname in ["lon", "lat", "ra", "dec"]:
                         continue
 
