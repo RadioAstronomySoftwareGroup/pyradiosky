@@ -2765,12 +2765,16 @@ class SkyModel(UVBase):
             lat_rad = np.radians(latitude_deg)
             buff = horizon_buffer
 
-            tans = np.tan(lat_rad) * np.tan(skyobj.lat.rad)
+            lon, lat = skyobj.get_lon_lat()
+
+            tans = np.tan(lat_rad) * np.tan(lat.rad)
             nonrising = tans < -1
 
             comp_inds_to_keep = np.nonzero(~nonrising)[0]
             skyobj.select(component_inds=comp_inds_to_keep, run_check=False)
             tans = tans[~nonrising]
+
+            lon, lat = skyobj.get_lon_lat()
 
             with warnings.catch_warnings():
                 warnings.filterwarnings(
@@ -2778,8 +2782,8 @@ class SkyModel(UVBase):
                     message="invalid value encountered",
                     category=RuntimeWarning,
                 )
-                rise_lst = skyobj.lon.rad - np.arccos((-1) * tans) - buff
-                set_lst = skyobj.lon.rad + np.arccos((-1) * tans) + buff
+                rise_lst = lon.rad - np.arccos((-1) * tans) - buff
+                set_lst = lon.rad + np.arccos((-1) * tans) + buff
 
                 rise_lst[rise_lst < 0] += 2 * np.pi
                 set_lst[set_lst < 0] += 2 * np.pi
