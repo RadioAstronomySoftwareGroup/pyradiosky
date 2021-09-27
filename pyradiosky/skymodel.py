@@ -24,6 +24,7 @@ from astropy.time import Time
 import astropy.units as units
 from astropy.units import Quantity
 from astropy.io import votable
+from astropy.table import Table
 
 from pyuvdata.uvbase import UVBase
 from pyuvdata.parameter import UVParameter
@@ -3428,10 +3429,9 @@ class SkyModel(UVBase):
         )
         return self
 
-    def read_votable_catalog(
+    def _extract_astropy_table_catalog(
         self,
-        votable_file,
-        table_name,
+        astropy_table,
         id_column,
         ra_column,
         dec_column,
@@ -3440,6 +3440,7 @@ class SkyModel(UVBase):
         freq_array=None,
         spectral_index_column=None,
         flux_error_columns=None,
+        extended_model_group_column=None,
         source_select_kwds=None,
         history="",
         run_check=True,
@@ -3447,17 +3448,15 @@ class SkyModel(UVBase):
         run_check_acceptability=True,
     ):
         """
-        Read a votable catalog file into this object.
+        Read a fits catalog file into this object.
 
         This reader uses the units in the file, the units should be specified
         following the VOTable conventions.
 
         Parameters
         ----------
-        votable_file : str
-            Path to votable catalog file.
-        table_name : str
-            Part of expected table name. Should match only one table name in votable_file.
+        astropy_table : astropy Table object
+            astropy table object to extract.
         id_column : str
             Part of expected ID column. Should match only one column in the table.
         ra_column : str
@@ -3476,6 +3475,9 @@ class SkyModel(UVBase):
         flux_error_columns : str or list of str
             Part of expected Flux error column(s). Each one should match only one
             column in the table.
+        extended_model_group_column : str
+            Part of expected column containing an identifier that groups components of
+            an extended source model.
         return_table : bool, optional
             Whether to return the astropy table instead of a list of Source objects.
         source_select_kwds : dict, optional
@@ -3504,47 +3506,17 @@ class SkyModel(UVBase):
             acceptable range check will be done).
 
         """
-        parsed_vo = votable.parse(votable_file)
-
-        tables = list(parsed_vo.iter_tables())
-        table_ids = [table._ID for table in tables]
-        table_names = [table.name for table in tables]
-
-        if None not in table_ids:
-            try:
-                table_name_use = _get_matching_fields(table_name, table_ids)
-                table_match = [
-                    table for table in tables if table._ID == table_name_use
-                ][0]
-            except ValueError:
-                table_name_use = _get_matching_fields(table_name, table_names)
-                table_match = [
-                    table for table in tables if table.name == table_name_use
-                ][0]
-        else:
-            warnings.warn(
-                f"File {votable_file} contains tables with no name or ID, Support for "
-                "such files is deprecated and will be removed in version 0.2.0.",
-                category=DeprecationWarning,
-            )
-            # Find correct table using the field names
-            tables_match = []
-            for table in tables:
-                id_col_use = _get_matching_fields(
-                    id_column, table.to_table().colnames, brittle=False
-                )
-                if id_col_use is not None:
-                    tables_match.append(table)
-            if len(tables_match) > 1:
-                raise ValueError("More than one matching table.")
-            else:
-                table_match = tables_match[0]
-
-        # Convert to astropy Table
-        astropy_table = table_match.to_table()
-
         # get ID column
         id_col_use = _get_matching_fields(id_column, astropy_table.colnames)
+        names = np.asarray(astropy_table[id_col_use].data.data).astype("str")
+
+        if extended_model_group_column is not None:
+            ext_model_use = _get_matching_fields(
+                extended_model_group_column, astropy_table.colnames
+            )
+            ext_model = np.asarray(astropy_table[ext_model_use].data.data).astype("str")
+        else:
+            ext_model = None
 
         # get RA & Dec columns, if multiple matches, exclude VizieR calculated columns
         # which start with an underscore
@@ -3643,7 +3615,7 @@ class SkyModel(UVBase):
             stokes_error = None
 
         self.__init__(
-            name=astropy_table[id_col_use].data.data.astype("str"),
+            name=names,
             ra=Longitude(astropy_table[ra_col_use].quantity),
             dec=Latitude(astropy_table[dec_col_use].quantity),
             stokes=stokes,
@@ -3652,6 +3624,7 @@ class SkyModel(UVBase):
             reference_frequency=reference_frequency,
             spectral_index=spectral_index,
             stokes_error=stokes_error,
+            extended_model_group=ext_model,
             history=history,
         )
 
@@ -3664,6 +3637,258 @@ class SkyModel(UVBase):
             )
 
         return
+
+    def read_fits_catalog(
+        self,
+        fits_file,
+        id_column,
+        ra_column,
+        dec_column,
+        flux_columns,
+        reference_frequency=None,
+        freq_array=None,
+        spectral_index_column=None,
+        flux_error_columns=None,
+        extended_model_group_column=None,
+        source_select_kwds=None,
+        history="",
+        run_check=True,
+        check_extra=True,
+        run_check_acceptability=True,
+    ):
+        """
+        Read a fits catalog file into this object.
+
+        This reader uses the units in the file, the units should be specified
+        following the VOTable conventions.
+
+        Parameters
+        ----------
+        fits_file : str
+            Path to fits catalog file.
+        id_column : str
+            Part of expected ID column. Should match only one column in the table.
+        ra_column : str
+            Part of expected RA column. Should match only one column in the table.
+        dec_column : str
+            Part of expected Dec column. Should match only one column in the table.
+        flux_columns : str or list of str
+            Part of expected Flux column(s). Each one should match only one column in the table.
+        reference_frequency : :class:`astropy.Quantity`
+            Reference frequency for flux values, assumed to be the same value for all rows.
+        freq_array : :class:`astropy.Quantity`
+            Frequencies corresponding to flux_columns (should be same length).
+            Required for multiple flux columns.
+        spectral_index_column : str
+            Part of expected spectral index column. Should match only one column in the table.
+        flux_error_columns : str or list of str
+            Part of expected Flux error column(s). Each one should match only one
+            column in the table.
+        extended_model_group_column : str
+            Part of expected column containing an identifier that groups components of
+            an extended source model.
+        return_table : bool, optional
+            Whether to return the astropy table instead of a list of Source objects.
+        source_select_kwds : dict, optional
+            Dictionary of keywords for source selection Valid options:
+
+            * `lst_array`: For coarse RA horizon cuts, lsts used in the simulation [radians]
+            * `latitude_deg`: Latitude of telescope in degrees. Used for declination coarse
+               horizon cut.
+            * `horizon_buffer`: Angle (float, in radians) of buffer for coarse horizon cut.
+              Default is about 10 minutes of sky rotation. (See caveats in
+              :func:`~skymodel.SkyModel.source_cuts` docstring)
+            * `min_flux`: Minimum stokes I flux to select [Jy]
+            * `max_flux`: Maximum stokes I flux to select [Jy]
+        history : str
+            History to add to object.
+        run_check : bool
+            Option to check for the existence and proper shapes of parameters
+            after downselecting data on this object (the default is True,
+            meaning the check will be run).
+        check_extra : bool
+            Option to check optional parameters as well as required ones (the
+            default is True, meaning the optional parameters will be checked).
+        run_check_acceptability : bool
+            Option to check acceptable range of the values of parameters after
+            downselecting data on this object (the default is True, meaning the
+            acceptable range check will be done).
+
+        """
+        astropy_table = Table.read(fits_file)
+
+        self._extract_astropy_table_catalog(
+            astropy_table,
+            id_column,
+            ra_column,
+            dec_column,
+            flux_columns,
+            reference_frequency=reference_frequency,
+            freq_array=freq_array,
+            spectral_index_column=spectral_index_column,
+            flux_error_columns=flux_error_columns,
+            extended_model_group_column=extended_model_group_column,
+            source_select_kwds=source_select_kwds,
+            history=history,
+            run_check=run_check,
+            check_extra=check_extra,
+            run_check_acceptability=run_check_acceptability,
+        )
+
+    @classmethod
+    def from_fits_catalog(cls, fits_file, *args, **kwargs):
+        """Create a :class:`SkyModel` from a FITS catalog.
+
+        Parameters
+        ----------
+        kwargs :
+            All parameters are sent through to :meth:`read_votable_catalog`.
+
+        Returns
+        -------
+        sky_model : :class:`SkyModel`
+            The object instantiated using the votable catalog.
+        """
+        self = cls()
+        self.read_fits_catalog(fits_file, *args, **kwargs)
+        return self
+
+    def read_votable_catalog(
+        self,
+        votable_file,
+        table_name,
+        id_column,
+        ra_column,
+        dec_column,
+        flux_columns,
+        reference_frequency=None,
+        freq_array=None,
+        spectral_index_column=None,
+        flux_error_columns=None,
+        extended_model_group_column=None,
+        source_select_kwds=None,
+        history="",
+        run_check=True,
+        check_extra=True,
+        run_check_acceptability=True,
+    ):
+        """
+        Read a votable catalog file into this object.
+
+        This reader uses the units in the file, the units should be specified
+        following the VOTable conventions.
+
+        Parameters
+        ----------
+        votable_file : str
+            Path to votable catalog file.
+        table_name : str
+            Part of expected table name. Should match only one table name in votable_file.
+        id_column : str
+            Part of expected ID column. Should match only one column in the table.
+        ra_column : str
+            Part of expected RA column. Should match only one column in the table.
+        dec_column : str
+            Part of expected Dec column. Should match only one column in the table.
+        flux_columns : str or list of str
+            Part of expected Flux column(s). Each one should match only one column in the table.
+        reference_frequency : :class:`astropy.Quantity`
+            Reference frequency for flux values, assumed to be the same value for all rows.
+        freq_array : :class:`astropy.Quantity`
+            Frequencies corresponding to flux_columns (should be same length).
+            Required for multiple flux columns.
+        spectral_index_column : str
+            Part of expected spectral index column. Should match only one column in the table.
+        flux_error_columns : str or list of str
+            Part of expected Flux error column(s). Each one should match only one
+            column in the table.
+        extended_model_group_column : str
+            Part of expected column containing an identifier that groups components of
+            an extended source model.
+        return_table : bool, optional
+            Whether to return the astropy table instead of a list of Source objects.
+        source_select_kwds : dict, optional
+            Dictionary of keywords for source selection Valid options:
+
+            * `lst_array`: For coarse RA horizon cuts, lsts used in the simulation [radians]
+            * `latitude_deg`: Latitude of telescope in degrees. Used for declination coarse
+               horizon cut.
+            * `horizon_buffer`: Angle (float, in radians) of buffer for coarse horizon cut.
+              Default is about 10 minutes of sky rotation. (See caveats in
+              :func:`~skymodel.SkyModel.source_cuts` docstring)
+            * `min_flux`: Minimum stokes I flux to select [Jy]
+            * `max_flux`: Maximum stokes I flux to select [Jy]
+        history : str
+            History to add to object.
+        run_check : bool
+            Option to check for the existence and proper shapes of parameters
+            after downselecting data on this object (the default is True,
+            meaning the check will be run).
+        check_extra : bool
+            Option to check optional parameters as well as required ones (the
+            default is True, meaning the optional parameters will be checked).
+        run_check_acceptability : bool
+            Option to check acceptable range of the values of parameters after
+            downselecting data on this object (the default is True, meaning the
+            acceptable range check will be done).
+
+        """
+        parsed_vo = votable.parse(votable_file)
+
+        tables = list(parsed_vo.iter_tables())
+        table_ids = [table._ID for table in tables]
+        table_names = [table.name for table in tables]
+
+        if None not in table_ids:
+            try:
+                table_name_use = _get_matching_fields(table_name, table_ids)
+                table_match = [
+                    table for table in tables if table._ID == table_name_use
+                ][0]
+            except ValueError:
+                table_name_use = _get_matching_fields(table_name, table_names)
+                table_match = [
+                    table for table in tables if table.name == table_name_use
+                ][0]
+        else:
+            warnings.warn(
+                f"File {votable_file} contains tables with no name or ID, Support for "
+                "such files is deprecated and will be removed in version 0.2.0.",
+                category=DeprecationWarning,
+            )
+            # Find correct table using the field names
+            tables_match = []
+            for table in tables:
+                id_col_use = _get_matching_fields(
+                    id_column, table.to_table().colnames, brittle=False
+                )
+                if id_col_use is not None:
+                    tables_match.append(table)
+            if len(tables_match) > 1:
+                raise ValueError("More than one matching table.")
+            else:
+                table_match = tables_match[0]
+
+        # Convert to astropy Table
+        astropy_table = table_match.to_table()
+
+        self._extract_astropy_table_catalog(
+            astropy_table,
+            id_column,
+            ra_column,
+            dec_column,
+            flux_columns,
+            reference_frequency=reference_frequency,
+            freq_array=freq_array,
+            spectral_index_column=spectral_index_column,
+            flux_error_columns=flux_error_columns,
+            extended_model_group_column=extended_model_group_column,
+            source_select_kwds=source_select_kwds,
+            history=history,
+            run_check=run_check,
+            check_extra=check_extra,
+            run_check_acceptability=run_check_acceptability,
+        )
 
     @classmethod
     def from_votable_catalog(cls, votable_file, *args, **kwargs):
@@ -3775,10 +4000,10 @@ class SkyModel(UVBase):
             ]
             freq_array = [76, 84, 92, 99, 107, 115, 122, 130, 143, 151, 158, 166,
                           174, 181, 189, 197, 204, 212, 220, 227]
+            # fmt: on
             freq_array = np.array(freq_array) * 1e6 * units.Hz
             reference_frequency = None
             spectral_index_column = None
-            # fmt: on
 
         if not with_error:
             flux_error_columns = None
