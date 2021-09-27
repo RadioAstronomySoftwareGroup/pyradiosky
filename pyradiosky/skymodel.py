@@ -4046,6 +4046,156 @@ class SkyModel(UVBase):
         self.read_gleam_catalog(gleam_file, **kwargs)
         return self
 
+    def read_lobes_catalog(
+        self,
+        lobes_file,
+        spectral_type="subband",
+        source_select_kwds=None,
+        with_error=False,
+        run_check=True,
+        check_extra=True,
+        run_check_acceptability=True,
+    ):
+        """
+        Read the LoBES fits catalog file into this object.
+
+        Tested on: LoBES preview file, C. Lynch personal communication
+
+        Parameters
+        ----------
+        lobes_file : str
+            Path to LoBES votable catalog file.
+        spectral_type : str
+            One of 'flat' or 'subband'. If set to 'flat', the
+            wide band integrated flux will be used.
+        source_select_kwds : dict, optional
+            Dictionary of keywords for source selection Valid options:
+
+            * `lst_array`: For coarse RA horizon cuts, lsts used in the simulation [radians]
+            * `latitude_deg`: Latitude of telescope in degrees. Used for declination coarse
+               horizon cut.
+            * `horizon_buffer`: Angle (float, in radians) of buffer for coarse horizon cut.
+              Default is about 10 minutes of sky rotation. (See caveats in
+              :func:`array_to_skymodel` docstring)
+            * `min_flux`: Minimum stokes I flux to select [Jy]
+            * `max_flux`: Maximum stokes I flux to select [Jy]
+        with_error : bool
+            Option to include the errors on the stokes array on the object in the
+            `stokes_error` parameter. Note that the values assigned to this parameter
+            are the flux fitting errors.
+        run_check : bool
+            Option to check for the existence and proper shapes of parameters
+            after downselecting data on this object (the default is True,
+            meaning the check will be run).
+        check_extra : bool
+            Option to check optional parameters as well as required ones (the
+            default is True, meaning the optional parameters will be checked).
+        run_check_acceptability : bool
+            Option to check acceptable range of the values of parameters after
+            downselecting data on this object (the default is True, meaning the
+            acceptable range check will be done).
+
+        """
+        spec_type_list = ["flat", "subband"]
+        if spectral_type not in spec_type_list:
+            raise ValueError(
+                f"spectral_type {spectral_type} is not an allowed type. "
+                f"Allowed types are: {spec_type_list}"
+            )
+
+        if spectral_type == "flat":
+            flux_columns = "INT_WIDE"
+            flux_error_columns = "ERR_INT_WIDE"
+            reference_frequency = 200e6 * units.Hz
+            freq_array = None
+            spectral_index_column = None
+        else:
+            # fmt: off
+            flux_columns = [
+                "INT_FLX107", "INT_FLX115", "INT_FLX122", "INT_FLX130",
+                "INT_FLX143", "INT_FLX151", "INT_FLX158", "INT_FLX166",
+                "INT_FLX174", "INT_FLX181", "INT_FLX189", "INT_FLX197",
+                "INT_FLX204", "INT_FLX212", "INT_FLX220", "INT_FLX227"
+            ]
+            flux_error_columns = [
+                "ERR_INT_FLX107", "ERR_INT_FLX115", "ERR_INT_FLX122", "ERR_INT_FLX130",
+                "ERR_INT_FLX143", "ERR_INT_FLX151", "ERR_INT_FLX158", "ERR_INT_FLX166",
+                "ERR_INT_FLX174", "ERR_INT_FLX181", "ERR_INT_FLX189", "ERR_INT_FLX197",
+                "ERR_INT_FLX204", "ERR_INT_FLX212", "ERR_INT_FLX220", "ERR_INT_FLX227"
+            ]
+            freq_array = [
+                107, 115, 122, 130, 143, 151, 158, 166, 174, 181, 189, 197, 204, 212,
+                220, 227
+            ]
+            # fmt: on
+            freq_array = np.array(freq_array) * 1e6 * units.Hz
+            reference_frequency = None
+            spectral_index_column = None
+
+        if not with_error:
+            flux_error_columns = None
+
+        self.read_fits_catalog(
+            lobes_file,
+            "NAME",
+            "RA",
+            "DEC",
+            flux_columns=flux_columns,
+            freq_array=freq_array,
+            reference_frequency=reference_frequency,
+            spectral_index_column=spectral_index_column,
+            flux_error_columns=flux_error_columns,
+            extended_model_group_column="UNQ_SOURCE_ID",
+            source_select_kwds=source_select_kwds,
+        )
+
+        # The LoBES catalog does have a unique identifer for each source, but they are
+        # integers rather than strings. However, the first 14 characters of the
+        # component name is always the source name, so extract those for the extended
+        # model group if there are multiple components for a source.
+        # single component sources will have an empty string for extended_model_group
+        ext_model_name = np.full((self.Ncomponents), "", dtype="<U14")
+
+        # count all the instances of each source ID
+        source_ids = self.extended_model_group.astype(int)
+        counts = np.bincount(source_ids)
+        multiple_src_ids = (np.arange(counts.size))[np.nonzero(counts > 1)]
+
+        for src_id in multiple_src_ids:
+            this_inds = np.nonzero(source_ids == src_id)[0]
+            this_names_arr = np.asarray([name[:14] for name in self.name[this_inds]])
+            this_name = this_names_arr[0]
+            assert np.all(this_names_arr == this_name)
+            if this_name in ext_model_name:
+                this_name += "_" + str(src_id)
+            ext_model_name[this_inds] = this_name
+
+        self.extended_model_group = ext_model_name
+
+        if run_check:
+            self.check(
+                check_extra=check_extra, run_check_acceptability=run_check_acceptability
+            )
+        return
+
+    @classmethod
+    def from_lobes_catalog(cls, lobes_file, **kwargs):
+        """Create a :class:`SkyModel` from the LoBES catalog.
+
+        Parameters
+        ----------
+        kwargs :
+            All parameters are sent through to :meth:`read_lobes_catalog`.
+
+        Returns
+        -------
+        sky_model : :class:`SkyModel`
+            The object instantiated using the LoBES catalog.
+        """
+        self = cls()
+        self.read_lobes_catalog(lobes_file, **kwargs)
+        return self
+
     def read_text_catalog(
         self,
         catalog_csv,
