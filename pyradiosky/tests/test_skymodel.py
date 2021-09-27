@@ -2445,6 +2445,15 @@ def test_select_none():
     assert skyobj2 == skyobj
 
 
+def test_source_cut_healpix(healpix_disk_new, time_location):
+    skyobj = healpix_disk_new
+
+    _, array_location = time_location
+
+    with uvtest.check_warnings(None):
+        skyobj.source_cuts(latitude_deg=array_location.lat.deg)
+
+
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 @pytest.mark.filterwarnings("ignore:The reference_frequency is aliased as `frequency`")
 @pytest.mark.parametrize(
