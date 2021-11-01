@@ -2626,9 +2626,9 @@ class SkyModel(UVBase):
             lon = 0, and the lons kept on the object will run from the larger value,
             through 0, and end at the smaller value.
         min_brightness : :class:`astropy.Quantity`
-            Minimum brightness in stokes I to keep on object.
+            Minimum brightness in stokes I to keep on object (implemented as a >= cut).
         max_flux : :class:`astropy.Quantity`
-            Maximum brightness in stokes I to keep on object.
+            Maximum brightness in stokes I to keep on object (implemented as a <= cut).
         freq_range : :class:`astropy.Quantity`
             Frequency range over which the min and max flux tests should be performed.
             Must be length 2. If None, use the range over which the object is defined.
@@ -2672,15 +2672,14 @@ class SkyModel(UVBase):
                     "lat_range must be 2 element range with the second component "
                     "larger than the first."
                 )
-            component_inds = np.nonzero(
-                np.logical_and(
-                    skyobj.lat[component_inds] >= lat_range[0],
-                    skyobj.lat[component_inds] <= lat_range[1],
-                )
-            )[0]
-
-        if np.asarray(component_inds).size == 0:
-            raise ValueError("Select would result in an empty object.")
+            component_inds = component_inds[
+                np.nonzero(
+                    np.logical_and(
+                        skyobj.lat[component_inds] >= lat_range[0],
+                        skyobj.lat[component_inds] <= lat_range[1],
+                    )
+                )[0]
+            ]
 
         if lon_range is not None:
             if not isinstance(lat_range, Longitude):
@@ -2691,29 +2690,32 @@ class SkyModel(UVBase):
                 # we're wrapping around longitude = 2*pi = 0
                 lon_range_1 = Longitude([lon_range[0], 2 * np.pi * units.rad])
                 lon_range_2 = Longitude([0 * units.rad, lon_range[1]])
-                component_inds1 = np.nonzero(
-                    np.logical_and(
-                        skyobj.lon[component_inds] >= lon_range_1[0],
-                        skyobj.lon[component_inds] <= lon_range_1[1],
-                    )
-                )[0]
-                component_inds2 = np.nonzero(
-                    np.logical_and(
-                        skyobj.lon[component_inds] >= lon_range_2[0],
-                        skyobj.lon[component_inds] <= lon_range_2[1],
-                    )
-                )[0]
+                component_inds1 = component_inds = component_inds[
+                    np.nonzero(
+                        np.logical_and(
+                            skyobj.lon[component_inds] >= lon_range_1[0],
+                            skyobj.lon[component_inds] <= lon_range_1[1],
+                        )
+                    )[0]
+                ]
+                component_inds2 = component_inds = component_inds[
+                    np.nonzero(
+                        np.logical_and(
+                            skyobj.lon[component_inds] >= lon_range_2[0],
+                            skyobj.lon[component_inds] <= lon_range_2[1],
+                        )
+                    )[0]
+                ]
                 component_inds = np.union1d(component_inds1, component_inds2)
             else:
-                component_inds = np.nonzero(
-                    np.logical_and(
-                        skyobj.lon[component_inds] >= lon_range[0],
-                        skyobj.lon[component_inds] <= lon_range[1],
-                    )
-                )[0]
-
-        if np.asarray(component_inds).size == 0:
-            raise ValueError("Select would result in an empty object.")
+                component_inds = component_inds = component_inds[
+                    np.nonzero(
+                        np.logical_and(
+                            skyobj.lon[component_inds] >= lon_range[0],
+                            skyobj.lon[component_inds] <= lon_range[1],
+                        )
+                    )[0]
+                ]
 
         if flux_freq_range is not None:
             if not np.atleast_1d(flux_freq_range).size == 2:
@@ -2724,18 +2726,20 @@ class SkyModel(UVBase):
                 raise NotImplementedError(
                     "Flux cuts with spectral index type objects is not supported yet."
                 )
-            freq_inds_use = slice(None)
+            freq_inds_use = None
 
             if skyobj.freq_array is not None:
                 if flux_freq_range is not None:
-                    freqs_inds_use = np.where(
+                    freq_inds_use = np.where(
                         (skyobj.freq_array >= np.min(flux_freq_range))
                         & (skyobj.freq_array <= np.max(flux_freq_range))
                     )[0]
-                    if freqs_inds_use.size == 0:
-                        raise ValueError("No frequencies in flux_freq_range.")
+                    if freq_inds_use.size == 0:
+                        raise ValueError(
+                            "No object frequencies in specified range for flux cuts."
+                        )
                 else:
-                    freqs_inds_use = np.arange(skyobj.Nfreqs)
+                    freq_inds_use = np.arange(skyobj.Nfreqs)
             if min_brightness is not None:
                 if not isinstance(
                     min_brightness, Quantity
@@ -2751,33 +2755,18 @@ class SkyModel(UVBase):
                     assert stokes_use.shape == (skyobj.Nfreqs, component_inds.size)
                 else:
                     # written this way to avoid multi-advanced indexing
-                    print(skyobj.stokes.shape)
-                    stokes_use = skyobj.stokes[0]
-                    print(stokes_use.shape)
-                    print(freqs_inds_use)
-                    print(freqs_inds_use.size)
-                    stokes_use = stokes_use[freq_inds_use]
-                    print(stokes_use.shape)
-                    print(component_inds)
-                    print(component_inds.size)
+                    stokes_use = skyobj.stokes[0][freq_inds_use, :]
                     stokes_use = stokes_use[:, component_inds]
-                    print(stokes_use.shape)
                     assert stokes_use.shape == (
-                        freqs_inds_use.size,
+                        freq_inds_use.size,
                         component_inds.size,
                     )
 
-                print(stokes_use)
-                print(component_inds)
                 component_inds = component_inds[
                     np.nonzero(
                         np.min(stokes_use.value, axis=0) >= min_brightness.value
                     )[0]
                 ]
-                print(component_inds)
-
-            if np.asarray(component_inds).size == 0:
-                raise ValueError("Select would result in an empty object.")
 
             if max_brightness is not None:
                 if not isinstance(
@@ -2794,20 +2783,18 @@ class SkyModel(UVBase):
                     assert stokes_use.shape == (skyobj.Nfreqs, component_inds.size)
                 else:
                     # written this way to avoid multi-advanced indexing
-                    stokes_use = skyobj.stokes[0][freq_inds_use, component_inds]
+                    stokes_use = skyobj.stokes[0][freq_inds_use, :]
+                    stokes_use = stokes_use[:, component_inds]
                     assert stokes_use.shape == (
-                        freqs_inds_use.size,
+                        freq_inds_use.size,
                         component_inds.size,
                     )
 
-                print(stokes_use)
-                print(component_inds)
                 component_inds = component_inds[
                     np.nonzero(
-                        np.min(stokes_use.value, axis=0) <= max_brightness.value,
+                        np.max(stokes_use.value, axis=0) <= max_brightness.value,
                     )[0]
                 ]
-                print(component_inds)
 
         if np.asarray(component_inds).size == 0:
             raise ValueError("Select would result in an empty object.")
@@ -2873,9 +2860,13 @@ class SkyModel(UVBase):
             required buffer should _not_ drift with time since the J2000 epoch.
             The default buffer has been tested around julian date 2457458.0.
         min_flux : Quantity or float
-            Minimum stokes I flux to select on. If not a Quantity, assumed to be in Jy.
+            Minimum stokes I flux to select on (implemented as a strict > cut, so
+            fluxes exactly equal to the min_flux will be cut). If not a Quantity,
+            assumed to be in Jy.
         max_flux : Quantity or float
-            Maximum stokes I flux to select. If not a Quantity, assumed to be in Jy.
+            Maximum stokes I flux to select(implemented as a strict < cut, so
+            fluxes exactly equal to the max_flux will be cut). If not a Quantity,
+            assumed to be in Jy.
         freq_range : :class:`astropy.Quantity`
             Frequency range over which the min and max flux tests should be performed.
             Must be length 2. If None, use the range over which the object is defined.
