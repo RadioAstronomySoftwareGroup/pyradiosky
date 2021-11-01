@@ -131,7 +131,7 @@ class SkyModel(UVBase):
     lon : :class:`astropy.Longitude`
         Source longitude in frame specified by keyword `frame`, shape (Ncomponents,).
     lat : :class:`astropy.Latitude`
-        Source latiitude in frame specified by keyword `frame`, shape (Ncomponents,).
+        Source latitude in frame specified by keyword `frame`, shape (Ncomponents,).
     ra : :class:`astropy.Longitude`
         source RA in J2000 (or ICRS) coordinates, shape (Ncomponents,).
     dec : :class:`astropy.Latitude`
@@ -254,7 +254,10 @@ class SkyModel(UVBase):
             expected_type=str,
         )
 
-        desc = "Longitudes of source component positions. shape (Ncomponents,)"
+        desc = (
+            "Longitudes of source component positions in frame specified by frame "
+            "attribute. shape (Ncomponents,)"
+        )
         self._lon = UVParameter(
             "lon",
             description=desc,
@@ -263,7 +266,10 @@ class SkyModel(UVBase):
             tols=angle_tol,
         )
 
-        desc = "Latitudes of source component positions. shape (Ncomponents,)"
+        desc = (
+            "Latitudes of source component positions in frame specified by frame "
+            "attribute. shape (Ncomponents,)"
+        )
         self._lat = UVParameter(
             "lat",
             description=desc,
@@ -2584,19 +2590,24 @@ class SkyModel(UVBase):
         if not inplace:
             return this
 
+    @units.quantity_input(
+        lat_range=units.rad, lon_range=units.rad, flux_freq_range=units.Hz
+    )
     def select(
         self,
         component_inds=None,
+        lat_range=None,
+        lon_range=None,
+        min_brightness=None,
+        max_brightness=None,
+        flux_freq_range=None,
         inplace=True,
         run_check=True,
         check_extra=True,
         run_check_acceptability=True,
     ):
         """
-        Downselect data to keep on the object along various axes.
-
-        Currently this only supports downselecting based on the component axis,
-        but this will be expanded to support other axes as well.
+        Downselect sources based on various criteria.
 
         The history attribute on the object will be updated to identify the
         operations performed.
@@ -2605,6 +2616,22 @@ class SkyModel(UVBase):
         ----------
         component_inds : array_like of int
             Component indices to keep on the object.
+        lat_range : :class:`astropy.Latitude`
+            Range of Dec or galactic latitude, depending on the object `frame`
+            attribute, to keep on the object, shape (2,).
+        lon_range : :class:`astropy.Longitude`
+            Range of RA or galactic longitude, depending on the object `frame`
+            attribute, to keep on the object, shape (2,). If the second value is
+            smaller than the first, the lons are treated as being wrapped around
+            lon = 0, and the lons kept on the object will run from the larger value,
+            through 0, and end at the smaller value.
+        min_brightness : :class:`astropy.Quantity`
+            Minimum brightness in stokes I to keep on object.
+        max_flux : :class:`astropy.Quantity`
+            Maximum brightness in stokes I to keep on object.
+        freq_range : :class:`astropy.Quantity`
+            Frequency range over which the min and max flux tests should be performed.
+            Must be length 2. If None, use the range over which the object is defined.
         run_check : bool
             Option to check for the existence and proper shapes of parameters
             after downselecting data on this object (the default is True,
@@ -2623,14 +2650,171 @@ class SkyModel(UVBase):
         """
         skyobj = self if inplace else self.copy()
 
-        if component_inds is None:
+        if (
+            component_inds is None
+            and lat_range is None
+            and lon_range is None
+            and min_brightness is None
+            and max_brightness is None
+        ):
             if not inplace:
                 return skyobj
             return
 
-        new_ncomponents = np.asarray(component_inds).size
-        if new_ncomponents == 0:
+        if component_inds is None:
+            component_inds = np.arange(skyobj.Ncomponents)
+
+        if lat_range is not None:
+            if not isinstance(lat_range, Latitude):
+                raise ValueError("lat_range must be an astropy Latitude object.")
+            if np.asarray(lat_range).size != 2 or lat_range[0] >= lat_range[1]:
+                raise ValueError(
+                    "lat_range must be 2 element range with the second component "
+                    "larger than the first."
+                )
+            component_inds = np.nonzero(
+                np.logical_and(
+                    skyobj.lat[component_inds] >= lat_range[0],
+                    skyobj.lat[component_inds] <= lat_range[1],
+                )
+            )[0]
+
+        if np.asarray(component_inds).size == 0:
             raise ValueError("Select would result in an empty object.")
+
+        if lon_range is not None:
+            if not isinstance(lat_range, Longitude):
+                raise ValueError("lon_range must be an astropy Longitude object.")
+            if np.asarray(lon_range).size != 2:
+                raise ValueError("lon_range must be 2 element range.")
+            if lon_range[1] < lon_range[0]:
+                # we're wrapping around longitude = 2*pi = 0
+                lon_range_1 = Longitude([lon_range[0], 2 * np.pi * units.rad])
+                lon_range_2 = Longitude([0 * units.rad, lon_range[1]])
+                component_inds1 = np.nonzero(
+                    np.logical_and(
+                        skyobj.lon[component_inds] >= lon_range_1[0],
+                        skyobj.lon[component_inds] <= lon_range_1[1],
+                    )
+                )[0]
+                component_inds2 = np.nonzero(
+                    np.logical_and(
+                        skyobj.lon[component_inds] >= lon_range_2[0],
+                        skyobj.lon[component_inds] <= lon_range_2[1],
+                    )
+                )[0]
+                component_inds = np.union1d(component_inds1, component_inds2)
+            else:
+                component_inds = np.nonzero(
+                    np.logical_and(
+                        skyobj.lon[component_inds] >= lon_range[0],
+                        skyobj.lon[component_inds] <= lon_range[1],
+                    )
+                )[0]
+
+        if np.asarray(component_inds).size == 0:
+            raise ValueError("Select would result in an empty object.")
+
+        if flux_freq_range is not None:
+            if not np.atleast_1d(flux_freq_range).size == 2:
+                raise ValueError("freq_range must have 2 elements.")
+
+        if min_brightness is not None or max_brightness is not None:
+            if skyobj.spectral_type == "spectral_index":
+                raise NotImplementedError(
+                    "Flux cuts with spectral index type objects is not supported yet."
+                )
+            freq_inds_use = slice(None)
+
+            if skyobj.freq_array is not None:
+                if flux_freq_range is not None:
+                    freqs_inds_use = np.where(
+                        (skyobj.freq_array >= np.min(flux_freq_range))
+                        & (skyobj.freq_array <= np.max(flux_freq_range))
+                    )[0]
+                    if freqs_inds_use.size == 0:
+                        raise ValueError("No frequencies in flux_freq_range.")
+                else:
+                    freqs_inds_use = np.arange(skyobj.Nfreqs)
+            if min_brightness is not None:
+                if not isinstance(
+                    min_brightness, Quantity
+                ) or not min_brightness.unit.is_equivalent(self.stokes.unit):
+                    raise ValueError(
+                        "min_brightness must be a Quantity object with units that can "
+                        f"be converted to {self.stokes.unit}"
+                    )
+                min_brightness = min_brightness.to(skyobj.stokes.unit)
+                if freq_inds_use is None:
+                    # written this way to avoid multi-advanced indexing
+                    stokes_use = skyobj.stokes[0][:, component_inds]
+                    assert stokes_use.shape == (skyobj.Nfreqs, component_inds.size)
+                else:
+                    # written this way to avoid multi-advanced indexing
+                    print(skyobj.stokes.shape)
+                    stokes_use = skyobj.stokes[0]
+                    print(stokes_use.shape)
+                    print(freqs_inds_use)
+                    print(freqs_inds_use.size)
+                    stokes_use = stokes_use[freq_inds_use]
+                    print(stokes_use.shape)
+                    print(component_inds)
+                    print(component_inds.size)
+                    stokes_use = stokes_use[:, component_inds]
+                    print(stokes_use.shape)
+                    assert stokes_use.shape == (
+                        freqs_inds_use.size,
+                        component_inds.size,
+                    )
+
+                print(stokes_use)
+                print(component_inds)
+                component_inds = component_inds[
+                    np.nonzero(
+                        np.min(stokes_use.value, axis=0) >= min_brightness.value
+                    )[0]
+                ]
+                print(component_inds)
+
+            if np.asarray(component_inds).size == 0:
+                raise ValueError("Select would result in an empty object.")
+
+            if max_brightness is not None:
+                if not isinstance(
+                    max_brightness, Quantity
+                ) or not max_brightness.unit.is_equivalent(self.stokes.unit):
+                    raise ValueError(
+                        "max_brightness must be a Quantity object with units that can "
+                        f"be converted to {self.stokes.unit}"
+                    )
+                max_brightness = max_brightness.to(skyobj.stokes.unit)
+                if freq_inds_use is None:
+                    # written this way to avoid multi-advanced indexing
+                    stokes_use = skyobj.stokes[0][:, component_inds]
+                    assert stokes_use.shape == (skyobj.Nfreqs, component_inds.size)
+                else:
+                    # written this way to avoid multi-advanced indexing
+                    stokes_use = skyobj.stokes[0][freq_inds_use, component_inds]
+                    assert stokes_use.shape == (
+                        freqs_inds_use.size,
+                        component_inds.size,
+                    )
+
+                print(stokes_use)
+                print(component_inds)
+                component_inds = component_inds[
+                    np.nonzero(
+                        np.min(stokes_use.value, axis=0) <= max_brightness.value,
+                    )[0]
+                ]
+                print(component_inds)
+
+        if np.asarray(component_inds).size == 0:
+            raise ValueError("Select would result in an empty object.")
+
+        new_ncomponents = np.asarray(component_inds).size
+
+        skyobj.history += "  Downselected to specific components using pyradiosky."
 
         skyobj.Ncomponents = new_ncomponents
         for param in skyobj.ncomponent_length_params:
@@ -2725,41 +2909,15 @@ class SkyModel(UVBase):
                 raise ValueError("freq_range must have 2 elements.")
 
         if min_flux is not None or max_flux is not None:
-            if skyobj.spectral_type == "spectral_index":
-                raise NotImplementedError(
-                    "Flux cuts with spectral index type objects is not supported yet."
-                )
-
             if min_flux is not None and not isinstance(min_flux, Quantity):
-                min_flux = min_flux * units.Jy
+                min_flux *= units.Jy
             if max_flux is not None and not isinstance(max_flux, Quantity):
-                max_flux = max_flux * units.Jy
-
-            freq_inds_use = slice(None)
-
-            if self.freq_array is not None:
-                if freq_range is not None:
-                    freqs_inds_use = np.where(
-                        (skyobj.freq_array >= np.min(freq_range))
-                        & (skyobj.freq_array <= np.max(freq_range))
-                    )[0]
-                    if freqs_inds_use.size == 0:
-                        raise ValueError("No frequencies in freq_range.")
-                else:
-                    freqs_inds_use = np.arange(skyobj.Nfreqs)
-
-            # just cut on Stokes I
-            if min_flux is not None:
-                comp_inds_to_keep = np.where(
-                    np.min(skyobj.stokes[0, freq_inds_use, :], axis=0) > min_flux
-                )[0]
-                skyobj.select(component_inds=comp_inds_to_keep, run_check=False)
-
-            if max_flux is not None:
-                comp_inds_to_keep = np.where(
-                    np.max(skyobj.stokes[0, freq_inds_use, :], axis=0) < max_flux
-                )[0]
-                skyobj.select(component_inds=comp_inds_to_keep, run_check=False)
+                max_flux *= units.Jy
+            skyobj.select(
+                min_brightness=min_flux,
+                max_brightness=max_flux,
+                flux_freq_range=freq_range,
+            )
 
         if coarse_horizon_cut:
             lat_rad = np.radians(latitude_deg)

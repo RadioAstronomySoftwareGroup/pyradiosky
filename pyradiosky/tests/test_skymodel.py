@@ -1694,6 +1694,7 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
     assert skyobj_new.history != skyobj_full.history
     expected_history = (
         skyobj_full.history
+        + "  Downselected to specific components using pyradiosky."
         + " Combined skymodels along the component axis using pyradiosky."
     )
     assert uvutils._check_histories(skyobj_new.history, expected_history)
@@ -1707,6 +1708,7 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
     assert skyobj_new.history != skyobj_full.history
     expected_history = (
         skyobj_full.history
+        + "  Downselected to specific components using pyradiosky."
         + " Combined skymodels along the component axis using pyradiosky. "
         + "Unique part of next object history follows.  testing history."
     )
@@ -1716,6 +1718,7 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
     assert skyobj_new.history != skyobj_full.history
     expected_history = (
         skyobj_full.history
+        + "  Downselected to specific components using pyradiosky."
         + " Combined skymodels along the component axis using pyradiosky. "
         + "Next object history follows. "
         + skyobj2.history
@@ -2415,6 +2418,20 @@ def test_param_flux_cuts():
     )[0]
     skyobj3 = skyobj.select(component_inds=components_to_keep, inplace=False)
 
+    expected_history2 = (
+        skyobj.history
+        + "  Downselected to specific components using pyradiosky."
+        + "  Downselected to specific components using pyradiosky."
+    )
+    assert uvutils._check_histories(skyobj2.history, expected_history2)
+
+    expected_history3 = (
+        skyobj.history + "  Downselected to specific components using pyradiosky."
+    )
+    assert uvutils._check_histories(skyobj3.history, expected_history3)
+
+    skyobj2.history = skyobj3.history
+
     assert skyobj2 == skyobj3
 
 
@@ -2456,6 +2473,7 @@ def test_source_cut_healpix(healpix_disk_new, time_location):
 
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 @pytest.mark.filterwarnings("ignore:The reference_frequency is aliased as `frequency`")
+@pytest.mark.parametrize("function", ["select", "source_cuts"])
 @pytest.mark.parametrize(
     "spec_type, init_kwargs, cut_kwargs",
     [
@@ -2479,7 +2497,7 @@ def test_source_cut_healpix(healpix_disk_new, time_location):
         ),
     ],
 )
-def test_flux_cuts(spec_type, init_kwargs, cut_kwargs):
+def test_flux_cuts(function, spec_type, init_kwargs, cut_kwargs):
     Nsrcs = 20
 
     minflux = 0.5
@@ -2511,23 +2529,41 @@ def test_flux_cuts(spec_type, init_kwargs, cut_kwargs):
 
     minI_cut = 1.0
     maxI_cut = 2.3
-    skyobj.source_cuts(
-        latitude_deg=30.0,
-        min_flux=minI_cut,
-        max_flux=maxI_cut,
-        **cut_kwargs,
-    )
+    if function == "select":
+        minI_cut *= units.Jy
+        maxI_cut *= units.Jy
+        if "freq_range" in cut_kwargs:
+            freq_range = cut_kwargs["freq_range"]
+        else:
+            freq_range = None
+        skyobj.select(
+            min_brightness=minI_cut,
+            max_brightness=maxI_cut,
+            flux_freq_range=freq_range,
+        )
+    else:
+        skyobj.source_cuts(
+            latitude_deg=30.0,
+            min_flux=minI_cut,
+            max_flux=maxI_cut,
+            **cut_kwargs,
+        )
 
-    cut_sourcelist = skyobj.to_recarray()
+    if function != "select":
+        minI_cut *= units.Jy
+        maxI_cut *= units.Jy
 
     if "freq_range" in cut_kwargs and np.min(
         cut_kwargs["freq_range"] > np.min(init_kwargs["freq_array"])
     ):
-        assert np.all(cut_sourcelist["I"] < maxI_cut)
+        assert np.all(skyobj.stokes[0] < maxI_cut)
     else:
-        assert np.all(cut_sourcelist["I"] > minI_cut)
-        assert np.all(cut_sourcelist["I"] < maxI_cut)
-    assert np.all(cut_sourcelist["U"] == Ucomp)
+        print(skyobj.stokes[0])
+        print(minI_cut)
+        print(maxI_cut)
+        assert np.all(skyobj.stokes[0] > minI_cut)
+        assert np.all(skyobj.stokes[0] < maxI_cut)
+    assert np.all(skyobj.stokes[2] == Ucomp * units.Jy)
 
 
 @pytest.mark.parametrize(
