@@ -2674,46 +2674,30 @@ class SkyModel(UVBase):
                 )
             component_inds = component_inds[
                 np.nonzero(
-                    np.logical_and(
-                        skyobj.lat[component_inds] >= lat_range[0],
-                        skyobj.lat[component_inds] <= lat_range[1],
-                    )
+                    (skyobj.lat[component_inds] >= lat_range[0])
+                    & (skyobj.lat[component_inds] <= lat_range[1])
                 )[0]
             ]
 
         if lon_range is not None:
-            if not isinstance(lat_range, Longitude):
+            if not isinstance(lon_range, Longitude):
                 raise ValueError("lon_range must be an astropy Longitude object.")
             if np.asarray(lon_range).size != 2:
                 raise ValueError("lon_range must be 2 element range.")
             if lon_range[1] < lon_range[0]:
                 # we're wrapping around longitude = 2*pi = 0
-                lon_range_1 = Longitude([lon_range[0], 2 * np.pi * units.rad])
-                lon_range_2 = Longitude([0 * units.rad, lon_range[1]])
-                component_inds1 = component_inds = component_inds[
-                    np.nonzero(
-                        np.logical_and(
-                            skyobj.lon[component_inds] >= lon_range_1[0],
-                            skyobj.lon[component_inds] <= lon_range_1[1],
-                        )
-                    )[0]
+                component_inds1 = component_inds[
+                    np.nonzero(skyobj.lon[component_inds] >= lon_range[0])[0]
                 ]
-                component_inds2 = component_inds = component_inds[
-                    np.nonzero(
-                        np.logical_and(
-                            skyobj.lon[component_inds] >= lon_range_2[0],
-                            skyobj.lon[component_inds] <= lon_range_2[1],
-                        )
-                    )[0]
+                component_inds2 = component_inds[
+                    np.nonzero(skyobj.lon[component_inds] <= lon_range[1])[0]
                 ]
                 component_inds = np.union1d(component_inds1, component_inds2)
             else:
                 component_inds = component_inds = component_inds[
                     np.nonzero(
-                        np.logical_and(
-                            skyobj.lon[component_inds] >= lon_range[0],
-                            skyobj.lon[component_inds] <= lon_range[1],
-                        )
+                        (skyobj.lon[component_inds] >= lon_range[0])
+                        & (skyobj.lon[component_inds] <= lon_range[1])
                     )[0]
                 ]
 

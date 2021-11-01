@@ -2469,8 +2469,6 @@ def test_source_cut_healpix(healpix_disk_new, time_location):
         skyobj.source_cuts(latitude_deg=array_location.lat.deg)
 
 
-@pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
-@pytest.mark.filterwarnings("ignore:The reference_frequency is aliased as `frequency`")
 @pytest.mark.parametrize("function", ["select", "source_cuts"])
 @pytest.mark.parametrize(
     "spec_type, init_kwargs, cut_kwargs",
@@ -2569,6 +2567,7 @@ def test_flux_cuts(function, spec_type, init_kwargs, cut_kwargs):
     assert np.all(skyobj.stokes[2] == Ucomp * units.Jy)
 
 
+@pytest.mark.parametrize("function", ["select", "source_cuts"])
 @pytest.mark.parametrize(
     "spec_type, init_kwargs, cut_kwargs, error_category, error_message",
     [
@@ -2606,7 +2605,7 @@ def test_flux_cuts(function, spec_type, init_kwargs, cut_kwargs):
     ],
 )
 def test_source_cut_error(
-    spec_type, init_kwargs, cut_kwargs, error_category, error_message
+    function, spec_type, init_kwargs, cut_kwargs, error_category, error_message
 ):
     Nsrcs = 20
 
@@ -2633,16 +2632,162 @@ def test_source_cut_error(
         **init_kwargs,
     )
 
+    if (
+        function == "select"
+        and "freq_range" in cut_kwargs
+        and not isinstance(cut_kwargs["freq_range"], Quantity)
+    ):
+        error_category = TypeError
+        error_message = (
+            "Argument 'flux_freq_range' to function 'select' has no "
+            "'unit' attribute. You should pass in an astropy Quantity instead."
+        )
+
     with pytest.raises(error_category, match=error_message):
         minI_cut = 1.0
         maxI_cut = 2.3
 
-        skyobj.source_cuts(
-            latitude_deg=30.0,
-            min_flux=minI_cut,
-            max_flux=maxI_cut,
-            **cut_kwargs,
-        )
+        if function == "select":
+            minI_cut *= units.Jy
+            maxI_cut *= units.Jy
+            if "freq_range" in cut_kwargs:
+                freq_range = cut_kwargs["freq_range"]
+            else:
+                freq_range = None
+            skyobj.select(
+                min_brightness=minI_cut,
+                max_brightness=maxI_cut,
+                flux_freq_range=freq_range,
+            )
+        else:
+            skyobj.source_cuts(
+                latitude_deg=30.0,
+                min_flux=minI_cut,
+                max_flux=maxI_cut,
+                **cut_kwargs,
+            )
+
+
+@pytest.mark.parametrize(
+    "spec_type, init_kwargs",
+    [
+        ("flat", {}),
+        ("flat", {"reference_frequency": np.ones(20) * 200e6 * units.Hz}),
+        ("full", {"freq_array": np.array([1e8, 1.5e8]) * units.Hz}),
+        ("subband", {"freq_array": np.array([1e8, 1.5e8]) * units.Hz}),
+        ("subband", {"freq_array": np.array([1e8, 1.5e8]) * units.Hz}),
+        ("flat", {"freq_array": np.array([1e8]) * units.Hz}),
+    ],
+)
+def test_select_field(spec_type, init_kwargs):
+    Nsrcs = 20
+
+    minflux = 0.5
+    maxflux = 3.0
+
+    ids = ["src{}".format(i) for i in range(Nsrcs)]
+    ras = Longitude(np.random.uniform(0, 360.0, Nsrcs), units.deg)
+    decs = Latitude(np.linspace(-90, 90, Nsrcs), units.deg)
+    stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
+    if spec_type == "flat":
+        stokes[0, :, :] = np.linspace(minflux, maxflux, Nsrcs) * units.Jy
+    else:
+        stokes = np.zeros((4, 2, Nsrcs)) * units.Jy
+        stokes[0, 0, :] = np.linspace(minflux, maxflux / 2.0, Nsrcs) * units.Jy
+        stokes[0, 1, :] = np.linspace(minflux * 2.0, maxflux, Nsrcs) * units.Jy
+
+    # Add a nonzero polarization.
+    Ucomp = maxflux + 1.3
+    stokes[2, :, :] = Ucomp * units.Jy  # Should not be affected by cuts.
+
+    skyobj = SkyModel(
+        name=ids,
+        ra=ras,
+        dec=decs,
+        stokes=stokes,
+        spectral_type=spec_type,
+        **init_kwargs,
+    )
+
+    lon_range = Longitude([90, 240], units.deg)
+    skyobj2 = skyobj.copy()
+    skyobj2.select(lon_range=lon_range)
+    assert np.all(skyobj2.lon >= lon_range[0])
+    assert np.all(skyobj2.lon <= lon_range[1])
+
+    lat_range = Latitude([-45, 45], units.deg)
+    skyobj2 = skyobj.copy()
+    skyobj2.select(lat_range=lat_range)
+    assert np.all(skyobj2.lat >= lat_range[0])
+    assert np.all(skyobj2.lat <= lat_range[1])
+
+    skyobj2 = skyobj.copy()
+    skyobj2.select(lon_range=lon_range, lat_range=lat_range)
+    assert np.all(skyobj2.lon >= lon_range[0])
+    assert np.all(skyobj2.lon <= lon_range[1])
+    assert np.all(skyobj2.lat >= lat_range[0])
+    assert np.all(skyobj2.lat <= lat_range[1])
+
+    # test wrapping longitude
+    lon_range = Longitude([270, 90], units.deg)
+    skyobj2 = skyobj.copy()
+    skyobj2.select(lon_range=lon_range)
+    assert (
+        np.nonzero((skyobj.lon > lon_range[0]) & (skyobj.lon < lon_range[1]))[0].size
+        == 0
+    )
+
+
+def test_select_field_error():
+    Nsrcs = 20
+
+    minflux = 0.5
+    maxflux = 3.0
+
+    ids = ["src{}".format(i) for i in range(Nsrcs)]
+    ras = Longitude(np.random.uniform(0, 360.0, Nsrcs), units.deg)
+    decs = Latitude(np.linspace(-90, 90, Nsrcs), units.deg)
+    stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
+    spec_type = "flat"
+    stokes[0, :, :] = np.linspace(minflux, maxflux, Nsrcs) * units.Jy
+
+    skyobj = SkyModel(
+        name=ids,
+        ra=ras,
+        dec=decs,
+        stokes=stokes,
+        spectral_type=spec_type,
+        reference_frequency=np.ones(20) * 200e6 * units.Hz,
+    )
+
+    lon_range = Longitude([90, 240], units.deg)
+    lat_range = Latitude([-45, 45], units.deg)
+    with pytest.raises(
+        ValueError, match="lat_range must be an astropy Latitude object."
+    ):
+        skyobj.select(lat_range=lon_range)
+
+    with pytest.raises(
+        ValueError,
+        match="lat_range must be 2 element range with the second component "
+        "larger than the first.",
+    ):
+        skyobj.select(lat_range=lat_range[0])
+
+    with pytest.raises(
+        ValueError,
+        match="lat_range must be 2 element range with the second component "
+        "larger than the first.",
+    ):
+        skyobj.select(lat_range=Latitude([lat_range[1], lat_range[0]]))
+
+    with pytest.raises(
+        ValueError, match="lon_range must be an astropy Longitude object."
+    ):
+        skyobj.select(lon_range=lat_range)
+
+    with pytest.raises(ValueError, match="lon_range must be 2 element range."):
+        skyobj.select(lon_range=lon_range[0])
 
 
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
