@@ -2419,9 +2419,7 @@ def test_param_flux_cuts():
     skyobj3 = skyobj.select(component_inds=components_to_keep, inplace=False)
 
     expected_history2 = (
-        skyobj.history
-        + "  Downselected to specific components using pyradiosky."
-        + "  Downselected to specific components using pyradiosky."
+        skyobj.history + "  Downselected to specific components using pyradiosky."
     )
     assert uvutils._check_histories(skyobj2.history, expected_history2)
 
@@ -2549,20 +2547,25 @@ def test_flux_cuts(function, spec_type, init_kwargs, cut_kwargs):
             **cut_kwargs,
         )
 
-    if function != "select":
+    if function == "select":
+        if "freq_range" in cut_kwargs and np.min(
+            cut_kwargs["freq_range"] > np.min(init_kwargs["freq_array"])
+        ):
+            assert np.all(skyobj.stokes[0] <= maxI_cut)
+        else:
+            assert np.all(skyobj.stokes[0] >= minI_cut)
+            assert np.all(skyobj.stokes[0] <= maxI_cut)
+    else:
         minI_cut *= units.Jy
         maxI_cut *= units.Jy
 
-    if "freq_range" in cut_kwargs and np.min(
-        cut_kwargs["freq_range"] > np.min(init_kwargs["freq_array"])
-    ):
-        assert np.all(skyobj.stokes[0] < maxI_cut)
-    else:
-        print(skyobj.stokes[0])
-        print(minI_cut)
-        print(maxI_cut)
-        assert np.all(skyobj.stokes[0] > minI_cut)
-        assert np.all(skyobj.stokes[0] < maxI_cut)
+        if "freq_range" in cut_kwargs and np.min(
+            cut_kwargs["freq_range"] > np.min(init_kwargs["freq_array"])
+        ):
+            assert np.all(skyobj.stokes[0] < maxI_cut)
+        else:
+            assert np.all(skyobj.stokes[0] > minI_cut)
+            assert np.all(skyobj.stokes[0] < maxI_cut)
     assert np.all(skyobj.stokes[2] == Ucomp * units.Jy)
 
 
@@ -2598,7 +2601,7 @@ def test_flux_cuts(function, spec_type, init_kwargs, cut_kwargs):
             {"freq_array": np.array([1e8, 1.5e8]) * units.Hz},
             {"freq_range": np.array([1.1e8, 1.4e8]) * units.Hz},
             ValueError,
-            "No frequencies in freq_range.",
+            "No object frequencies in specified range for flux cuts.",
         ),
     ],
 )
@@ -2831,7 +2834,7 @@ def test_read_gleam(spec_type):
 
     assert len(cut_catalog) == cut_obj.Ncomponents
 
-    source_select_kwds = {"min_flux": 10.0}
+    source_select_kwds = {"min_flux": 10.0, "max_flux": 20.0}
     with pytest.raises(ValueError, match="Select would result in an empty object."):
         skyobj.read_gleam_catalog(
             GLEAM_vot,
