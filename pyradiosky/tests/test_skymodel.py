@@ -2518,7 +2518,7 @@ def test_flux_cuts(function, spec_type, init_kwargs, cut_kwargs):
     maxflux = 3.0
 
     ids = ["src{}".format(i) for i in range(Nsrcs)]
-    ras = Longitude(np.random.uniform(0, 360.0, Nsrcs), units.deg)
+    ras = Longitude(np.linspace(0, 360.0, Nsrcs), units.deg)
     decs = Latitude(np.linspace(-90, 90, Nsrcs), units.deg)
     stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
     if spec_type == "flat":
@@ -2624,7 +2624,7 @@ def test_flux_cut_error(
     maxflux = 3.0
 
     ids = ["src{}".format(i) for i in range(Nsrcs)]
-    ras = Longitude(np.random.uniform(0, 360.0, Nsrcs), units.deg)
+    ras = Longitude(np.linspace(0, 360.0, Nsrcs), units.deg)
     decs = Latitude(np.linspace(-90, 90, Nsrcs), units.deg)
     stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
     if spec_type in ["flat", "spectral_index"]:
@@ -2686,7 +2686,7 @@ def test_select_flux_error():
     maxflux = 3.0
 
     ids = ["src{}".format(i) for i in range(Nsrcs)]
-    ras = Longitude(np.random.uniform(0, 360.0, Nsrcs), units.deg)
+    ras = Longitude(np.linspace(0, 360.0, Nsrcs), units.deg)
     decs = Latitude(np.linspace(-90, 90, Nsrcs), units.deg)
     stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
     stokes[0, :, :] = np.linspace(minflux, maxflux, Nsrcs) * units.Jy
@@ -2727,7 +2727,7 @@ def test_select_field(spec_type, init_kwargs):
     maxflux = 3.0
 
     ids = ["src{}".format(i) for i in range(Nsrcs)]
-    ras = Longitude(np.random.uniform(0, 360.0, Nsrcs), units.deg)
+    ras = Longitude(np.linspace(0, 360.0, Nsrcs), units.deg)
     decs = Latitude(np.linspace(-90, 90, Nsrcs), units.deg)
     stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
     if spec_type == "flat":
@@ -2786,7 +2786,7 @@ def test_select_field_error():
     maxflux = 3.0
 
     ids = ["src{}".format(i) for i in range(Nsrcs)]
-    ras = Longitude(np.random.uniform(0, 360.0, Nsrcs), units.deg)
+    ras = Longitude(np.linspace(0, 360.0, Nsrcs), units.deg)
     decs = Latitude(np.linspace(-90, 90, Nsrcs), units.deg)
     stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
     spec_type = "flat"
@@ -4155,7 +4155,7 @@ def test_healpix_transform_full_sky(healpix_disk_new):
         frame=healpix_disk_new._frame_inst,
     )
 
-    # randomly get rid of half the data
+    # get rid of half the data
     healpix_disk_new.select(
         component_inds=np.arange(healpix_disk_new.Ncomponents)[::2],
     )
