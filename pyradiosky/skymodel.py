@@ -2591,7 +2591,7 @@ class SkyModel(UVBase):
             return this
 
     @units.quantity_input(
-        lat_range=units.rad, lon_range=units.rad, flux_freq_range=units.Hz
+        lat_range=units.rad, lon_range=units.rad, brightness_freq_range=units.Hz
     )
     def select(
         self,
@@ -2600,7 +2600,7 @@ class SkyModel(UVBase):
         lon_range=None,
         min_brightness=None,
         max_brightness=None,
-        flux_freq_range=None,
+        brightness_freq_range=None,
         inplace=True,
         run_check=True,
         check_extra=True,
@@ -2627,11 +2627,12 @@ class SkyModel(UVBase):
             through 0, and end at the smaller value.
         min_brightness : :class:`astropy.Quantity`
             Minimum brightness in stokes I to keep on object (implemented as a >= cut).
-        max_flux : :class:`astropy.Quantity`
+        max_brightness : :class:`astropy.Quantity`
             Maximum brightness in stokes I to keep on object (implemented as a <= cut).
-        freq_range : :class:`astropy.Quantity`
-            Frequency range over which the min and max flux tests should be performed.
-            Must be length 2. If None, use the range over which the object is defined.
+        brightness_freq_range : :class:`astropy.Quantity`
+            Frequency range over which the min and max brightness tests should be
+            performed. Must be length 2. If None, use the range over which the object
+            is defined.
         run_check : bool
             Option to check for the existence and proper shapes of parameters
             after downselecting data on this object (the default is True,
@@ -2666,7 +2667,7 @@ class SkyModel(UVBase):
 
         if lat_range is not None:
             if not isinstance(lat_range, Latitude):
-                raise ValueError("lat_range must be an astropy Latitude object.")
+                raise TypeError("lat_range must be an astropy Latitude object.")
             if np.asarray(lat_range).size != 2 or lat_range[0] >= lat_range[1]:
                 raise ValueError(
                     "lat_range must be 2 element range with the second component "
@@ -2681,7 +2682,7 @@ class SkyModel(UVBase):
 
         if lon_range is not None:
             if not isinstance(lon_range, Longitude):
-                raise ValueError("lon_range must be an astropy Longitude object.")
+                raise TypeError("lon_range must be an astropy Longitude object.")
             if np.asarray(lon_range).size != 2:
                 raise ValueError("lon_range must be 2 element range.")
             if lon_range[1] < lon_range[0]:
@@ -2701,9 +2702,9 @@ class SkyModel(UVBase):
                     )[0]
                 ]
 
-        if flux_freq_range is not None:
-            if not np.atleast_1d(flux_freq_range).size == 2:
-                raise ValueError("freq_range must have 2 elements.")
+        if brightness_freq_range is not None:
+            if not np.atleast_1d(brightness_freq_range).size == 2:
+                raise ValueError("brightness_freq_range must have 2 elements.")
 
         if min_brightness is not None or max_brightness is not None:
             if skyobj.spectral_type == "spectral_index":
@@ -2713,10 +2714,10 @@ class SkyModel(UVBase):
             freq_inds_use = None
 
             if skyobj.freq_array is not None:
-                if flux_freq_range is not None:
+                if brightness_freq_range is not None:
                     freq_inds_use = np.where(
-                        (skyobj.freq_array >= np.min(flux_freq_range))
-                        & (skyobj.freq_array <= np.max(flux_freq_range))
+                        (skyobj.freq_array >= np.min(brightness_freq_range))
+                        & (skyobj.freq_array <= np.max(brightness_freq_range))
                     )[0]
                     if freq_inds_use.size == 0:
                         raise ValueError(
@@ -2728,7 +2729,7 @@ class SkyModel(UVBase):
                 if not isinstance(
                     min_brightness, Quantity
                 ) or not min_brightness.unit.is_equivalent(self.stokes.unit):
-                    raise ValueError(
+                    raise TypeError(
                         "min_brightness must be a Quantity object with units that can "
                         f"be converted to {self.stokes.unit}"
                     )
@@ -2756,7 +2757,7 @@ class SkyModel(UVBase):
                 if not isinstance(
                     max_brightness, Quantity
                 ) or not max_brightness.unit.is_equivalent(self.stokes.unit):
-                    raise ValueError(
+                    raise TypeError(
                         "max_brightness must be a Quantity object with units that can "
                         f"be converted to {self.stokes.unit}"
                     )
@@ -2813,6 +2814,118 @@ class SkyModel(UVBase):
         if not inplace:
             return skyobj
 
+    @units.quantity_input(telescope_latitude=units.rad)
+    def calculate_rise_set_lsts(
+        self,
+        telescope_latitude,
+        horizon_buffer=0.04364,
+    ):
+        """
+        Calculate the rise & set LSTs given a telescope latitude.
+
+        Sets the `_rise_lst` and `_set_lst` attributes on the object. These values can
+        be NaNs for sources that never rise or never set. Call `cut_nonrising` to remove
+        sources that never rise from the object.
+
+        Parameters
+        ----------
+        telescope_latitude : Latitude object
+            Latitude of telescope. Used to estimate rise/set lst.
+        horizon_buffer : float
+            Angle buffer for rise/set LSTs in radians.
+            Default is about 10 minutes of sky rotation. Components whose
+            calculated altitude is less than `horizon_buffer` are excluded.
+            Caution! The altitude calculation does not account for
+            precession/nutation of the Earth.
+            The buffer angle is needed to ensure that the horizon cut doesn't
+            exclude sources near but above the horizon. Since the cutoff is
+            done using lst, and the lsts are calculated with astropy, the
+            required buffer should _not_ drift with time since the J2000 epoch.
+            The default buffer has been tested around julian date 2457458.0.
+
+        """
+        lat_rad = telescope_latitude.rad
+        buff = horizon_buffer
+
+        lon, lat = self.get_lon_lat()
+
+        tans = np.tan(lat_rad) * np.tan(lat.rad)
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="invalid value encountered",
+                category=RuntimeWarning,
+            )
+            rise_lst = lon.rad - np.arccos((-1) * tans) - buff
+            set_lst = lon.rad + np.arccos((-1) * tans) + buff
+
+            rise_lst[rise_lst < 0] += 2 * np.pi
+            set_lst[set_lst < 0] += 2 * np.pi
+            rise_lst[rise_lst > 2 * np.pi] -= 2 * np.pi
+            set_lst[set_lst > 2 * np.pi] -= 2 * np.pi
+
+        self._rise_lst = rise_lst
+        self._set_lst = set_lst
+
+    @units.quantity_input(telescope_latitude=units.rad)
+    def cut_nonrising(
+        self,
+        telescope_latitude,
+        inplace=True,
+        run_check=True,
+        check_extra=True,
+        run_check_acceptability=True,
+    ):
+        """
+        Remove sources that will never rise.
+
+        Parameters
+        ----------
+        telescope_latitude : Latitude object
+            Latitude of telescope.
+        inplace : bool
+            Option to do the cuts on the object in place or to return a copy
+            with the cuts applied.
+        run_check : bool
+            Option to check for the existence and proper shapes of parameters
+            after downselecting data on this object (the default is True,
+            meaning the check will be run).
+        check_extra : bool
+            Option to check optional parameters as well as required ones (the
+            default is True, meaning the optional parameters will be checked).
+        run_check_acceptability : bool
+            Option to check acceptable range of the values of parameters after
+            downselecting data on this object (the default is True, meaning the
+            acceptable range check will be done).
+
+        """
+        if not isinstance(telescope_latitude, Latitude):
+            raise TypeError("telescope_latitude must be an astropy Latitude object.")
+
+        if inplace:
+            skyobj = self
+        else:
+            skyobj = self.copy()
+
+        lat_rad = telescope_latitude.rad
+
+        _, lat = skyobj.get_lon_lat()
+
+        tans = np.tan(lat_rad) * np.tan(lat.rad)
+        nonrising = tans < -1
+
+        comp_inds_to_keep = np.nonzero(~nonrising)[0]
+        skyobj.select(component_inds=comp_inds_to_keep, run_check=False)
+
+        if run_check:
+            skyobj.check(
+                check_extra=check_extra, run_check_acceptability=run_check_acceptability
+            )
+
+        if not inplace:
+            return skyobj
+
     def source_cuts(
         self,
         latitude_deg=None,
@@ -2844,13 +2957,9 @@ class SkyModel(UVBase):
             required buffer should _not_ drift with time since the J2000 epoch.
             The default buffer has been tested around julian date 2457458.0.
         min_flux : Quantity or float
-            Minimum stokes I flux to select on (implemented as a strict > cut, so
-            fluxes exactly equal to the min_flux will be cut). If not a Quantity,
-            assumed to be in Jy.
+            Minimum stokes I flux to select. If not a Quantity, assumed to be in Jy.
         max_flux : Quantity or float
-            Maximum stokes I flux to select(implemented as a strict < cut, so
-            fluxes exactly equal to the max_flux will be cut). If not a Quantity,
-            assumed to be in Jy.
+            Maximum stokes I flux to select. If not a Quantity, assumed to be in Jy.
         freq_range : :class:`astropy.Quantity`
             Frequency range over which the min and max flux tests should be performed.
             Must be length 2. If None, use the range over which the object is defined.
@@ -2870,7 +2979,12 @@ class SkyModel(UVBase):
             with the cuts applied.
 
         """
-        coarse_horizon_cut = latitude_deg is not None
+        warnings.warn(
+            "The `source_cuts` method is deprecated and will be removed in version "
+            "0.3.0. Please use the `select` method and/or the `cut_nonrising` "
+            "method as appropriate.",
+            category=DeprecationWarning,
+        )
 
         if inplace:
             skyobj = self
@@ -2891,40 +3005,14 @@ class SkyModel(UVBase):
             skyobj.select(
                 min_brightness=min_flux,
                 max_brightness=max_flux,
-                flux_freq_range=freq_range,
+                brightness_freq_range=freq_range,
             )
 
-        if coarse_horizon_cut:
-            lat_rad = np.radians(latitude_deg)
-            buff = horizon_buffer
-
-            lon, lat = skyobj.get_lon_lat()
-
-            tans = np.tan(lat_rad) * np.tan(lat.rad)
-            nonrising = tans < -1
-
-            comp_inds_to_keep = np.nonzero(~nonrising)[0]
-            skyobj.select(component_inds=comp_inds_to_keep, run_check=False)
-            tans = tans[~nonrising]
-
-            lon, lat = skyobj.get_lon_lat()
-
-            with warnings.catch_warnings():
-                warnings.filterwarnings(
-                    "ignore",
-                    message="invalid value encountered",
-                    category=RuntimeWarning,
-                )
-                rise_lst = lon.rad - np.arccos((-1) * tans) - buff
-                set_lst = lon.rad + np.arccos((-1) * tans) + buff
-
-                rise_lst[rise_lst < 0] += 2 * np.pi
-                set_lst[set_lst < 0] += 2 * np.pi
-                rise_lst[rise_lst > 2 * np.pi] -= 2 * np.pi
-                set_lst[set_lst > 2 * np.pi] -= 2 * np.pi
-
-            skyobj._rise_lst = rise_lst
-            skyobj._set_lst = set_lst
+        if latitude_deg is not None:
+            skyobj.cut_nonrising(Latitude(latitude_deg, units.deg))
+            skyobj.calculate_rise_set_lsts(
+                Latitude(latitude_deg, units.deg), horizon_buffer=horizon_buffer
+            )
 
         if run_check:
             skyobj.check(
@@ -3613,15 +3701,16 @@ class SkyModel(UVBase):
         flux_error_columns : str or list of str
             Part of expected Flux error column(s). Each one should match only one
             column in the table.
-        return_table : bool, optional
-            Whether to return the astropy table instead of a list of Source objects.
         source_select_kwds : dict, optional
+            This parameter is Deprecated, please use the `select` and/or the
+            `cut_nonrising` methods as appropriate instead.
+
             Dictionary of keywords for source selection Valid options:
 
-            * `lst_array`: For coarse RA horizon cuts, lsts used in the simulation [radians]
-            * `latitude_deg`: Latitude of telescope in degrees. Used for declination coarse
-               horizon cut.
-            * `horizon_buffer`: Angle (float, in radians) of buffer for coarse horizon cut.
+            * `latitude_deg`: Latitude of telescope in degrees. Used for declination
+               coarse horizon cut.
+            * `horizon_buffer`: Angle (float, in radians) of buffer for coarse horizon
+              cut.
               Default is about 10 minutes of sky rotation. (See caveats in
               :func:`~skymodel.SkyModel.source_cuts` docstring)
             * `min_flux`: Minimum stokes I flux to select [Jy]
@@ -3793,6 +3882,12 @@ class SkyModel(UVBase):
         )
 
         if source_select_kwds is not None:
+            warnings.warn(
+                "The source_select_kwds parameter is deprecated, use the `select` "
+                "and/or the `cut_nonrising` methods as appropriate instead."
+                "This parameter will be removed in version 0.3.0.",
+                category=DeprecationWarning,
+            )
             self.source_cuts(**source_select_kwds)
 
         if run_check:
@@ -3844,9 +3939,11 @@ class SkyModel(UVBase):
             wide band integrated flux will be used, if set to 'spectral_index' the
             fitted flux at 200 MHz will be used for the flux column.
         source_select_kwds : dict, optional
+            This parameter is Deprecated, please use the `select` and/or the
+            `cut_nonrising` methods as appropriate instead.
+
             Dictionary of keywords for source selection Valid options:
 
-            * `lst_array`: For coarse RA horizon cuts, lsts used in the simulation [radians]
             * `latitude_deg`: Latitude of telescope in degrees. Used for declination coarse
                horizon cut.
             * `horizon_buffer`: Angle (float, in radians) of buffer for coarse horizon cut.
@@ -3990,9 +4087,11 @@ class SkyModel(UVBase):
             *  `Spectral_Index`: spectral index
 
         source_select_kwds : dict, optional
+            This parameter is Deprecated, please use the `select` and/or the
+            `cut_nonrising` methods as appropriate.
+
             Dictionary of keywords for source selection. Valid options:
 
-            * `lst_array`: For coarse RA horizon cuts, lsts used in the simulation [radians]
             * `latitude_deg`: Latitude of telescope in degrees. Used for declination coarse
             *  horizon cut.
             * `horizon_buffer`: Angle (float, in radians) of buffer for coarse horizon cut.
@@ -4154,6 +4253,12 @@ class SkyModel(UVBase):
         assert type(self.stokes_error) == type(stokes_error)
 
         if source_select_kwds is not None:
+            warnings.warn(
+                "The source_select_kwds parameter is deprecated, use the `select` "
+                "and/or the `cut_nonrising` methods as appropriate instead."
+                "This parameter will be removed in version 0.3.0.",
+                category=DeprecationWarning,
+            )
             self.source_cuts(**source_select_kwds)
 
         if run_check:
@@ -4204,9 +4309,11 @@ class SkyModel(UVBase):
             If True, return extended source components.
             Default: True
         source_select_kwds : dict, optional
+            This parameter is Deprecated, please use the `select` and/or the
+            `cut_nonrising` methods as appropriate.
+
             Dictionary of keywords for source selection. Valid options:
 
-            * `lst_array`: For coarse RA horizon cuts, lsts used in the simulation [radians]
             * `latitude_deg`: Latitude of telescope in degrees. Used for declination coarse
             *  horizon cut.
             * `horizon_buffer`: Angle (float, in radians) of buffer for coarse horizon cut.
@@ -4344,6 +4451,12 @@ class SkyModel(UVBase):
         )
 
         if source_select_kwds is not None:
+            warnings.warn(
+                "The source_select_kwds parameter is deprecated, use the `select` "
+                "and/or the `cut_nonrising` methods as appropriate instead."
+                "This parameter will be removed in version 0.3.0.",
+                category=DeprecationWarning,
+            )
             self.source_cuts(**source_select_kwds)
 
         if run_check:
@@ -4394,9 +4507,11 @@ class SkyModel(UVBase):
             If True, return extended source components.
             Default: True
         source_select_kwds : dict, optional
+            This parameter is Deprecated, please use the `select` and/or the
+            `cut_nonrising` methods as appropriate.
+
             Dictionary of keywords for source selection. Valid options:
 
-            * `lst_array`: For coarse RA horizon cuts, lsts used in the simulation [radians]
             * `latitude_deg`: Latitude of telescope in degrees. Used for declination coarse
             *  horizon cut.
             * `horizon_buffer`: Angle (float, in radians) of buffer for coarse horizon cut.
@@ -4986,7 +5101,8 @@ def source_cuts(
     """
     Perform flux and horizon selections on recarray of source components.
 
-    Deprecated. Use `SkyModel.source_cuts` instead.
+    Deprecated. Use the `SkyModel.select` and/or `SkyModel.cut_nonrising` methods
+    instead.
 
     Parameters
     ----------
@@ -5021,19 +5137,30 @@ def source_cuts(
 
     """
     warnings.warn(
-        "This function is deprecated, use `SkyModel.source_cuts` instead. "
+        "This function is deprecated, use the `SkyModel.select` and/or"
+        "`SkyModel.cut_nonrising` methods instead. "
         "This function will be removed in version 0.2.0.",
         category=DeprecationWarning,
     )
 
     skyobj = SkyModel.from_recarray(catalog_table)
-    skyobj.source_cuts(
-        latitude_deg=latitude_deg,
-        horizon_buffer=horizon_buffer,
-        min_flux=min_flux,
-        max_flux=max_flux,
-        freq_range=freq_range,
-    )
+
+    if min_flux is not None and max_flux is not None:
+        if min_flux is not None:
+            min_flux = min_flux * units.Jy
+        if max_flux is not None:
+            max_flux = max_flux * units.Jy
+
+        skyobj.select(
+            min_brightness=min_flux,
+            max_brightness=max_flux,
+            brightness_freq_range=freq_range,
+        )
+
+    if latitude_deg is not None:
+        lat_use = Latitude(latitude_deg, units.deg)
+        skyobj.cut_nonrising(lat_use)
+        skyobj.calculate_rise_set_lsts(lat_use, horizon_buffer=horizon_buffer)
 
     return skyobj.to_recarray()
 
@@ -5080,7 +5207,6 @@ def read_votable_catalog(
     source_select_kwds : dict, optional
         Dictionary of keywords for source selection Valid options:
 
-        * `lst_array`: For coarse RA horizon cuts, lsts used in the simulation [radians]
         * `latitude_deg`: Latitude of telescope in degrees. Used for declination coarse
            horizon cut.
         * `horizon_buffer`: Angle (float, in radians) of buffer for coarse horizon cut.
@@ -5144,7 +5270,6 @@ def read_gleam_catalog(
     source_select_kwds : dict, optional
         Dictionary of keywords for source selection Valid options:
 
-        * `lst_array`: For coarse RA horizon cuts, lsts used in the simulation [radians]
         * `latitude_deg`: Latitude of telescope in degrees. Used for declination coarse
            horizon cut.
         * `horizon_buffer`: Angle (float, in radians) of buffer for coarse horizon cut.
@@ -5206,7 +5331,6 @@ def read_text_catalog(catalog_csv, source_select_kwds=None, return_table=False):
     source_select_kwds : dict, optional
         Dictionary of keywords for source selection. Valid options:
 
-        * `lst_array`: For coarse RA horizon cuts, lsts used in the simulation [radians]
         * `latitude_deg`: Latitude of telescope in degrees. Used for declination coarse
         *  horizon cut.
         * `horizon_buffer`: Angle (float, in radians) of buffer for coarse horizon cut.
