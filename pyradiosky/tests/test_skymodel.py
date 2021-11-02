@@ -3564,7 +3564,7 @@ def test_zenith_on_moon(moonsky):
 
 
 def test_source_motion(moonsky):
-    """ Check that period is about 28 days."""
+    """Check that period is about 28 days."""
 
     zenith_source = moonsky
 
