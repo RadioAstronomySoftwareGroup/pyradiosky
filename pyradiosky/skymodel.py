@@ -2563,8 +2563,8 @@ class SkyModel(UVBase):
             if verbose_history:
                 this.history += " Next object history follows. " + other.history
             else:
-                if "_combine_history_addition" in dir(uvutils):  # pragma: no cover
-                    # this uses very new (unreleased) functionality in pyuvdata
+                if "_combine_history_addition" in dir(uvutils):
+                    # this uses new (in v2.2.0) functionality in pyuvdata
                     extra_history = uvutils._combine_history_addition(
                         this.history, other.history
                     )
@@ -2573,8 +2573,9 @@ class SkyModel(UVBase):
                             " Unique part of next object history follows. "
                             + extra_history
                         )
-                else:
+                else:  # pragma: no cover
                     # backwards compatibility for older versions of pyuvdata
+                    # remove when we require pyuvdata>=2.2.0
                     this.history = uvutils._combine_histories(
                         this.history + " Unique part of next object history follows. ",
                         other.history,
