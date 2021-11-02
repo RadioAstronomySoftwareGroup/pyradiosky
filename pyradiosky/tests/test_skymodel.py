@@ -2615,7 +2615,7 @@ def test_flux_cuts(function, spec_type, init_kwargs, cut_kwargs):
         ),
     ],
 )
-def test_source_cut_error(
+def test_flux_cut_error(
     function, spec_type, init_kwargs, cut_kwargs, error_category, error_message
 ):
     Nsrcs = 20
@@ -2677,6 +2677,36 @@ def test_source_cut_error(
                 max_flux=maxI_cut,
                 **cut_kwargs,
             )
+
+
+def test_select_flux_error():
+    Nsrcs = 20
+
+    minflux = 0.5
+    maxflux = 3.0
+
+    ids = ["src{}".format(i) for i in range(Nsrcs)]
+    ras = Longitude(np.random.uniform(0, 360.0, Nsrcs), units.deg)
+    decs = Latitude(np.linspace(-90, 90, Nsrcs), units.deg)
+    stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
+    stokes[0, :, :] = np.linspace(minflux, maxflux, Nsrcs) * units.Jy
+
+    skyobj = SkyModel(
+        name=ids,
+        ra=ras,
+        dec=decs,
+        stokes=stokes,
+        spectral_type="flat",
+        reference_frequency=np.ones(20) * 200e6 * units.Hz,
+    )
+    minI_cut = 1.0
+    maxI_cut = 2.3
+
+    with pytest.raises(TypeError, match="min_brightness must be a Quantity object"):
+        skyobj.select(min_brightness=minI_cut)
+
+    with pytest.raises(TypeError, match="max_brightness must be a Quantity object"):
+        skyobj.select(max_brightness=maxI_cut)
 
 
 @pytest.mark.parametrize(
@@ -2806,7 +2836,8 @@ def test_select_field_error():
 
 
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
-def test_circumpolar_nonrising(time_location):
+@pytest.mark.parametrize("function", ["source_cuts", "cut_nonrising"])
+def test_circumpolar_nonrising(time_location, function):
     # Check that the source_cut function correctly identifies sources that are circumpolar or
     # won't rise.
     # Working with an observatory at the HERA latitude.
@@ -2833,22 +2864,32 @@ def test_circumpolar_nonrising(time_location):
 
     sky = SkyModel(name=names, ra=ra, dec=dec, stokes=stokes, spectral_type="flat")
 
-    src_arr = sky.to_recarray()
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match=[
-            "This function is deprecated, use the `SkyModel.select` and/or"
-            "`SkyModel.cut_nonrising` methods instead.",
-            "recarray flux columns will no longer be labeled `flux_density_I` etc. in "
-            "version 0.2.0. Use `I` instead.",
-        ],
-    ):
-        src_arr = skymodel.source_cuts(src_arr, latitude_deg=location.lat.deg)
+    if function == "cut_nonrising":
+        sky2 = sky.cut_nonrising(location.lat, inplace=False)
 
-    # Boolean array identifying nonrising sources that were removed by source_cuts
-    nonrising = np.array(
-        [sky.name[ind] not in src_arr["source_id"] for ind in range(Nsrcs)]
-    )
+        # Boolean array identifying nonrising sources that were removed by source_cuts
+        nonrising = np.array([sky.name[ind] not in sky2.name for ind in range(Nsrcs)])
+        sky2.calculate_rise_set_lsts(location.lat)
+
+    else:
+        src_arr = sky.to_recarray()
+        with uvtest.check_warnings(
+            DeprecationWarning,
+            match=[
+                "This function is deprecated, use the `SkyModel.select` and/or"
+                "`SkyModel.cut_nonrising` methods instead.",
+                "recarray flux columns will no longer be labeled `flux_density_I` etc. in "
+                "version 0.2.0. Use `I` instead.",
+            ],
+        ):
+            src_arr = skymodel.source_cuts(
+                src_arr, latitude_deg=location.lat.deg, min_flux=0.5, max_flux=2.0
+            )
+
+        # Boolean array identifying nonrising sources that were removed by source_cuts
+        nonrising = np.array(
+            [sky.name[ind] not in src_arr["source_id"] for ind in range(Nsrcs)]
+        )
     is_below_horizon = np.zeros(Nsrcs).astype(bool)
     is_below_horizon[nonrising] = True
 
@@ -2861,8 +2902,12 @@ def test_circumpolar_nonrising(time_location):
         # Check that sources below the horizon by coarse cut are
         # indeed below the horizon.
         lst = times[ti].sidereal_time("mean").rad
-        dt0 = lst - src_arr["rise_lst"]
-        dt1 = src_arr["set_lst"] - src_arr["rise_lst"]
+        if function == "cut_nonrising":
+            dt0 = lst - sky2._rise_lst
+            dt1 = sky2._set_lst - sky2._rise_lst
+        else:
+            dt0 = lst - src_arr["rise_lst"]
+            dt1 = src_arr["set_lst"] - src_arr["rise_lst"]
         with warnings.catch_warnings():
             warnings.filterwarnings(
                 "ignore", message="invalid value encountered", category=RuntimeWarning
@@ -2890,33 +2935,68 @@ def test_circumpolar_nonrising(time_location):
     # Confirm that the source cuts excluded the non-rising sources.
     assert np.all(np.where(nonrising)[0] == nonrising_test)
 
-    # check that rise_lst and set_lst get added to object when converted
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match="This function is deprecated, use `SkyModel.from_recarray` instead.",
-    ):
-        new_sky = skymodel.array_to_skymodel(src_arr)
-    assert hasattr(new_sky, "_rise_lst")
-    assert hasattr(new_sky, "_set_lst")
+    if function != "cut_nonrising":
+        # check that rise_lst and set_lst get added to object when converted
+        with uvtest.check_warnings(
+            DeprecationWarning,
+            match="This function is deprecated, use `SkyModel.from_recarray` instead.",
+        ):
+            new_sky = skymodel.array_to_skymodel(src_arr)
+        assert hasattr(new_sky, "_rise_lst")
+        assert hasattr(new_sky, "_set_lst")
 
-    # and that it's round tripped
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match=[
-            "This function is deprecated, use `SkyModel.to_recarray` instead.",
-            "recarray flux columns will no longer be labeled `flux_density_I` etc. in "
-            "version 0.2.0. Use `I` instead.",
-        ],
-    ):
-        src_arr2 = skymodel.skymodel_to_array(new_sky)
-    assert src_arr.dtype == src_arr2.dtype
-    assert len(src_arr) == len(src_arr2)
+        # and that it's round tripped
+        with uvtest.check_warnings(
+            DeprecationWarning,
+            match=[
+                "This function is deprecated, use `SkyModel.to_recarray` instead.",
+                "recarray flux columns will no longer be labeled `flux_density_I` etc. in "
+                "version 0.2.0. Use `I` instead.",
+            ],
+        ):
+            src_arr2 = skymodel.skymodel_to_array(new_sky)
+        assert src_arr.dtype == src_arr2.dtype
+        assert len(src_arr) == len(src_arr2)
 
-    for name in src_arr.dtype.names:
-        if isinstance(src_arr[name][0], (str,)):
-            assert np.array_equal(src_arr[name], src_arr2[name])
-        else:
-            assert np.allclose(src_arr[name], src_arr2[name], equal_nan=True)
+        for name in src_arr.dtype.names:
+            if isinstance(src_arr[name][0], (str,)):
+                assert np.array_equal(src_arr[name], src_arr2[name])
+            else:
+                assert np.allclose(src_arr[name], src_arr2[name], equal_nan=True)
+
+
+def test_cut_nonrising_error(time_location):
+    _, location = time_location
+
+    Nras = 2
+    Ndecs = 2
+    Nsrcs = Nras * Ndecs
+
+    lon = location.lon.deg
+    ra = np.linspace(lon - 90, lon + 90, Nras)
+    dec = np.linspace(-90, 90, Ndecs)
+
+    ra, dec = map(np.ndarray.flatten, np.meshgrid(ra, dec))
+    ra = Longitude(ra, units.deg)
+    dec = Latitude(dec, units.deg)
+
+    names = ["src{}".format(i) for i in range(Nsrcs)]
+    stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
+    stokes[0, ...] = 1.0 * units.Jy
+
+    sky = SkyModel(name=names, ra=ra, dec=dec, stokes=stokes, spectral_type="flat")
+
+    with pytest.raises(
+        TypeError,
+        match="Argument 'telescope_latitude' to function 'cut_nonrising' has no "
+        "'unit' attribute. You should pass in an astropy Quantity instead.",
+    ):
+        sky.cut_nonrising(location.lat.deg)
+
+    with pytest.raises(
+        TypeError, match="telescope_latitude must be an astropy Latitude object."
+    ):
+        sky.cut_nonrising(location.lon)
 
 
 @pytest.mark.parametrize(
