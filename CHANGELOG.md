@@ -3,6 +3,15 @@
 ## [Unreleased]
 
 ### Added
+- The `lat_range` and `lon_range` keywords to the `select` method to support selecting
+on fields.
+- The `min_brightness`, `max_brightness` and `brightness_freq_range` keywords to the
+`select` method to support selecting on brightness.
+- The `cut_nonrising` method to remove sources that never rise given a telescope
+location, replacing functionality that was in the `source_cuts` method.
+- The `calculate_rise_set_lsts` method to calculate and set the `_rise_lst` and
+`_set_lst` attributes on the object, replacing functionality that was in the
+`source_cuts` method.
 - The `get_ra_dec` method which computes the values from `hpx_inds` on healpix objects
 and just returns the parameter values on point objects.
 - The `assign_to_healpix` method to assign point component objects to a healpix grid
@@ -16,6 +25,7 @@ healpix objects the `ra` and `dec` parameters are no longer populated.
 to be used internally to undo the `healpix_to_point` method.
 
 ### Deprecated
+- The `source_cuts` method and the `source_select_kwds` keywords to the reading methods.
 - The `point_to_healpix` method.
 
 ## [0.1.2] - 2021-07-06
