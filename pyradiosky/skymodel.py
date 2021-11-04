@@ -2935,12 +2935,12 @@ class SkyModel(UVBase):
         nonrising = tans < -1
 
         comp_inds_to_keep = np.nonzero(~nonrising)[0]
-        skyobj.select(component_inds=comp_inds_to_keep, run_check=False)
-
-        if run_check:
-            skyobj.check(
-                check_extra=check_extra, run_check_acceptability=run_check_acceptability
-            )
+        skyobj.select(
+            component_inds=comp_inds_to_keep,
+            run_check=run_check,
+            check_extra=check_extra,
+            run_check_acceptability=run_check_acceptability,
+        )
 
         if not inplace:
             return skyobj
