@@ -218,17 +218,7 @@ def healpix_disk_old():
 @pytest.fixture(scope="function")
 def healpix_disk_new():
     pytest.importorskip("astropy_healpix")
-    with uvtest.check_warnings(
-        UserWarning,
-        match=[
-            "No frame available in this file. ",
-        ],
-    ):
-        sky = SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "healpix_disk.skyh5"))
-
-    # these should not be set (the file is old)
-    sky.ra = None
-    sky.dec = None
+    sky = SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "healpix_disk.skyh5"))
 
     yield sky
 

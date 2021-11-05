@@ -12,7 +12,7 @@ location, replacing functionality that was in the `source_cuts` method.
 - The `calculate_rise_set_lsts` method to calculate and set the `_rise_lst` and
 `_set_lst` attributes on the object, replacing functionality that was in the
 `source_cuts` method.
-- The `get_ra_dec` method which computes the values from `hpx_inds` on healpix objects
+- The `get_lon_lat` method which computes the values from `hpx_inds` on healpix objects
 and just returns the parameter values on point objects.
 - The `assign_to_healpix` method to assign point component objects to a healpix grid
 (using the nearest neighbor approach).
