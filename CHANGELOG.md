@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Added
+- The `nan_handling` keyword to the `at_frequencies` method to control how NaNs in the
+stokes array on subband objects are handled during interpolation.
 - The `lat_range` and `lon_range` keywords to the `select` method to support selecting
 on fields.
 - The `min_brightness`, `max_brightness` and `brightness_freq_range` keywords to the
@@ -16,6 +18,10 @@ location, replacing functionality that was in the `source_cuts` method.
 and just returns the parameter values on point objects.
 - The `assign_to_healpix` method to assign point component objects to a healpix grid
 (using the nearest neighbor approach).
+
+### Fixed
+- A bug that caused the stokes array to be all NaNs after using the `at_frequencies`
+method on a subband spectral_type object if any NaNs appeared in the input stokes.
 
 ### Changed
 - `ra` and `dec` are no longer required parameters on healpix objects (since that
