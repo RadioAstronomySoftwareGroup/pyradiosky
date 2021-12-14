@@ -1880,7 +1880,13 @@ class SkyModel(UVBase):
             return sky
 
     def at_frequencies(
-        self, freqs, inplace=True, freq_interp_kind="cubic", run_check=True, atol=None
+        self,
+        freqs,
+        inplace=True,
+        freq_interp_kind="cubic",
+        nan_handling="clip",
+        run_check=True,
+        atol=None,
     ):
         """
         Evaluate the stokes array at the specified frequencies.
@@ -1901,7 +1907,22 @@ class SkyModel(UVBase):
             Otherwise, returns a new instance. Default True.
         freq_interp_kind: str or int
             Spline interpolation order, as can be understood by scipy.interpolate.interp1d.
-            Defaults to 'cubic'
+            Only used if the spectral_type is "subband".
+        nan_handling : str
+            Choice of how to handle nans in the stokes when interpolating, only used if
+            the spectral_type is "subband". These are applied per source, so
+            sources with no NaNs will not be affected by these choices.  Options are
+            "propagate" to set all the output stokes to NaN values if any of the input
+            stokes values are NaN, "interp" to interpolate values using only the non-NaN
+            values and to set any values that are outside the range of non-NaN values to
+            NaN, and "clip" to interpolate values using only the non-NaN values and to
+            set any values that are outside the range of non-NaN values to the nearest
+            non-NaN value. Any sources that have all NaN values in the stokes array will
+            have NaN values in the output stokes. Note that the detection of NaNs is
+            done across all polarizations for each source, so all polarizations are
+            evaluated using the same set of frequencies (so a NaN in one polarization
+            at one frequency will cause that frequency to be excluded for the
+            interpolation of all the polarizations on that source).
         run_check: bool
             Run check on new SkyModel.
             Default True.
@@ -1931,20 +1952,158 @@ class SkyModel(UVBase):
 
             if np.sum(matches) != freqs.size:
                 raise ValueError(
-                    "Some requested frequencies are not "
-                    "present in the current SkyModel."
+                    "Some requested frequencies are not present in the current SkyModel."
                 )
             sky.stokes = self.stokes[:, matches, :]
         elif self.spectral_type == "subband":
-            # Interpolate.
+            if np.max(freqs.to("Hz")) > np.max(self.freq_array.to("Hz")):
+                raise ValueError(
+                    "A requested frequency is larger than the highest subband frequency."
+                )
+            if np.min(freqs.to("Hz")) < np.min(self.freq_array.to("Hz")):
+                raise ValueError(
+                    "A requested frequency is smaller than the lowest subband frequency."
+                )
+            # Interpolate. Need to be careful if there are NaNs -- they spoil the
+            # interpolation even for sources that do not have any NaNs.
             stokes_unit = self.stokes.unit
-            finterp = scipy.interpolate.interp1d(
-                self.freq_array.to("Hz").value,
-                self.stokes.value,
-                axis=1,
-                kind=freq_interp_kind,
-            )
-            sky.stokes = finterp(freqs) * stokes_unit
+            if np.any(np.isnan(self.stokes.value)):
+                allowed_nan_handling = ["propagate", "interp", "clip"]
+                if nan_handling not in allowed_nan_handling:
+                    raise ValueError(
+                        f"nan_handling must be one of {allowed_nan_handling}"
+                    )
+
+                message = "Some stokes values are NaNs."
+                if nan_handling == "propagate":
+                    message += " All output stokes values for sources with any NaN values will be NaN."
+                else:
+                    message += " Interpolating using the non-NaN values only."
+                message += " You can change the way NaNs are handled using the `nan_handling` keyword."
+                warnings.warn(message)
+                stokes_arr = self.stokes.value
+                freq_arr = self.freq_array.to("Hz").value
+                at_freq_arr = freqs.to("Hz").value
+                # first interpolate any that have no NaNs
+                wh_nan = np.nonzero(np.any(np.isnan(stokes_arr), axis=(0, 1)))[0]
+                wh_non_nan = np.nonzero(np.all(~np.isnan(stokes_arr), axis=(0, 1)))[0]
+                assert wh_non_nan.size + wh_nan.size == self.Ncomponents, (
+                    "Something went wrong with spliting sources with NaNs. This is a "
+                    "bug, please make an issue in our issue log"
+                )
+                new_stokes = np.zeros(
+                    (4, freqs.size, self.Ncomponents), dtype=stokes_arr.dtype
+                )
+                finterp = scipy.interpolate.interp1d(
+                    freq_arr,
+                    stokes_arr[:, :, wh_non_nan],
+                    axis=1,
+                    kind=freq_interp_kind,
+                )
+                new_stokes[:, :, wh_non_nan] = finterp(at_freq_arr)
+
+                if nan_handling == "propagate":
+                    new_stokes[:, :, wh_nan] = np.NaN
+                else:
+                    wh_all_nan = []
+                    wh_nan_high = []
+                    wh_nan_low = []
+                    for comp in wh_nan:
+                        freq_inds_use = np.nonzero(
+                            np.all(~np.isnan(stokes_arr[:, :, comp]), axis=0)
+                        )[0]
+                        if freq_inds_use.size == 0:
+                            new_stokes[:, :, comp] = np.NaN
+                            wh_all_nan.append(comp)
+                            continue
+                        at_freq_inds_use = np.arange(freqs.size)
+
+                        if np.max(at_freq_arr) > np.max(freq_arr[freq_inds_use]):
+                            at_freq_inds_use = np.nonzero(
+                                at_freq_arr <= np.max(freq_arr[freq_inds_use])
+                            )[0]
+                            at_freqs_large = np.nonzero(
+                                at_freq_arr > np.max(freq_arr[freq_inds_use])
+                            )[0]
+                            wh_nan_high.append(comp)
+                            if nan_handling == "interp":
+                                new_stokes[:, at_freqs_large, comp] = np.NaN
+                            else:  # clip
+                                large_inds_use = np.full(
+                                    (at_freqs_large.size), freq_inds_use[-1]
+                                )
+                                new_stokes[:, at_freqs_large, comp] = stokes_arr[
+                                    :, large_inds_use, comp
+                                ]
+
+                        if np.min(at_freq_arr) < np.min(freq_arr[freq_inds_use]):
+                            at_freq_inds_use = np.nonzero(
+                                at_freq_arr >= np.min(freq_arr[freq_inds_use])
+                            )[0]
+                            at_freqs_small = np.nonzero(
+                                at_freq_arr < np.min(freq_arr[freq_inds_use])
+                            )[0]
+                            wh_nan_low.append(comp)
+                            if nan_handling == "interp":
+                                new_stokes[:, at_freqs_small, comp] = np.NaN
+                            else:  # clip
+                                small_inds_use = np.full(
+                                    (at_freqs_small.size), freq_inds_use[0]
+                                )
+                                new_stokes[:, at_freqs_small, comp] = stokes_arr[
+                                    :, small_inds_use, comp
+                                ]
+
+                        if at_freq_inds_use.size > 0:
+                            finterp = scipy.interpolate.interp1d(
+                                freq_arr[freq_inds_use],
+                                stokes_arr[:, freq_inds_use, comp],
+                                axis=1,
+                                kind=freq_interp_kind,
+                            )
+                            new_stokes[:, at_freq_inds_use, comp] = finterp(
+                                at_freq_arr[at_freq_inds_use]
+                            )
+                    if len(wh_all_nan) > 0:
+                        warnings.warn(
+                            f"{len(wh_all_nan)} components had all NaN stokes values. "
+                            "Output stokes for these components will all be NaN."
+                        )
+                    if len(wh_nan_high) > 0:
+                        message = (
+                            f"{len(wh_nan_high)} components had all NaN stokes values above "
+                            "one or more of the requested frequencies. "
+                        )
+                        if nan_handling == "interp":
+                            message += "The stokes for these components at these frequencies will be NaN."
+                        else:
+                            message += (
+                                "Using the stokes value at the highest frequency without a "
+                                "NaN for these components at these frequencies."
+                            )
+                        warnings.warn(message)
+                    if len(wh_nan_low) > 0:
+                        message = (
+                            f"{len(wh_nan_high)} components had all NaN stokes values below "
+                            "one or more of the requested frequencies. "
+                        )
+                        if nan_handling == "interp":
+                            message += "The stokes for these components at these frequencies will be NaN."
+                        else:
+                            message += (
+                                "Using the stokes value at the lowest frequency without a "
+                                "NaN for these components at these frequencies."
+                            )
+                        warnings.warn(message)
+                sky.stokes = new_stokes * stokes_unit
+            else:
+                finterp = scipy.interpolate.interp1d(
+                    self.freq_array.to("Hz").value,
+                    self.stokes.value,
+                    axis=1,
+                    kind=freq_interp_kind,
+                )
+                sky.stokes = finterp(freqs.to("Hz").value) * stokes_unit
         else:
             # flat spectrum
             stokes_unit = self.stokes.unit
