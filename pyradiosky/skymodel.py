@@ -1994,13 +1994,14 @@ class SkyModel(UVBase):
                 new_stokes = np.zeros(
                     (4, freqs.size, self.Ncomponents), dtype=stokes_arr.dtype
                 )
-                finterp = scipy.interpolate.interp1d(
-                    freq_arr,
-                    stokes_arr[:, :, wh_non_nan],
-                    axis=1,
-                    kind=freq_interp_kind,
-                )
-                new_stokes[:, :, wh_non_nan] = finterp(at_freq_arr)
+                if wh_non_nan.size > 0:
+                    finterp = scipy.interpolate.interp1d(
+                        freq_arr,
+                        stokes_arr[:, :, wh_non_nan],
+                        axis=1,
+                        kind=freq_interp_kind,
+                    )
+                    new_stokes[:, :, wh_non_nan] = finterp(at_freq_arr)
 
                 if nan_handling == "propagate":
                     new_stokes[:, :, wh_nan] = np.NaN
@@ -2008,6 +2009,7 @@ class SkyModel(UVBase):
                     wh_all_nan = []
                     wh_nan_high = []
                     wh_nan_low = []
+                    wh_nan_many = []
                     for comp in wh_nan:
                         freq_inds_use = np.nonzero(
                             np.all(~np.isnan(stokes_arr[:, :, comp]), axis=0)
@@ -2055,12 +2057,21 @@ class SkyModel(UVBase):
                                 ]
 
                         if at_freq_inds_use.size > 0:
-                            finterp = scipy.interpolate.interp1d(
-                                freq_arr[freq_inds_use],
-                                stokes_arr[:, freq_inds_use, comp],
-                                axis=1,
-                                kind=freq_interp_kind,
-                            )
+                            try:
+                                finterp = scipy.interpolate.interp1d(
+                                    freq_arr[freq_inds_use],
+                                    stokes_arr[:, freq_inds_use, comp],
+                                    axis=1,
+                                    kind=freq_interp_kind,
+                                )
+                            except ValueError:
+                                wh_nan_many.append(comp)
+                                finterp = scipy.interpolate.interp1d(
+                                    freq_arr[freq_inds_use],
+                                    stokes_arr[:, freq_inds_use, comp],
+                                    axis=1,
+                                    kind="linear",
+                                )
                             new_stokes[:, at_freq_inds_use, comp] = finterp(
                                 at_freq_arr[at_freq_inds_use]
                             )
@@ -2084,7 +2095,7 @@ class SkyModel(UVBase):
                         warnings.warn(message)
                     if len(wh_nan_low) > 0:
                         message = (
-                            f"{len(wh_nan_high)} components had all NaN stokes values below "
+                            f"{len(wh_nan_low)} components had all NaN stokes values below "
                             "one or more of the requested frequencies. "
                         )
                         if nan_handling == "interp":
@@ -2095,6 +2106,12 @@ class SkyModel(UVBase):
                                 "NaN for these components at these frequencies."
                             )
                         warnings.warn(message)
+                    if len(wh_nan_many) > 0:
+                        warnings.warn(
+                            f"{len(wh_nan_many)} components had too few non-NaN stokes "
+                            "values for chosen interpolation. Using linear "
+                            "interpolation for these components instead."
+                        )
                 sky.stokes = new_stokes * stokes_unit
             else:
                 finterp = scipy.interpolate.interp1d(
