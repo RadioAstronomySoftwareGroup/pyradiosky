@@ -1732,6 +1732,7 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
         "lon",
         "lat",
         "name",
+        "spectral_index",
     ],
 )
 def test_concat_optional_params(param, healpix_disk_new):
@@ -1754,6 +1755,8 @@ def test_concat_optional_params(param, healpix_disk_new):
         skyobj_full.extended_model_group = skyobj_full.name
     elif param == "beam_amp":
         skyobj_full.beam_amp = np.ones((4, skyobj_full.Nfreqs, skyobj_full.Ncomponents))
+    elif param == "spectral_index":
+        skyobj_full.spectral_index = np.full((skyobj_full.Ncomponents), -0.7)
 
     assert getattr(skyobj_full, param) is not None
 
@@ -1781,7 +1784,7 @@ def test_concat_optional_params(param, healpix_disk_new):
     skyobj_new.history = skyobj_full.history
 
     assert getattr(skyobj_new, "_" + param) != getattr(skyobj_full, "_" + param)
-    if param == "reference_frequency":
+    if param in ["reference_frequency", "spectral_index"]:
         assert np.allclose(
             getattr(skyobj_new, param)[
                 skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
@@ -1812,6 +1815,10 @@ def test_concat_optional_params(param, healpix_disk_new):
         assert np.isnan(
             getattr(skyobj_new, param)[: skyobj_full.Ncomponents // 2].value
         ).all()
+    elif param == "spectral_index":
+        assert np.isnan(
+            getattr(skyobj_new, param)[: skyobj_full.Ncomponents // 2]
+        ).all()
     elif param == "extended_model_group":
         assert np.all(getattr(skyobj_new, param)[: skyobj_full.Ncomponents // 2] == "")
     elif param not in ["lon", "lat", "name"]:
@@ -1836,7 +1843,7 @@ def test_concat_optional_params(param, healpix_disk_new):
     skyobj_new.history = skyobj_full.history
 
     assert getattr(skyobj_new, "_" + param) != getattr(skyobj_full, "_" + param)
-    if param == "reference_frequency":
+    if param in ["reference_frequency", "spectral_index"]:
         assert np.allclose(
             getattr(skyobj_new, param)[: skyobj_full.Ncomponents // 2],
             getattr(skyobj_full, param)[: skyobj_full.Ncomponents // 2],
@@ -1858,6 +1865,12 @@ def test_concat_optional_params(param, healpix_disk_new):
             getattr(skyobj_new, param)[
                 skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
             ].value
+        ).all()
+    elif param == "spectral_index":
+        assert np.isnan(
+            getattr(skyobj_new, param)[
+                skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
+            ]
         ).all()
     elif param == "extended_model_group":
         assert np.all(
