@@ -2394,48 +2394,6 @@ class SkyModel(UVBase):
         this.coherency_radec = np.concatenate(
             (this.coherency_radec, other.coherency_radec), axis=3
         )
-        if this.stokes_error is not None and other.stokes_error is not None:
-            this.stokes_error = np.concatenate(
-                (this.stokes_error, other.stokes_error), axis=2
-            )
-        elif this.stokes_error is not None:
-            warnings.warn(
-                "This object has stokes_error values, other object does not. "
-                "Filling missing values with NaNs."
-            )
-            this.stokes_error = np.concatenate(
-                (
-                    this.stokes_error,
-                    Quantity(
-                        np.full(
-                            (4, other.Nfreqs, other.Ncomponents),
-                            None,
-                            dtype=this.stokes_error.dtype,
-                        ),
-                        unit=this.stokes_error.unit,
-                    ),
-                ),
-                axis=2,
-            )
-        elif other.stokes_error is not None:
-            warnings.warn(
-                "This object does not have stokes_error values, other object does. "
-                "Filling missing values with NaNs."
-            )
-            this.stokes_error = np.concatenate(
-                (
-                    Quantity(
-                        np.full(
-                            (4, this.Nfreqs, this.Ncomponents),
-                            None,
-                            dtype=other.stokes_error.dtype,
-                        ),
-                        unit=other.stokes_error.unit,
-                    ),
-                    other.stokes_error,
-                ),
-                axis=2,
-            )
 
         if this.spectral_type == "spectral_index":
             this.reference_frequency = np.concatenate(
@@ -2444,113 +2402,91 @@ class SkyModel(UVBase):
             this.spectral_index = np.concatenate(
                 (this.spectral_index, other.spectral_index)
             )
-        elif this.spectral_type == "flat":
-            if (
-                this.reference_frequency is not None
-                and other.reference_frequency is not None
-            ):
-                this.reference_frequency = np.concatenate(
-                    (this.reference_frequency, other.reference_frequency)
-                )
-            elif this.reference_frequency is not None:
-                warnings.warn(
-                    "This object has reference_frequency values, other object does not. "
-                    "Filling missing values with NaNs."
-                )
-                this.reference_frequency = np.concatenate(
-                    (
-                        this.reference_frequency,
-                        np.full(
-                            other.Ncomponents,
-                            None,
-                            dtype=this.reference_frequency.dtype,
-                        ),
-                    )
-                )
-            elif other.reference_frequency is not None:
-                warnings.warn(
-                    "This object does not have reference_frequency values, other object does. "
-                    "Filling missing values with NaNs."
-                )
-                this.reference_frequency = np.concatenate(
-                    (
-                        np.full(
-                            this.Ncomponents,
-                            None,
-                            dtype=other.reference_frequency.dtype,
-                        ),
-                        other.reference_frequency,
-                    )
-                )
 
-        if (
-            this.extended_model_group is not None
-            and other.extended_model_group is not None
-        ):
-            this.extended_model_group = np.concatenate(
-                (this.extended_model_group, other.extended_model_group)
-            )
-        elif this.extended_model_group is not None:
-            warnings.warn(
-                "This object has extended_model_group values, other object does not. "
-                "Filling missing values with empty strings."
-            )
-            this.extended_model_group = np.concatenate(
-                (
-                    this.extended_model_group,
-                    np.full(
-                        other.Ncomponents, "", dtype=this.extended_model_group.dtype
-                    ),
-                )
-            )
-        elif other.extended_model_group is not None:
-            warnings.warn(
-                "This object does not have extended_model_group values, other object does. "
-                "Filling missing values with empty strings."
-            )
-            this.extended_model_group = np.concatenate(
-                (
-                    np.full(
-                        this.Ncomponents, "", dtype=other.extended_model_group.dtype
-                    ),
-                    other.extended_model_group,
-                )
-            )
+        ncomp_length_extras = {
+            "stokes_error": {"axis": 2, "type": "numeric"},
+            "extended_model_group": {"axis": 0, "type": "string"},
+            "beam_amp": {"axis": 2, "type": "numeric"},
+        }
+        if this.spectral_type in ["full", "subband", "flat"]:
+            ncomp_length_extras["reference_frequency"] = {"axis": 0, "type": "numeric"}
+            ncomp_length_extras["spectral_index"] = {"axis": 0, "type": "numeric"}
 
-        if this.beam_amp is not None and other.beam_amp is not None:
-            this.beam_amp = np.concatenate((this.beam_amp, other.beam_amp), axis=2)
-        elif this.beam_amp is not None:
-            warnings.warn(
-                "This object has beam_amp values, other object does not. "
-                "Filling missing values with NaNs."
-            )
-            this.beam_amp = np.concatenate(
-                (
-                    this.beam_amp,
-                    np.full(
-                        (4, other.Nfreqs, other.Ncomponents),
+        for param, pdict in ncomp_length_extras.items():
+            this_param = getattr(this, param)
+            other_param = getattr(other, param)
+            if pdict["type"] == "numeric":
+                fill_str = "NaNs"
+            else:
+                fill_str = "empty strings"
+            if this_param is not None and other_param is not None:
+                new_param = np.concatenate(
+                    (this_param, other_param), axis=pdict["axis"]
+                )
+                setattr(this, param, new_param)
+            elif this_param is not None:
+                warnings.warn(
+                    f"This object has {param} values, other object does not. "
+                    f"Filling missing values with {fill_str}."
+                )
+                fill_shape = list(this_param.shape)
+                fill_shape[pdict["axis"]] = other.Ncomponents
+                fill_shape = tuple(fill_shape)
+                if isinstance(this_param, Quantity):
+                    fill_arr = Quantity(
+                        np.full(
+                            fill_shape,
+                            None,
+                            dtype=this_param.dtype,
+                        ),
+                        unit=this_param.unit,
+                    )
+                elif pdict["type"] == "numeric":
+                    fill_arr = np.full(
+                        fill_shape,
                         None,
-                        dtype=this.beam_amp.dtype,
-                    ),
-                ),
-                axis=2,
-            )
-        elif other.beam_amp is not None:
-            warnings.warn(
-                "This object does not have beam_amp values, other object does. "
-                "Filling missing values with NaNs."
-            )
-            this.beam_amp = np.concatenate(
-                (
-                    np.full(
-                        (4, other.Nfreqs, other.Ncomponents),
+                        dtype=this_param.dtype,
+                    )
+                else:
+                    fill_arr = np.full(
+                        fill_shape,
+                        "",
+                        dtype=this_param.dtype,
+                    )
+                new_param = np.concatenate((this_param, fill_arr), axis=pdict["axis"])
+                setattr(this, param, new_param)
+            elif other_param is not None:
+                warnings.warn(
+                    f"This object does not have {param} values, other object does. "
+                    f"Filling missing values with {fill_str}."
+                )
+                fill_shape = list(other_param.shape)
+                fill_shape[pdict["axis"]] = this.Ncomponents
+                fill_shape = tuple(fill_shape)
+                if isinstance(other_param, Quantity):
+                    fill_arr = Quantity(
+                        np.full(
+                            fill_shape,
+                            None,
+                            dtype=other_param.dtype,
+                        ),
+                        unit=other_param.unit,
+                    )
+                elif pdict["type"] == "numeric":
+                    fill_arr = np.full(
+                        fill_shape,
                         None,
-                        dtype=other.beam_amp.dtype,
-                    ),
-                    other.beam_amp,
-                ),
-                axis=2,
-            )
+                        dtype=other_param.dtype,
+                    )
+                else:
+                    fill_arr = np.full(
+                        fill_shape,
+                        "",
+                        dtype=other_param.dtype,
+                    )
+                new_param = np.concatenate((fill_arr, other_param), axis=pdict["axis"])
+                setattr(this, param, new_param)
+
         this.Ncomponents = this.Ncomponents + other.Ncomponents
 
         history_update_string = (
