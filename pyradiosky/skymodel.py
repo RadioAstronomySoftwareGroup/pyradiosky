@@ -1917,12 +1917,14 @@ class SkyModel(UVBase):
             values and to set any values that are outside the range of non-NaN values to
             NaN, and "clip" to interpolate values using only the non-NaN values and to
             set any values that are outside the range of non-NaN values to the nearest
-            non-NaN value. Any sources that have all NaN values in the stokes array will
-            have NaN values in the output stokes. Note that the detection of NaNs is
-            done across all polarizations for each source, so all polarizations are
-            evaluated using the same set of frequencies (so a NaN in one polarization
-            at one frequency will cause that frequency to be excluded for the
-            interpolation of all the polarizations on that source).
+            non-NaN value. For both "interp" and "clip", any sources that have
+            too few non-Nan values to use the chosen `freq_interp_kind` will be
+            interpolated linearly and any sources that have all NaN values in the stokes
+            array will have NaN values in the output stokes. Note that the detection of
+            NaNs is done across all polarizations for each source, so all polarizations
+            are evaluated using the same set of frequencies (so a NaN in one
+            polarization at one frequency will cause that frequency to be excluded for
+            the interpolation of all the polarizations on that source).
         run_check: bool
             Run check on new SkyModel.
             Default True.
