@@ -3736,10 +3736,11 @@ def test_at_frequencies_nan_handling(nan_handling):
 
     skyobj2 = skyobj.copy()
     # add some NaNs. These exist in full GLEAM catalog but not in our small test file
-    skyobj2.stokes[0, 0:2, 0] = np.NaN
-    skyobj2.stokes[0, 10:11, 1] = np.NaN
-    skyobj2.stokes[0, -2:, 2] = np.NaN
-    skyobj2.stokes[0, :, 3] = np.NaN
+    skyobj2.stokes[0, 0:2, 0] = np.NaN  # no low freq support
+    skyobj2.stokes[0, 10:11, 1] = np.NaN  # missing freqs in middle
+    skyobj2.stokes[0, -2:, 2] = np.NaN  # no high freq support
+    skyobj2.stokes[0, :, 3] = np.NaN  # all NaNs
+    skyobj2.stokes[0, 1:-2, 4] = np.NaN  # only 2 good freqs
 
     message = ["Some stokes values are NaNs."]
     if nan_handling == "propagate":
@@ -3751,8 +3752,12 @@ def test_at_frequencies_nan_handling(nan_handling):
         message.extend(
             [
                 "1 components had all NaN stokes values. ",
-                "1 components had all NaN stokes values above one or more of the requested frequencies. ",
-                "1 components had all NaN stokes values below one or more of the requested frequencies. ",
+                "1 components had all NaN stokes values above one or more of the "
+                "requested frequencies. ",
+                "1 components had all NaN stokes values below one or more of the "
+                "requested frequencies. ",
+                "1 components had too few non-NaN stokes values for chosen "
+                "interpolation. Using linear interpolation for these components instead.",
             ]
         )
         if nan_handling == "interp":
@@ -3774,30 +3779,14 @@ def test_at_frequencies_nan_handling(nan_handling):
         )
 
     if nan_handling == "propagate":
-        assert np.all(np.isnan(skyobj2_interp.stokes[:, :, 0:4]))
+        assert np.all(np.isnan(skyobj2_interp.stokes[:, :, 0:5]))
+        assert np.all(~np.isnan(skyobj2_interp.stokes[:, :, 5:]))
     elif nan_handling == "interp":
         assert np.all(np.isnan(skyobj2_interp.stokes[:, 0, 0]))
         assert np.allclose(
             skyobj2_interp.stokes[:, 1:, 0],
             skyobj_interp.stokes[:, 1:, 0],
             atol=1e-5,
-            rtol=0,
-        )
-
-        assert np.all(~np.isnan(skyobj2_interp.stokes[:, :, 1]))
-        assert np.allclose(
-            skyobj2_interp.stokes[:, 0, 1], skyobj_interp.stokes[:, 0, 1]
-        )
-        assert np.allclose(
-            skyobj2_interp.stokes[:, 2, 1], skyobj_interp.stokes[:, 2, 1]
-        )
-        assert not np.allclose(
-            skyobj2_interp.stokes[:, 1, 1], skyobj_interp.stokes[:, 1, 1]
-        )
-        assert np.allclose(
-            skyobj2_interp.stokes[:, 1, 1],
-            skyobj_interp.stokes[:, 1, 1],
-            atol=1e-2,
             rtol=0,
         )
 
@@ -3808,8 +3797,6 @@ def test_at_frequencies_nan_handling(nan_handling):
             atol=1e-5,
             rtol=0,
         )
-
-        assert np.all(np.isnan(skyobj2_interp.stokes[:, :, 3]))
     else:  # clip
         assert np.all(~np.isnan(skyobj2_interp.stokes[:, :, 0:3]))
 
@@ -3848,7 +3835,106 @@ def test_at_frequencies_nan_handling(nan_handling):
 
         assert np.all(np.isnan(skyobj2_interp.stokes[:, :, 3]))
 
+    if nan_handling in ["interp", "clip"]:
+        assert np.all(np.isnan(skyobj2_interp.stokes[:, :, 3]))
+
+        assert np.all(~np.isnan(skyobj2_interp.stokes[:, :, 1]))
+        assert np.allclose(
+            skyobj2_interp.stokes[:, 0, 1], skyobj_interp.stokes[:, 0, 1]
+        )
+        assert np.allclose(
+            skyobj2_interp.stokes[:, 2, 1], skyobj_interp.stokes[:, 2, 1]
+        )
+        assert not np.allclose(
+            skyobj2_interp.stokes[:, 1, 1], skyobj_interp.stokes[:, 1, 1]
+        )
+        assert np.allclose(
+            skyobj2_interp.stokes[:, 1, 1],
+            skyobj_interp.stokes[:, 1, 1],
+            atol=1e-2,
+            rtol=0,
+        )
+
+        assert np.all(~np.isnan(skyobj2_interp.stokes[:, :, 4]))
+        assert np.allclose(
+            skyobj2_interp.stokes[:, 0, 4],
+            skyobj_interp.stokes[:, 0, 4],
+            atol=1e-1,
+            rtol=0,
+        )
+        assert np.allclose(
+            skyobj2_interp.stokes[:, 2, 4],
+            skyobj_interp.stokes[:, 2, 4],
+            atol=1e-1,
+            rtol=0,
+        )
+        assert not np.allclose(
+            skyobj2_interp.stokes[:, 1, 4],
+            skyobj_interp.stokes[:, 1, 4],
+            atol=1e-1,
+            rtol=0,
+        )
+        assert np.allclose(
+            skyobj2_interp.stokes[:, 1, 4],
+            skyobj_interp.stokes[:, 1, 4],
+            atol=2e-1,
+            rtol=0,
+        )
+
     assert np.allclose(skyobj2_interp.stokes[:, :, 5:], skyobj_interp.stokes[:, :, 5:])
+
+
+@pytest.mark.parametrize("nan_handling", ["propagate", "interp", "clip"])
+def test_at_frequencies_nan_handling_allsrc(nan_handling):
+    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot)
+    interp_freqs = np.asarray([77, 154, 225]) * units.MHz
+    skyobj_interp = skyobj.at_frequencies(interp_freqs, inplace=False)
+
+    skyobj2 = skyobj.copy()
+    # add some NaNs to all sources
+    skyobj2.stokes[0, 10:11, :] = np.NaN
+    message = ["Some stokes values are NaNs."]
+    if nan_handling == "propagate":
+        message[
+            0
+        ] += " All output stokes values for sources with any NaN values will be NaN."
+    else:
+        message[0] += " Interpolating using the non-NaN values only."
+    message[
+        0
+    ] += " You can change the way NaNs are handled using the `nan_handling` keyword."
+    with uvtest.check_warnings(UserWarning, match=message):
+        skyobj2_interp = skyobj2.at_frequencies(
+            interp_freqs, inplace=False, nan_handling=nan_handling
+        )
+    if nan_handling == "propagate":
+        assert np.all(np.isnan(skyobj2_interp.stokes))
+    else:
+        assert np.all(~np.isnan(skyobj2_interp.stokes))
+        assert np.allclose(
+            skyobj2_interp.stokes[:, 0, :],
+            skyobj_interp.stokes[:, 0, :],
+            atol=1e-5,
+            rtol=0,
+        )
+        assert np.allclose(
+            skyobj2_interp.stokes[:, 2, :],
+            skyobj_interp.stokes[:, 2, :],
+            atol=1e-5,
+            rtol=0,
+        )
+        assert not np.allclose(
+            skyobj2_interp.stokes[:, 1, :],
+            skyobj_interp.stokes[:, 1, :],
+            atol=1e-5,
+            rtol=0,
+        )
+        assert np.allclose(
+            skyobj2_interp.stokes[:, 1, :],
+            skyobj_interp.stokes[:, 1, :],
+            atol=1e-1,
+            rtol=0,
+        )
 
 
 @pytest.mark.parametrize("stype", ["full", "subband", "spectral_index", "flat"])
