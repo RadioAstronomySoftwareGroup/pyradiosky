@@ -24,6 +24,9 @@ healpix objects the `ra` and `dec` parameters are no longer populated.
 - `point_to_healpix` has been renamed to `_point_to_healpix` because it's only intended
 to be used internally to undo the `healpix_to_point` method.
 
+## Fixed
+- A bug in `concat` when optional spectral paramters are not None on one of the objects.
+
 ### Deprecated
 - The `source_cuts` method and the `source_select_kwds` keywords to the reading methods.
 - The `point_to_healpix` method.
