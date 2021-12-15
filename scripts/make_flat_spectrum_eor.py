@@ -34,8 +34,7 @@ def flat_spectrum_skymodel(
     ref_zbin: int
         Redshift bin number to use as reference, if using redshifts.
     redshifts: numpy.ndarray
-        Redshifts at which to generate maps.
-        Optional if freqs is provided.
+        Redshifts at which to generate maps. Ignored if freqs is provided.
     freqs: numpy.ndarray
         Frequencies in Hz. Overrides redshifts, setting them to be
         the redshifts of the 21 cm line corresponding with these frequencies.
@@ -52,10 +51,17 @@ def flat_spectrum_skymodel(
     The history string of the returned SkyModel gives the expected amplitude.
     """
     if freqs is not None:
+        if np.any(np.diff(freqs) < 0):
+            raise ValueError("freqs must be in ascending order.")
         redshifts = f21 / freqs - 1
-        ref_zbin = np.argsort(redshifts).tolist().index(ref_chan)
+        ref_z = redshifts[ref_chan]
+        # must sort so that redshifts go in ascending order (opposite freq order)
+        redshifts.sort()
+        ref_zbin = np.where(np.isclose(redshifts, ref_z))[0][0]
     elif redshifts is None:
         freqs = f21 / (redshifts + 1)
+        if np.any(np.diff(redshifts) < 0):
+            raise ValueError("redshifts must be in ascending order.")
     else:
         raise ValueError("Either redshifts or freqs must be set.")
 
@@ -66,10 +72,6 @@ def flat_spectrum_skymodel(
     # Make some noise.
     stokes = np.zeros((4, npix, nfreqs))
     stokes[0, :, :] = np.random.normal(0.0, np.sqrt(variance), (npix, nfreqs))
-
-    ref_z = redshifts[ref_zbin]
-    redshifts.sort()
-    ref_zbin = np.where(np.isclose(redshifts, ref_z))[0][0]
 
     voxvols = np.zeros(nfreqs)
     for zi in range(nfreqs - 1):
@@ -173,11 +175,11 @@ if __name__ == "__main__":
     freq_array = np.linspace(start_freq, end_freq, Nfreqs)
 
     print(
-        f"Generating sky model with MWA frequencies, nside {nside},"
+        f"Generating sky model, nside {nside},"
         f" and variance {var} K^2 at channel {args.ref_chan}."
     )
 
-    sky = flat_spectrum_skymodel(var, nside, freqs=freq_array)
+    sky = flat_spectrum_skymodel(var, nside, freqs=freq_array, ref_chan=args.ref_chan)
     sky.check()
     print(sky.history)
     print(f"Saving to {fname}.")
