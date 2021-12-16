@@ -3741,6 +3741,8 @@ def test_at_frequencies_nan_handling(nan_handling):
     skyobj2.stokes[0, -2:, 2] = np.NaN  # no high freq support
     skyobj2.stokes[0, :, 3] = np.NaN  # all NaNs
     skyobj2.stokes[0, 1:-2, 4] = np.NaN  # only 2 good freqs
+    skyobj2.stokes[0, 0, 5] = np.NaN  # no low or high frequency support
+    skyobj2.stokes[0, -1, 5] = np.NaN  # no low or high frequency support
 
     message = ["Some stokes values are NaNs."]
     if nan_handling == "propagate":
@@ -3752,9 +3754,9 @@ def test_at_frequencies_nan_handling(nan_handling):
         message.extend(
             [
                 "1 components had all NaN stokes values. ",
-                "1 components had all NaN stokes values above one or more of the "
+                "2 components had all NaN stokes values above one or more of the "
                 "requested frequencies. ",
-                "1 components had all NaN stokes values below one or more of the "
+                "2 components had all NaN stokes values below one or more of the "
                 "requested frequencies. ",
                 "1 components had too few non-NaN stokes values for chosen "
                 "interpolation. Using linear interpolation for these components instead.",
@@ -3779,8 +3781,8 @@ def test_at_frequencies_nan_handling(nan_handling):
         )
 
     if nan_handling == "propagate":
-        assert np.all(np.isnan(skyobj2_interp.stokes[:, :, 0:5]))
-        assert np.all(~np.isnan(skyobj2_interp.stokes[:, :, 5:]))
+        assert np.all(np.isnan(skyobj2_interp.stokes[:, :, 0:6]))
+        assert np.all(~np.isnan(skyobj2_interp.stokes[:, :, 6:]))
     elif nan_handling == "interp":
         assert np.all(np.isnan(skyobj2_interp.stokes[:, 0, 0]))
         assert np.allclose(
@@ -3797,6 +3799,16 @@ def test_at_frequencies_nan_handling(nan_handling):
             atol=1e-5,
             rtol=0,
         )
+
+        assert np.all(np.isnan(skyobj2_interp.stokes[:, 0, 5]))
+        assert np.all(np.isnan(skyobj2_interp.stokes[:, 2, 5]))
+        assert np.allclose(
+            skyobj2_interp.stokes[:, 1, 2],
+            skyobj_interp.stokes[:, 1, 2],
+            atol=1e-5,
+            rtol=0,
+        )
+
     else:  # clip
         assert np.all(~np.isnan(skyobj2_interp.stokes[:, :, 0:3]))
 
@@ -3808,23 +3820,6 @@ def test_at_frequencies_nan_handling(nan_handling):
             rtol=0,
         )
 
-        assert np.all(~np.isnan(skyobj2_interp.stokes[:, :, 1]))
-        assert np.allclose(
-            skyobj2_interp.stokes[:, 0, 1], skyobj_interp.stokes[:, 0, 1]
-        )
-        assert np.allclose(
-            skyobj2_interp.stokes[:, 2, 1], skyobj_interp.stokes[:, 2, 1]
-        )
-        assert not np.allclose(
-            skyobj2_interp.stokes[:, 1, 1], skyobj_interp.stokes[:, 1, 1]
-        )
-        assert np.allclose(
-            skyobj2_interp.stokes[:, 1, 1],
-            skyobj_interp.stokes[:, 1, 1],
-            atol=1e-2,
-            rtol=0,
-        )
-
         assert np.allclose(skyobj2_interp.stokes[:, 2, 2], skyobj.stokes[:, -3, 2])
         assert np.allclose(
             skyobj2_interp.stokes[:, 0:-1, 2],
@@ -3833,7 +3828,14 @@ def test_at_frequencies_nan_handling(nan_handling):
             rtol=0,
         )
 
-        assert np.all(np.isnan(skyobj2_interp.stokes[:, :, 3]))
+        assert np.allclose(skyobj2_interp.stokes[:, 0, 5], skyobj.stokes[:, 1, 5])
+        assert np.allclose(skyobj2_interp.stokes[:, 2, 5], skyobj.stokes[:, -2, 5])
+        assert np.allclose(
+            skyobj2_interp.stokes[:, 1, 5],
+            skyobj_interp.stokes[:, 1, 5],
+            atol=1e-5,
+            rtol=0,
+        )
 
     if nan_handling in ["interp", "clip"]:
         assert np.all(np.isnan(skyobj2_interp.stokes[:, :, 3]))
@@ -3881,7 +3883,7 @@ def test_at_frequencies_nan_handling(nan_handling):
             rtol=0,
         )
 
-    assert np.allclose(skyobj2_interp.stokes[:, :, 5:], skyobj_interp.stokes[:, :, 5:])
+    assert np.allclose(skyobj2_interp.stokes[:, :, 6:], skyobj_interp.stokes[:, :, 6:])
 
 
 @pytest.mark.parametrize("nan_handling", ["propagate", "interp", "clip"])
