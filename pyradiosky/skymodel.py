@@ -2041,9 +2041,12 @@ class SkyModel(UVBase):
                                 ]
 
                         if np.min(at_freq_arr) < np.min(freq_arr[freq_inds_use]):
-                            at_freq_inds_use = np.nonzero(
+                            at_freq_inds_use_low = np.nonzero(
                                 at_freq_arr >= np.min(freq_arr[freq_inds_use])
                             )[0]
+                            at_freq_inds_use = np.intersect1d(
+                                at_freq_inds_use, at_freq_inds_use_low
+                            )
                             at_freqs_small = np.nonzero(
                                 at_freq_arr < np.min(freq_arr[freq_inds_use])
                             )[0]
