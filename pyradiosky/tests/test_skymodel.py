@@ -3071,13 +3071,24 @@ def test_read_gleam(spec_type):
     ]
     if spec_type == "flat":
         msg_expected.append("The reference_frequency is aliased as `frequency`")
-    with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
-        cut_catalog = skymodel.read_gleam_catalog(
-            GLEAM_vot,
-            spectral_type=spec_type,
-            source_select_kwds=source_select_kwds,
-            return_table=True,
-        )
+    # The try/except can be removed once we require pyuvdata > 2.2.6
+    try:
+        with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
+            cut_catalog = skymodel.read_gleam_catalog(
+                GLEAM_vot,
+                spectral_type=spec_type,
+                source_select_kwds=source_select_kwds,
+                return_table=True,
+            )
+    except AssertionError:
+        msg_expected += ["distutils Version classes are deprecated."] * 8
+        with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
+            cut_catalog = skymodel.read_gleam_catalog(
+                GLEAM_vot,
+                spectral_type=spec_type,
+                source_select_kwds=source_select_kwds,
+                return_table=True,
+            )
 
     assert len(cut_catalog) < skyobj.Ncomponents
 
@@ -3086,10 +3097,22 @@ def test_read_gleam(spec_type):
         "The source_select_kwds parameter is deprecated",
         "The `source_cuts` method is deprecated and will be removed",
     ]
-    with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
-        cut_obj = skymodel.read_gleam_catalog(
-            GLEAM_vot, spectral_type=spec_type, source_select_kwds=source_select_kwds
-        )
+    # The try/except can be removed once we require pyuvdata > 2.2.6
+    try:
+        with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
+            cut_obj = skymodel.read_gleam_catalog(
+                GLEAM_vot,
+                spectral_type=spec_type,
+                source_select_kwds=source_select_kwds,
+            )
+    except AssertionError:
+        msg_expected += ["distutils Version classes are deprecated."] * 8
+        with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
+            cut_obj = skymodel.read_gleam_catalog(
+                GLEAM_vot,
+                spectral_type=spec_type,
+                source_select_kwds=source_select_kwds,
+            )
 
     assert len(cut_catalog) == cut_obj.Ncomponents
 
@@ -3108,39 +3131,65 @@ def test_read_votable():
     )
 
     assert skyobj.Ncomponents == 2
-
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match="This function is deprecated, use `SkyModel.read_votable_catalog` instead.",
-    ):
-        skyobj2 = skymodel.read_votable_catalog(
-            votable_file,
-            table_name="VIII/1000/single",
-            id_column="source_id",
-            ra_column="RAJ2000",
-            dec_column="DEJ2000",
-            flux_columns="Si",
-            reference_frequency=None,
-        )
+    msg_expected = [
+        "This function is deprecated, use `SkyModel.read_votable_catalog` instead."
+    ]
+    # The try/except can be removed once we require pyuvdata > 2.2.6
+    try:
+        with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
+            skyobj2 = skymodel.read_votable_catalog(
+                votable_file,
+                table_name="VIII/1000/single",
+                id_column="source_id",
+                ra_column="RAJ2000",
+                dec_column="DEJ2000",
+                flux_columns="Si",
+                reference_frequency=None,
+            )
+    except AssertionError:
+        msg_expected += ["distutils Version classes are deprecated."] * 8
+        with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
+            skyobj2 = skymodel.read_votable_catalog(
+                votable_file,
+                table_name="VIII/1000/single",
+                id_column="source_id",
+                ra_column="RAJ2000",
+                dec_column="DEJ2000",
+                flux_columns="Si",
+                reference_frequency=None,
+            )
     assert skyobj == skyobj2
 
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match=[
-            "This function is deprecated, use `SkyModel.read_votable_catalog` instead.",
-            "recarray flux columns will no longer be labeled",
-        ],
-    ):
-        skyarr = skymodel.read_votable_catalog(
-            votable_file,
-            table_name="VIII/1000/single",
-            id_column="source_id",
-            ra_column="RAJ2000",
-            dec_column="DEJ2000",
-            flux_columns="Si",
-            reference_frequency=None,
-            return_table=True,
-        )
+    msg_expected = [
+        "This function is deprecated, use `SkyModel.read_votable_catalog` instead.",
+        "recarray flux columns will no longer be labeled",
+    ]
+    # The try/except can be removed once we require pyuvdata > 2.2.6
+    try:
+        with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
+            skyarr = skymodel.read_votable_catalog(
+                votable_file,
+                table_name="VIII/1000/single",
+                id_column="source_id",
+                ra_column="RAJ2000",
+                dec_column="DEJ2000",
+                flux_columns="Si",
+                reference_frequency=None,
+                return_table=True,
+            )
+    except AssertionError:
+        msg_expected += ["distutils Version classes are deprecated."] * 8
+        with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
+            skyarr = skymodel.read_votable_catalog(
+                votable_file,
+                table_name="VIII/1000/single",
+                id_column="source_id",
+                ra_column="RAJ2000",
+                dec_column="DEJ2000",
+                flux_columns="Si",
+                reference_frequency=None,
+                return_table=True,
+            )
     skyobj2.from_recarray(skyarr)
     assert skyobj == skyobj2
 
@@ -3149,30 +3198,41 @@ def test_read_deprecated_votable():
     votable_file = os.path.join(SKY_DATA_PATH, "single_source_old.vot")
 
     skyobj = SkyModel()
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match=(
-            "contains tables with no name or ID, "
-            "Support for such files is deprecated."
-        ),
-    ):
-        skyobj.read_votable_catalog(
-            votable_file, "GLEAM", "GLEAM", "RAJ2000", "DEJ2000", "Fintwide"
-        )
+    msg_expected = [
+        "contains tables with no name or ID, " "Support for such files is deprecated."
+    ]
+    # The try/except can be removed once we require pyuvdata > 2.2.6
+    try:
+        with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
+            skyobj.read_votable_catalog(
+                votable_file, "GLEAM", "GLEAM", "RAJ2000", "DEJ2000", "Fintwide"
+            )
+    except AssertionError:
+        msg_expected += ["distutils Version classes are deprecated."] * 8
+        with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
+            skyobj.read_votable_catalog(
+                votable_file, "GLEAM", "GLEAM", "RAJ2000", "DEJ2000", "Fintwide"
+            )
 
     assert skyobj.Ncomponents == 1
 
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match=(
-            "contains tables with no name or ID, "
-            "Support for such files is deprecated."
-        ),
-    ):
-        with pytest.raises(ValueError, match=("More than one matching table.")):
-            skyobj.read_votable_catalog(
-                votable_file, "GLEAM", "de", "RAJ2000", "DEJ2000", "Fintwide"
-            )
+    msg_expected = [
+        "contains tables with no name or ID, " "Support for such files is deprecated."
+    ]
+    # The try/except can be removed once we require pyuvdata > 2.2.6
+    try:
+        with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
+            with pytest.raises(ValueError, match=("More than one matching table.")):
+                skyobj.read_votable_catalog(
+                    votable_file, "GLEAM", "de", "RAJ2000", "DEJ2000", "Fintwide"
+                )
+    except AssertionError:
+        msg_expected += ["distutils Version classes are deprecated."] * 8
+        with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
+            with pytest.raises(ValueError, match=("More than one matching table.")):
+                skyobj.read_votable_catalog(
+                    votable_file, "GLEAM", "de", "RAJ2000", "DEJ2000", "Fintwide"
+                )
 
 
 def test_read_votable_errors():
