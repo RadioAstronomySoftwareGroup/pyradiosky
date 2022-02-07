@@ -56,7 +56,9 @@ def flat_spectrum_skymodel(
         redshifts = f21 / freqs - 1
         ref_z = redshifts[ref_chan]
         # must sort so that redshifts go in ascending order (opposite freq order)
-        redshifts.sort()
+        z_order = np.argsort(redshifts)
+        redshifts = redshifts[z_order]
+        freqs = freqs[z_order]
         ref_zbin = np.where(np.isclose(redshifts, ref_z))[0][0]
     elif redshifts is None:
         freqs = f21 / (redshifts + 1)
@@ -90,6 +92,11 @@ def flat_spectrum_skymodel(
     scale = np.sqrt(voxvols / voxvols[ref_zbin])
     stokes *= scale
     stokes = np.swapaxes(stokes, 1, 2)  # Put npix in last place again.
+
+    # sort back to freq order
+    f_order = np.argsort(freqs)
+    freqs = freqs[f_order]
+    stokes = stokes[:, f_order]
 
     if not isinstance(freqs, units.Quantity):
         freqs *= units.Hz
@@ -183,4 +190,4 @@ if __name__ == "__main__":
     sky.check()
     print(sky.history)
     print(f"Saving to {fname}.")
-    sky.write_healpix_hdf5(fname)
+    sky.write_skyh5(fname)
