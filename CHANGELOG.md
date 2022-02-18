@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- A `filename` attribute to SkyModel objects.
 - The `nan_handling` keyword to the `at_frequencies` method to control how NaNs in the
 stokes array on subband objects are handled during interpolation.
 - The `lat_range` and `lon_range` keywords to the `select` method to support selecting
