@@ -173,6 +173,7 @@ def mock_point_skies():
     def _func(stype):
 
         stokes = spectrum.repeat(4, 0).repeat(Ncomp, 2)
+        filename_use = ["mock_point_" + stype]
         if stype in ["full", "subband"]:
             stokes = spectrum.repeat(4, 0).repeat(Ncomp, 2)
             stokes[1:, :, :] = 0.0  # Set unpolarized
@@ -183,6 +184,7 @@ def mock_point_skies():
                 stokes=stokes,
                 spectral_type=stype,
                 freq_array=freq_arr,
+                filename=filename_use,
             )
         elif stype == "spectral_index":
             stokes = stokes[:, :1, :]
@@ -195,6 +197,7 @@ def mock_point_skies():
                 spectral_type=stype,
                 spectral_index=spectral_index,
                 reference_frequency=np.repeat(freq_arr[0], Ncomp),
+                filename=filename_use,
             )
         elif stype == "flat":
             stokes = stokes[:, :1, :]
@@ -204,6 +207,7 @@ def mock_point_skies():
                 dec=decs,
                 stokes=stokes,
                 spectral_type=stype,
+                filename=filename_use,
             )
 
     yield _func
@@ -1670,8 +1674,12 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
         skyobj_full = SkyModel.from_gleam_catalog(
             GLEAM_vot, spectral_type=spec_type, with_error=True
         )
+        filebasename = "gleam_50srcs.vot"
     else:
         skyobj_full = healpix_disk_new
+        filebasename = "healpix_disk.skyh5"
+
+    assert skyobj_full.filename == [filebasename]
 
     # Add on optional parameters
     skyobj_full.extended_model_group = skyobj_full.name
@@ -1686,6 +1694,8 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
     )
 
     skyobj_new = skyobj1.concat(skyobj2, inplace=False)
+    # check that filename not duplicated if its the same on both objects
+    assert skyobj_new.filename == [filebasename]
 
     assert skyobj_new.history != skyobj_full.history
     expected_history = (
@@ -1751,6 +1761,8 @@ def test_concat_optional_params(param, healpix_disk_new):
     else:
         skyobj_full = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type="flat")
 
+    input_filename = skyobj_full.filename[0]
+
     if param == "extended_model_group":
         skyobj_full.extended_model_group = skyobj_full.name
     elif param == "beam_amp":
@@ -1763,13 +1775,18 @@ def test_concat_optional_params(param, healpix_disk_new):
     skyobj1 = skyobj_full.select(
         component_inds=np.arange(skyobj_full.Ncomponents // 2), inplace=False
     )
+    skyobj1.filename = [input_filename + "_1"]
     setattr(skyobj1, param, None)
     skyobj2 = skyobj_full.select(
         component_inds=np.arange(skyobj_full.Ncomponents // 2, skyobj_full.Ncomponents),
         inplace=False,
     )
+    skyobj2.filename = [input_filename + "_2"]
+
     with uvtest.check_warnings(UserWarning, f"This object does not have {param}"):
         skyobj_new = skyobj1.concat(skyobj2, inplace=False)
+
+    assert skyobj_new.filename == [input_filename + "_1", input_filename + "_2"]
 
     if param not in ["lon", "lat", "name"]:
         assert getattr(skyobj_new, param) is not None
@@ -2026,6 +2043,7 @@ def test_healpix_to_sky(healpix_data, healpix_disk_old):
 
     sky.history = history + sky.pyradiosky_version_str
 
+    assert healpix_disk_old.filename == ["healpix_disk.hdf5"]
     assert healpix_disk_old == sky
     assert units.quantity.allclose(healpix_disk_old.stokes[0], hmap_orig)
 
@@ -3316,6 +3334,7 @@ def test_fhd_catalog_reader():
     ):
         skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
 
+    assert skyobj.filename == ["fhd_catalog.sav"]
     catalog = scipy.io.readsav(catfile)["catalog"]
     assert skyobj.Ncomponents == len(catalog)
 
@@ -3451,6 +3470,8 @@ def test_fhd_catalog_reader_labeling_extended_sources():
 def test_point_catalog_reader():
     catfile = os.path.join(SKY_DATA_PATH, "pointsource_catalog.txt")
     skyobj = SkyModel.from_text_catalog(catfile)
+
+    assert skyobj.filename == ["pointsource_catalog.txt"]
 
     with open(catfile, "r") as fileobj:
         header = fileobj.readline()
@@ -4021,6 +4042,7 @@ def test_skyh5_file_loop(mock_point_skies, stype, tmpdir):
 
     sky2 = SkyModel.from_skyh5(testfile)
 
+    assert sky2.filename == ["testfile.skyh5"]
     assert sky2 == sky
 
 
