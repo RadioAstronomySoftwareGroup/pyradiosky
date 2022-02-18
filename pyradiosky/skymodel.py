@@ -184,6 +184,9 @@ class SkyModel(UVBase):
         polarizations.
     history : str
         History to add to object.
+    filename : str or list of str
+        Base file name (not the whole path) or list of base file names for input data
+        to track on the object.
 
     """
 
@@ -229,6 +232,7 @@ class SkyModel(UVBase):
         extended_model_group=None,
         beam_amp=None,
         history="",
+        filename=None,
     ):
         # standard angle tolerance: 1 mas in radians.
         angle_tol = Angle(1, units.arcsec)
@@ -432,6 +436,17 @@ class SkyModel(UVBase):
             "history",
             description="String of history.",
             form="str",
+            expected_type=str,
+        )
+
+        desc = (
+            "List of strings containing the unique basenames (not the full path) of "
+            "input files."
+        )
+        self._filename = UVParameter(
+            "filename",
+            required=False,
+            description=desc,
             expected_type=str,
         )
 
@@ -794,6 +809,15 @@ class SkyModel(UVBase):
             self._n_polarized = np.unique(self._polarized).size
 
             self.coherency_radec = skyutils.stokes_to_coherency(self.stokes)
+
+            # update filename attribute
+            if filename is not None:
+                if isinstance(filename, str):
+                    filename_use = [filename]
+                else:
+                    filename_use = filename
+                self.filename = filename_use
+                self._filename.form = (len(filename_use),)
 
             self.history = history
             if not uvutils._check_history_version(
@@ -2670,6 +2694,11 @@ class SkyModel(UVBase):
 
         this.Ncomponents = this.Ncomponents + other.Ncomponents
 
+        # Update filename parameter
+        this.filename = uvutils._combine_filenames(this.filename, other.filename)
+        if this.filename is not None:
+            this._filename.form = (len(this.filename),)
+
         history_update_string = (
             " Combined skymodels along the component axis using pyradiosky."
         )
@@ -3465,7 +3494,7 @@ class SkyModel(UVBase):
                     "is deprecated and will be removed in version 0.3.0."
                 )
 
-        init_params = {}
+        init_params = {"filename": os.path.basename(filename)}
 
         with h5py.File(filename, "r") as fileobj:
 
@@ -3736,6 +3765,7 @@ class SkyModel(UVBase):
             freq_array=freq,
             history=history,
             frame="icrs",
+            filename=os.path.basename(hdf5_filename),
         )
         assert self.component_type == "healpix"
 
@@ -4015,6 +4045,7 @@ class SkyModel(UVBase):
             spectral_index=spectral_index,
             stokes_error=stokes_error,
             history=history,
+            filename=os.path.basename(votable_file),
         )
 
         if source_select_kwds is not None:
@@ -4384,6 +4415,7 @@ class SkyModel(UVBase):
             reference_frequency=reference_frequency,
             spectral_index=spectral_index,
             stokes_error=stokes_error,
+            filename=os.path.basename(catalog_csv),
         )
 
         assert type(self.stokes_error) == type(stokes_error)
@@ -4584,6 +4616,7 @@ class SkyModel(UVBase):
             spectral_index=spectral_index,
             beam_amp=beam_amp,
             extended_model_group=extended_model_group,
+            filename=os.path.basename(filename_sav),
         )
 
         if source_select_kwds is not None:
