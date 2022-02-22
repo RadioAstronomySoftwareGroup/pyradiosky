@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@master
         with:
-         fetch-depth: 1
+         fetch-depth: 0
 
       - name: clone pyuvsim
         run: |
