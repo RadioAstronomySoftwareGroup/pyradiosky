@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.1.3] - 2022-02-22
+
 ### Added
 - A `filename` attribute to SkyModel objects.
 - The `nan_handling` keyword to the `at_frequencies` method to control how NaNs in the
