@@ -10,13 +10,19 @@ jobs:
         # Adding -l {0} helps ensure conda can be found properly.
         shell: bash -l {0}
     env:
-      ENV_NAME: pyuvsim
-      PYTHON: 3.7
+      ENV_NAME: tests
+      PYTHON: 3.8
 
     steps:
       - uses: actions/checkout@master
         with:
          fetch-depth: 1
+
+      - name: clone pyuvsim
+        run: |
+          cd ../
+          git clone https://github.com/RadioAstronomySoftwareGroup/pyuvsim.git
+          cd pyradiosky
 
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.0.0
@@ -24,7 +30,7 @@ jobs:
           auto-update-conda: true
           miniconda-version: "latest"
           python-version: ${{ env.PYTHON }}
-          environment-file: ci/${{ env.ENV_NAME }}.yaml
+          environment-file: ../pyuvsim/ci/${{ env.ENV_NAME }}.yaml
           activate-environment: ${{ env.ENV_NAME }}
 
       - name: Conda Info
@@ -40,7 +46,7 @@ jobs:
         run: |
           pip install --no-deps .
           cd ../
-          git clone https://github.com/RadioAstronomySoftwareGroup/pyuvsim.git
           cd pyuvsim
+          pip install --no-deps .
           mkdir test-reports
           python -m pytest pyuvsim --junitxml=test-reports/xunit.xml
