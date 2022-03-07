@@ -90,7 +90,7 @@ def flat_spectrum_skymodel(
     ] = vol  # Assume the last redshift bin is the same width as the next-to-last.
 
     scale = np.sqrt(voxvols / voxvols[ref_zbin])
-    stokes *= scale
+    stokes /= scale
     stokes = np.swapaxes(stokes, 1, 2)  # Put npix in last place again.
 
     # sort back to freq order
