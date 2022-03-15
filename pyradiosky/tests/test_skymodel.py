@@ -1093,7 +1093,7 @@ def test_assign_to_healpix(assign_hpx_data):
 
     assert np.allclose(
         sky_hpx.stokes_error[0, 0, 0],
-        np.sqrt(0.15 ** 2 + 0.25 ** 2) * units.Jy * jy_to_ksr_conv_factor / hpx_area,
+        np.sqrt(0.15**2 + 0.25**2) * units.Jy * jy_to_ksr_conv_factor / hpx_area,
     )
     assert np.allclose(
         sky_hpx.stokes_error[1, 0, 0],
@@ -1140,7 +1140,7 @@ def test_assign_to_healpix_fullsky(assign_hpx_data, spectral_type):
     if spectral_type == "subband":
         assert np.allclose(
             sky_hpx.stokes_error[0, 0, pix_num],
-            np.sqrt(0.15 ** 2 + 0.25 ** 2)
+            np.sqrt(0.15**2 + 0.25**2)
             * units.Jy
             * jy_to_ksr_conv_factor
             / hpx_area,
@@ -2254,7 +2254,7 @@ def test_healpix_import_err(zenith_skymodel):
     try:
         import astropy_healpix
 
-        astropy_healpix.nside_to_npix(2 ** 3)
+        astropy_healpix.nside_to_npix(2**3)
     except ImportError:
         errstr = "The astropy-healpix module must be installed to use HEALPix methods"
         Npix = 12
@@ -4207,7 +4207,7 @@ def test_hpx_ordering():
     # Setting the hpx_order parameter
     pytest.importorskip("astropy_healpix")
     nside = 16
-    npix = 12 * nside ** 2
+    npix = 12 * nside**2
     stokes = np.zeros((4, 1, npix)) * units.K
 
     with pytest.raises(
@@ -4439,7 +4439,7 @@ def test_skymod_healpix_transform_import_error(zenith_skymodel):
     try:
         import astropy_healpix
 
-        astropy_healpix.nside_to_npix(2 ** 3)
+        astropy_healpix.nside_to_npix(2**3)
     except ImportError:
         # spoof to get into healpix component without actually having healpix installed
         zenith_skymodel.component_type = "healpix"

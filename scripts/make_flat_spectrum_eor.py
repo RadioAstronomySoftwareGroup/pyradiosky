@@ -67,7 +67,7 @@ def flat_spectrum_skymodel(
     else:
         raise ValueError("Either redshifts or freqs must be set.")
 
-    npix = 12 * nside ** 2
+    npix = 12 * nside**2
     nfreqs = freqs.size
     omega = 4 * np.pi / npix
 

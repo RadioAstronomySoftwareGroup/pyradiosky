@@ -128,7 +128,7 @@ def test_jy_to_ksr():
         c_cmps = 29979245800.0  # cm/s
         k_boltz = 1.380658e-16  # erg/K
         lam = c_cmps / freq_arr.to_value("Hz")  # cm
-        return 1e-23 * lam ** 2 / (2 * k_boltz)
+        return 1e-23 * lam**2 / (2 * k_boltz)
 
     conv0 = skyutils.jy_to_ksr(freqs)
     conv1 = jy2ksr_nonastropy(freqs) * units.K * units.sr / units.Jy
