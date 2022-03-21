@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Deprecated
+- The `to_recarray` and `from_recarray` methods.
+
 ## [0.1.3] - 2022-02-22
 
 ### Added
