@@ -3187,19 +3187,14 @@ class SkyModel(UVBase):
         if not inplace:
             return skyobj
 
-    def to_recarray(self):
+    def _text_write_preprocess(self):
         """
-        Make a recarray of source components from this object.
+        Set up a recarray to use for writing out as a text file.
 
         Returns
         -------
         catalog_table : recarray
-            recarray equivalent to SkyModel data.
-
-        Notes
-        -----
-        This stores all SkyModel data in a contiguous array
-        that can be more easily handled with numpy.
+            recarray with data for a text file.
 
         """
         self.check()
@@ -3320,6 +3315,25 @@ class SkyModel(UVBase):
 
         return arr
 
+    def to_recarray(self):
+        """
+        Make a recarray of source components from this object.
+
+        Deprecated, will be removed in version 0.3.0.
+
+        Returns
+        -------
+        catalog_table : recarray
+            recarray equivalent to SkyModel data.
+
+        """
+        warnings.warn(
+            "The to_recarray method is deprecated and will be removed in 0.3.0.",
+            DeprecationWarning,
+        )
+
+        return self._text_write_preprocess()
+
     @classmethod
     def from_recarray(
         cls,
@@ -3331,6 +3345,8 @@ class SkyModel(UVBase):
     ):
         """
         Initialize this object from a recarray.
+
+        Deprecated, will be removed in version 0.3.0.
 
         Parameters
         ----------
@@ -3351,6 +3367,11 @@ class SkyModel(UVBase):
             acceptable range check will be done).
 
         """
+        warnings.warn(
+            "The from_recarray method is deprecated and will be removed in 0.3.0.",
+            DeprecationWarning,
+        )
+
         ra = Longitude(recarray_in["ra_j2000"], units.deg)
         dec = Latitude(recarray_in["dec_j2000"], units.deg)
         ids = np.asarray(recarray_in["source_id"]).astype(str)
@@ -4981,7 +5002,7 @@ class SkyModel(UVBase):
 
         with open(filename, "w+") as fo:
             fo.write(header)
-            arr = self.to_recarray()
+            arr = self._text_write_preprocess()
             fieldnames = arr.dtype.names
             for src in arr:
                 fieldvals = src
@@ -5207,7 +5228,7 @@ def skymodel_to_array(sky):
     """
     Make a recarray of source components from a SkyModel object.
 
-    Deprecated. Use `SkyModel.to_recarray` instead.
+    Deprecated, will be removed in v0.2.0.
 
     Parameters
     ----------
@@ -5226,19 +5247,20 @@ def skymodel_to_array(sky):
     This is used by pyuvsim for sharing catalog data via MPI.
     """
     warnings.warn(
-        "This function is deprecated, use `SkyModel.to_recarray` instead. "
-        "This function will be removed in version 0.2.0.",
+        "This function is deprecated, and will be removed in version 0.2.0.",
         category=DeprecationWarning,
     )
 
-    return sky.to_recarray()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return sky.to_recarray()
 
 
 def array_to_skymodel(catalog_table):
     """
     Make a SkyModel object from a recarray.
 
-    Deprecated. Use `SkyModel.from_recarray` instead."
+    Deprecated, will be removed in v0.2.0.
 
     Parameters
     ----------
@@ -5251,12 +5273,13 @@ def array_to_skymodel(catalog_table):
 
     """
     warnings.warn(
-        "This function is deprecated, use `SkyModel.from_recarray` instead. "
-        "This function will be removed in version 0.2.0.",
+        "This function is deprecated, and will be removed in version 0.2.0.",
         category=DeprecationWarning,
     )
 
-    return SkyModel.from_recarray(catalog_table)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return SkyModel.from_recarray(catalog_table)
 
 
 def source_cuts(
@@ -5312,7 +5335,9 @@ def source_cuts(
         category=DeprecationWarning,
     )
 
-    skyobj = SkyModel.from_recarray(catalog_table)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        skyobj = SkyModel.from_recarray(catalog_table)
 
     if min_flux is not None and max_flux is not None:
         if min_flux is not None:
@@ -5331,7 +5356,9 @@ def source_cuts(
         skyobj.cut_nonrising(lat_use)
         skyobj.calculate_rise_set_lsts(lat_use, horizon_buffer=horizon_buffer)
 
-    return skyobj.to_recarray()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return skyobj.to_recarray()
 
 
 def read_votable_catalog(
@@ -5411,7 +5438,9 @@ def read_votable_catalog(
     )
 
     if return_table:
-        return skyobj.to_recarray()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return skyobj.to_recarray()
 
     return skyobj
 
@@ -5466,7 +5495,9 @@ def read_gleam_catalog(
     )
 
     if return_table:
-        return skyobj.to_recarray()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return skyobj.to_recarray()
 
     return skyobj
 
@@ -5526,7 +5557,9 @@ def read_text_catalog(catalog_csv, source_select_kwds=None, return_table=False):
     )
 
     if return_table:
-        return skyobj.to_recarray()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return skyobj.to_recarray()
 
     return skyobj
 

@@ -2098,13 +2098,23 @@ def test_order_healpix_to_sky(healpix_data, hpx_order):
             assert sky.hpx_order == hpx_order
 
 
-@pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 def test_healpix_recarray_loop(healpix_disk_new):
 
     skyobj = healpix_disk_new
-    skyarr = skyobj.to_recarray()
+    with uvtest.check_warnings(
+        DeprecationWarning,
+        match=[
+            "The to_recarray method is deprecated and will be removed in 0.3.0.",
+            "recarray flux columns will no longer be labeled",
+        ],
+    ):
+        skyarr = skyobj.to_recarray()
 
-    skyobj2 = SkyModel.from_recarray(skyarr, history=skyobj.history)
+    with uvtest.check_warnings(
+        DeprecationWarning,
+        match="The from_recarray method is deprecated and will be removed in 0.3.0.",
+    ):
+        skyobj2 = SkyModel.from_recarray(skyarr, history=skyobj.history)
     assert skyobj.component_type == "healpix"
     assert skyobj2.component_type == "healpix"
 
@@ -2398,8 +2408,9 @@ def test_healpix_positions(tmp_path, time_location):
     assert np.isclose(src_lmn[2][ipix], src_n)
 
 
+@pytest.mark.filterwarnings("ignore:The to_recarray method is deprecated")
+@pytest.mark.filterwarnings("ignore:The from_recarray method is deprecated")
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
-@pytest.mark.filterwarnings("ignore:The reference_frequency is aliased as `frequency`")
 @pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index", "full"])
 @pytest.mark.parametrize("with_error", [False, True])
 def test_array_to_skymodel_loop(spec_type, with_error):
@@ -2411,8 +2422,21 @@ def test_array_to_skymodel_loop(spec_type, with_error):
     if spec_type == "full":
         sky.spectral_type = "full"
 
-    arr = sky.to_recarray()
-    sky2 = SkyModel.from_recarray(arr)
+    messages = [
+        "The to_recarray method is deprecated and will be removed in 0.3.0.",
+        "recarray flux columns will no longer be labeled",
+    ]
+    if spec_type in ["flat", "spectral_index"]:
+        messages += ["The reference_frequency is aliased as"]
+
+    with uvtest.check_warnings(DeprecationWarning, match=messages):
+        arr = sky.to_recarray()
+
+    with uvtest.check_warnings(
+        DeprecationWarning,
+        match="The from_recarray method is deprecated and will be removed in 0.3.0.",
+    ):
+        sky2 = SkyModel.from_recarray(arr)
 
     assert sky == sky2
 
@@ -2856,6 +2880,7 @@ def test_select_field_error():
         skyobj.select(lat_range=Latitude([-90, -75], units.deg))
 
 
+@pytest.mark.filterwarnings("ignore:The to_recarray method is deprecated")
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 @pytest.mark.parametrize("function", ["source_cuts", "cut_nonrising"])
 def test_circumpolar_nonrising(time_location, function):
@@ -2899,8 +2924,6 @@ def test_circumpolar_nonrising(time_location, function):
             match=[
                 "This function is deprecated, use the `SkyModel.select` and/or"
                 "`SkyModel.cut_nonrising` methods instead.",
-                "recarray flux columns will no longer be labeled `flux_density_I` etc. in "
-                "version 0.2.0. Use `I` instead.",
             ],
         ):
             src_arr = skymodel.source_cuts(
@@ -2960,7 +2983,7 @@ def test_circumpolar_nonrising(time_location, function):
         # check that rise_lst and set_lst get added to object when converted
         with uvtest.check_warnings(
             DeprecationWarning,
-            match="This function is deprecated, use `SkyModel.from_recarray` instead.",
+            match="This function is deprecated, and will be removed in version 0.2.0.",
         ):
             new_sky = skymodel.array_to_skymodel(src_arr)
         assert hasattr(new_sky, "_rise_lst")
@@ -2970,9 +2993,7 @@ def test_circumpolar_nonrising(time_location, function):
         with uvtest.check_warnings(
             DeprecationWarning,
             match=[
-                "This function is deprecated, use `SkyModel.to_recarray` instead.",
-                "recarray flux columns will no longer be labeled `flux_density_I` etc. in "
-                "version 0.2.0. Use `I` instead.",
+                "This function is deprecated, and will be removed in version 0.2.0.",
             ],
         ):
             src_arr2 = skymodel.skymodel_to_array(new_sky)
@@ -3083,12 +3104,9 @@ def test_read_gleam(spec_type):
 
     msg_expected = [
         "This function is deprecated, use `SkyModel.read_gleam_catalog` instead.",
-        "recarray flux columns will no longer be labeled",
         "The source_select_kwds parameter is deprecated",
         "The `source_cuts` method is deprecated and will be removed",
     ]
-    if spec_type == "flat":
-        msg_expected.append("The reference_frequency is aliased as `frequency`")
     # The try/except can be removed once we require pyuvdata > 2.2.6
     try:
         with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
@@ -3141,6 +3159,9 @@ def test_read_gleam_errors():
         skyobj.read_gleam_catalog(GLEAM_vot, spectral_type="full")
 
 
+@pytest.mark.filterwarnings("ignore:The to_recarray method is deprecated")
+@pytest.mark.filterwarnings("ignore:The from_recarray method is deprecated")
+@pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 def test_read_votable():
     votable_file = os.path.join(SKY_DATA_PATH, "simple_test.vot")
 
@@ -3180,7 +3201,6 @@ def test_read_votable():
 
     msg_expected = [
         "This function is deprecated, use `SkyModel.read_votable_catalog` instead.",
-        "recarray flux columns will no longer be labeled",
     ]
     # The try/except can be removed once we require pyuvdata > 2.2.6
     try:
@@ -3501,8 +3521,6 @@ def test_point_catalog_reader():
             "This function is deprecated, use `SkyModel.read_text_catalog` instead.",
             "The source_select_kwds parameter is deprecated",
             "The `source_cuts` method is deprecated and will be removed",
-            "The reference_frequency is aliased as `frequency` in the recarray",
-            "recarray flux columns will no longer be labeled",
         ],
     ):
         skyarr = skymodel.read_text_catalog(
