@@ -66,6 +66,8 @@ jobs:
       PYTHON: 3.7
     name: Min Deps Testing
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
     defaults:
       run:
         # Adding -l {0} helps ensure conda can be found properly.
@@ -120,7 +122,7 @@ jobs:
     steps:
       - uses: actions/checkout@master
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.0.0
