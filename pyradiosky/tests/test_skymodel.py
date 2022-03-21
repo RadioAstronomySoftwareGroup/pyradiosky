@@ -222,7 +222,7 @@ def healpix_disk_old():
 @pytest.fixture(scope="function")
 def healpix_disk_new():
     pytest.importorskip("astropy_healpix")
-    sky = SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "healpix_disk.skyh5"))
+    sky = SkyModel.from_file(os.path.join(SKY_DATA_PATH, "healpix_disk.skyh5"))
 
     yield sky
 
@@ -282,7 +282,7 @@ def assign_hpx_data():
 @pytest.fixture(scope="function")
 def healpix_gsm_galactic():
     pytest.importorskip("astropy_healpix")
-    sky = SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "gsm_galactic.skyh5"))
+    sky = SkyModel.from_file(os.path.join(SKY_DATA_PATH, "gsm_galactic.skyh5"))
 
     yield sky
 
@@ -292,7 +292,7 @@ def healpix_gsm_galactic():
 @pytest.fixture(scope="function")
 def healpix_gsm_icrs():
     pytest.importorskip("astropy_healpix")
-    sky = SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "gsm_icrs.skyh5"))
+    sky = SkyModel.from_file(os.path.join(SKY_DATA_PATH, "gsm_icrs.skyh5"))
 
     yield sky
 
@@ -342,7 +342,7 @@ def test_init_error_freqparams(zenith_skycoord, spec_type):
 
 
 def test_check_errors():
-    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, with_error=True)
+    skyobj = SkyModel.from_file(GLEAM_vot, with_error=True)
 
     # Change units on stokes_error
     skyobj.stokes_error = skyobj.stokes_error / units.sr
@@ -938,8 +938,8 @@ def test_skymodel_deprecated(time_location):
 @pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index"])
 def test_jansky_to_kelvin_loop(spec_type):
 
-    skyobj = SkyModel.from_gleam_catalog(
-        GLEAM_vot, spectral_type=spec_type, with_error=True
+    skyobj = SkyModel.from_file(
+        GLEAM_vot, spectral_type=spec_type, with_error=True, filetype="gleam"
     )
 
     stokes_expected = np.zeros_like(skyobj.stokes.value) * units.K * units.sr
@@ -1260,9 +1260,7 @@ def test_assign_to_healpix_gleam_simple(spec_type):
     """
     astropy_healpix = pytest.importorskip("astropy_healpix")
 
-    sky = SkyModel.from_gleam_catalog(
-        GLEAM_vot, spectral_type=spec_type, with_error=True
-    )
+    sky = SkyModel.from_file(GLEAM_vot, spectral_type=spec_type, with_error=True)
 
     nside = 1024
     hpx_sky = sky.assign_to_healpix(nside, sort=False, to_k=False, frame="icrs")
@@ -1283,7 +1281,7 @@ def test_assign_to_healpix_gleam_multi(spec_type):
     """
     pytest.importorskip("astropy_healpix")
 
-    skyobj_full = SkyModel.from_gleam_catalog(
+    skyobj_full = SkyModel.from_file(
         GLEAM_vot, spectral_type=spec_type, with_error=True
     )
 
@@ -1671,7 +1669,7 @@ def test_polarized_source_smooth_visibilities():
 )
 def test_concat(comp_type, spec_type, healpix_disk_new):
     if comp_type == "point":
-        skyobj_full = SkyModel.from_gleam_catalog(
+        skyobj_full = SkyModel.from_file(
             GLEAM_vot, spectral_type=spec_type, with_error=True
         )
         filebasename = "gleam_50srcs.vot"
@@ -1755,11 +1753,11 @@ def test_concat_optional_params(param, healpix_disk_new):
                 ["hpx" + str(ind) for ind in skyobj_full.hpx_inds]
             )
     elif param == "stokes_error":
-        skyobj_full = SkyModel.from_gleam_catalog(
+        skyobj_full = SkyModel.from_file(
             GLEAM_vot, spectral_type="flat", with_error=True
         )
     else:
-        skyobj_full = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type="flat")
+        skyobj_full = SkyModel.from_file(GLEAM_vot, spectral_type="flat")
 
     input_filename = skyobj_full.filename[0]
 
@@ -1909,7 +1907,7 @@ def test_concat_optional_params(param, healpix_disk_new):
 @pytest.mark.parametrize("comp_type", ["point", "healpix"])
 def test_concat_overlap_errors(comp_type, healpix_disk_new):
     if comp_type == "point":
-        skyobj_full = SkyModel.from_gleam_catalog(GLEAM_vot)
+        skyobj_full = SkyModel.from_file(GLEAM_vot)
     else:
         skyobj_full = healpix_disk_new
 
@@ -1929,10 +1927,8 @@ def test_concat_overlap_errors(comp_type, healpix_disk_new):
 
 
 def test_concat_compatibility_errors(healpix_disk_new, time_location):
-    skyobj_gleam_subband = SkyModel.from_gleam_catalog(
-        GLEAM_vot, spectral_type="subband"
-    )
-    skyobj_gleam_specindex = SkyModel.from_gleam_catalog(
+    skyobj_gleam_subband = SkyModel.from_file(GLEAM_vot, spectral_type="subband")
+    skyobj_gleam_specindex = SkyModel.from_file(
         GLEAM_vot, spectral_type="spectral_index"
     )
     skyobj_hpx_disk = healpix_disk_new
@@ -2240,7 +2236,7 @@ def test_read_write_healpix_old_nover_history(tmp_path, healpix_data, healpix_di
 
 @pytest.mark.filterwarnings("ignore:This method writes an old 'healvis' style healpix")
 def test_write_healpix_error(tmp_path):
-    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, with_error=True)
+    skyobj = SkyModel.from_file(GLEAM_vot, with_error=True)
     test_filename = os.path.join(tmp_path, "tempfile.hdf5")
 
     with pytest.raises(
@@ -2405,7 +2401,7 @@ def test_healpix_positions(tmp_path, time_location):
 def test_array_to_skymodel_loop(spec_type, with_error):
     spectral_type = "subband" if spec_type == "full" else spec_type
 
-    sky = SkyModel.from_gleam_catalog(
+    sky = SkyModel.from_file(
         GLEAM_vot, spectral_type=spectral_type, with_error=with_error
     )
     if spec_type == "full":
@@ -2436,7 +2432,7 @@ def test_array_to_skymodel_loop(spec_type, with_error):
 def test_flux_source_cuts():
     # Check that min/max flux limits in test params work.
 
-    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, with_error=True)
+    skyobj = SkyModel.from_file(GLEAM_vot, with_error=True)
 
     skyobj2 = skyobj.source_cuts(
         min_flux=0.2 * units.Jy, max_flux=1.5 * units.Jy, inplace=False
@@ -2470,7 +2466,7 @@ def test_flux_source_cuts():
 def test_select(spec_type, time_location):
     time, array_location = time_location
 
-    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, with_error=True)
+    skyobj = SkyModel.from_file(GLEAM_vot, with_error=True)
 
     skyobj.beam_amp = np.ones((4, skyobj.Nfreqs, skyobj.Ncomponents))
     skyobj.extended_model_group = np.full(skyobj.Ncomponents, "", dtype="<U10")
@@ -2484,7 +2480,7 @@ def test_select(spec_type, time_location):
 
 
 def test_select_none():
-    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, with_error=True)
+    skyobj = SkyModel.from_file(GLEAM_vot, with_error=True)
 
     skyobj2 = skyobj.select(component_inds=None, inplace=False)
     assert skyobj2 == skyobj
@@ -3070,9 +3066,7 @@ def test_get_matching_fields_errors(name_to_match, name_list, error_message):
 
 @pytest.mark.parametrize("spec_type", ["flat", "subband"])
 def test_read_gleam(spec_type):
-    skyobj = SkyModel.from_gleam_catalog(
-        GLEAM_vot, spectral_type=spec_type, with_error=True
-    )
+    skyobj = SkyModel.from_file(GLEAM_vot, spectral_type=spec_type, with_error=True)
 
     assert skyobj.Ncomponents == 50
     if spec_type == "subband":
@@ -3135,6 +3129,17 @@ def test_read_gleam(spec_type):
     assert len(cut_catalog) == cut_obj.Ncomponents
 
 
+def test_read_errors(tmpdir):
+    skyobj = SkyModel()
+    with pytest.raises(ValueError, match="Invalid filetype. Filetype options are"):
+        skyobj.read(GLEAM_vot, filetype="foo")
+
+    testfile = os.path.join(tmpdir, "catalog.foo")
+
+    with pytest.raises(ValueError, match="Cannot determine the file type."):
+        skyobj.read(testfile)
+
+
 def test_read_gleam_errors():
     skyobj = SkyModel()
     with pytest.raises(ValueError, match="spectral_type full is not an allowed type"):
@@ -3144,8 +3149,13 @@ def test_read_gleam_errors():
 def test_read_votable():
     votable_file = os.path.join(SKY_DATA_PATH, "simple_test.vot")
 
-    skyobj = SkyModel.from_votable_catalog(
-        votable_file, "VIII_1000_single", "source_id", "RAJ2000", "DEJ2000", "Si"
+    skyobj = SkyModel.from_file(
+        votable_file,
+        table_name="VIII_1000_single",
+        id_column="source_id",
+        ra_column="RAJ2000",
+        dec_column="DEJ2000",
+        flux_columns="Si",
     )
 
     assert skyobj.Ncomponents == 2
@@ -3274,13 +3284,14 @@ def test_read_votable_errors():
     with pytest.raises(
         ValueError, match="freq_array must be provided for multiple flux columns."
     ):
-        SkyModel.from_votable_catalog(
+        SkyModel.from_file(
             GLEAM_vot,
-            "GLEAM",
-            "GLEAM",
-            "RAJ2000",
-            "DEJ2000",
-            flux_columns,
+            filetype="vot",
+            table_name="GLEAM",
+            id_column="GLEAM",
+            ra_column="RAJ2000",
+            dec_column="DEJ2000",
+            flux_columns=flux_columns,
             reference_frequency=200e6 * units.Hz,
             flux_error_columns=flux_error_columns,
         )
@@ -3288,25 +3299,27 @@ def test_read_votable_errors():
     with pytest.raises(
         ValueError, match="reference_frequency must be an astropy Quantity."
     ):
-        SkyModel.from_votable_catalog(
+        SkyModel.from_file(
             GLEAM_vot,
-            "GLEAM",
-            "GLEAM",
-            "RAJ2000",
-            "DEJ2000",
-            "Fintwide",
+            filetype="vot",
+            table_name="GLEAM",
+            id_column="GLEAM",
+            ra_column="RAJ2000",
+            dec_column="DEJ2000",
+            flux_columns="Fintwide",
             reference_frequency=200e6,
             flux_error_columns="e_Fintwide",
         )
 
     with pytest.raises(ValueError, match="All flux columns must have compatible units"):
-        SkyModel.from_votable_catalog(
+        SkyModel.from_file(
             GLEAM_vot,
-            "GLEAM",
-            "GLEAM",
-            "RAJ2000",
-            "DEJ2000",
-            ["Fintwide", "Fpwide"],
+            filetype="vot",
+            table_name="GLEAM",
+            id_column="GLEAM",
+            ra_column="RAJ2000",
+            dec_column="DEJ2000",
+            flux_columns=["Fintwide", "Fpwide"],
             freq_array=[150e6, 200e6] * units.Hz,
         )
 
@@ -3314,13 +3327,14 @@ def test_read_votable_errors():
     with pytest.raises(
         ValueError, match="All flux error columns must have units compatible with"
     ):
-        SkyModel.from_votable_catalog(
+        SkyModel.from_file(
             GLEAM_vot,
-            "GLEAM",
-            "GLEAM",
-            "RAJ2000",
-            "DEJ2000",
-            flux_columns,
+            filetype="vot",
+            table_name="GLEAM",
+            id_column="GLEAM",
+            ra_column="RAJ2000",
+            dec_column="DEJ2000",
+            flux_columns=flux_columns,
             flux_error_columns=flux_error_columns,
             freq_array=freq_array,
         )
@@ -3332,7 +3346,7 @@ def test_fhd_catalog_reader():
     with uvtest.check_warnings(
         UserWarning, match="WARNING: Source IDs are not unique. Defining unique IDs."
     ):
-        skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
+        skyobj = SkyModel.from_file(catfile, expand_extended=False)
 
     assert skyobj.filename == ["fhd_catalog.sav"]
     catalog = scipy.io.readsav(catfile)["catalog"]
@@ -3368,7 +3382,7 @@ def test_fhd_catalog_reader_source_cuts():
     with uvtest.check_warnings(
         UserWarning, match="WARNING: Source IDs are not unique. Defining unique IDs."
     ):
-        skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
+        skyobj = SkyModel.from_file(catfile, expand_extended=False, filetype="fhd")
 
     with uvtest.check_warnings(
         DeprecationWarning,
@@ -3409,7 +3423,7 @@ def test_fhd_catalog_reader_extended_sources():
 
 def test_fhd_catalog_reader_beam_values():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog_with_beam_values.sav")
-    skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
+    skyobj = SkyModel.from_file(catfile, expand_extended=False)
 
     catalog = scipy.io.readsav(catfile)["catalog"]
     beam_vals = np.zeros((4, len(catalog)))
@@ -3425,7 +3439,7 @@ def test_fhd_catalog_reader_beam_values():
 
 def test_fhd_catalog_reader_beam_values_extended():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog_with_beam_values.sav")
-    skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=True)
+    skyobj = SkyModel.from_file(catfile, expand_extended=True)
 
     catalog = scipy.io.readsav(catfile)["catalog"]
     comp_ind = 0
@@ -3469,7 +3483,7 @@ def test_fhd_catalog_reader_labeling_extended_sources():
 
 def test_point_catalog_reader():
     catfile = os.path.join(SKY_DATA_PATH, "pointsource_catalog.txt")
-    skyobj = SkyModel.from_text_catalog(catfile)
+    skyobj = SkyModel.from_file(catfile)
 
     assert skyobj.filename == ["pointsource_catalog.txt"]
 
@@ -3550,7 +3564,7 @@ def test_catalog_file_writer(tmp_path):
     fname = os.path.join(tmp_path, "temp_cat.txt")
 
     zenith_source.write_text_catalog(fname)
-    zenith_loop = SkyModel.from_text_catalog(fname)
+    zenith_loop = SkyModel.from_file(fname, filetype="text")
     assert np.all(zenith_loop == zenith_source)
     os.remove(fname)
 
@@ -3562,7 +3576,7 @@ def test_catalog_file_writer(tmp_path):
 def test_text_catalog_loop(tmp_path, spec_type, with_error):
     spectral_type = "subband" if spec_type == "full" else spec_type
 
-    skyobj = SkyModel.from_gleam_catalog(
+    skyobj = SkyModel.from_file(
         GLEAM_vot, spectral_type=spectral_type, with_error=with_error
     )
     if spec_type == "full":
@@ -3579,7 +3593,7 @@ def test_text_catalog_loop(tmp_path, spec_type, with_error):
 
     with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
         skymodel.write_catalog_to_file(fname, skyobj)
-    skyobj2 = SkyModel.from_text_catalog(fname)
+    skyobj2 = SkyModel.from_file(fname)
 
     assert skyobj == skyobj2
 
@@ -3588,14 +3602,14 @@ def test_text_catalog_loop(tmp_path, spec_type, with_error):
         reference_frequency = skyobj.reference_frequency
         skyobj.reference_frequency = None
         skyobj.write_text_catalog(fname)
-        skyobj2 = SkyModel.from_text_catalog(fname)
+        skyobj2 = SkyModel.from_file(fname)
 
         assert skyobj == skyobj2
 
         # again with flat & freq_array
         skyobj.freq_array = np.atleast_1d(np.unique(reference_frequency))
         skyobj.write_text_catalog(fname)
-        skyobj2 = SkyModel.from_text_catalog(fname)
+        skyobj2 = SkyModel.from_file(fname)
 
         assert skyobj == skyobj2
 
@@ -3603,15 +3617,13 @@ def test_text_catalog_loop(tmp_path, spec_type, with_error):
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 @pytest.mark.parametrize("freq_mult", [1e-6, 1e-3, 1e3])
 def test_text_catalog_loop_other_freqs(tmp_path, freq_mult):
-    skyobj = SkyModel.from_gleam_catalog(
-        GLEAM_vot, spectral_type="flat", with_error=True
-    )
+    skyobj = SkyModel.from_file(GLEAM_vot, spectral_type="flat", with_error=True)
     skyobj.freq_array = np.atleast_1d(np.unique(skyobj.reference_frequency) * freq_mult)
     skyobj.reference_frequency = None
 
     fname = os.path.join(tmp_path, "temp_cat.txt")
     skyobj.write_text_catalog(fname)
-    skyobj2 = SkyModel.from_text_catalog(fname)
+    skyobj2 = SkyModel.from_file(fname)
     os.remove(fname)
 
     assert skyobj == skyobj2
@@ -3631,9 +3643,7 @@ def test_write_text_catalog_error(tmp_path, healpix_disk_new):
 @pytest.mark.parametrize("spec_type", ["flat", "subband"])
 def test_read_text_source_cuts(tmp_path, spec_type):
 
-    skyobj = SkyModel.from_gleam_catalog(
-        GLEAM_vot, spectral_type=spec_type, with_error=True
-    )
+    skyobj = SkyModel.from_file(GLEAM_vot, spectral_type=spec_type, with_error=True)
     fname = os.path.join(tmp_path, "temp_cat.txt")
     skyobj.write_text_catalog(fname)
 
@@ -3655,16 +3665,14 @@ def test_read_text_source_cuts(tmp_path, spec_type):
 def test_pyuvsim_mock_catalog_read():
     mock_cat_file = os.path.join(SKY_DATA_PATH, "mock_hera_text_2458098.27471.txt")
 
-    mock_sky = SkyModel.from_text_catalog(mock_cat_file)
+    mock_sky = SkyModel.from_file(mock_cat_file)
     expected_names = ["src" + str(val) for val in np.arange(mock_sky.Ncomponents)]
     assert mock_sky.name.tolist() == expected_names
 
 
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 def test_read_text_errors(tmp_path):
-    skyobj = SkyModel.from_gleam_catalog(
-        GLEAM_vot, spectral_type="subband", with_error=True
-    )
+    skyobj = SkyModel.from_file(GLEAM_vot, spectral_type="subband", with_error=True)
 
     fname = os.path.join(tmp_path, "temp_cat.txt")
     skyobj.write_text_catalog(fname)
@@ -3677,7 +3685,7 @@ def test_read_text_errors(tmp_path):
         ValueError,
         match="Number of flux error fields does not match number of flux fields.",
     ):
-        SkyModel.from_text_catalog(fname)
+        SkyModel.from_file(fname)
 
     skyobj2 = skyobj.copy()
     skyobj2.stokes_error = None
@@ -3691,7 +3699,7 @@ def test_read_text_errors(tmp_path):
         ValueError,
         match="If frequency column is present, only one flux column allowed.",
     ):
-        SkyModel.from_text_catalog(fname)
+        SkyModel.from_file(fname)
 
     skyobj.write_text_catalog(fname)
     with fileinput.input(files=fname, inplace=True) as infile:
@@ -3703,7 +3711,7 @@ def test_read_text_errors(tmp_path):
         ValueError,
         match="Multiple flux fields, but they do not all contain a frequency.",
     ):
-        SkyModel.from_text_catalog(fname)
+        SkyModel.from_file(fname)
 
     skyobj.write_text_catalog(fname)
     with fileinput.input(files=fname, inplace=True) as infile:
@@ -3712,7 +3720,7 @@ def test_read_text_errors(tmp_path):
             print(line, end="")
 
     with pytest.raises(ValueError, match="Header does not match expectations."):
-        SkyModel.from_text_catalog(fname)
+        SkyModel.from_file(fname)
 
     os.remove(fname)
 
@@ -3817,14 +3825,14 @@ def test_at_frequencies_tol(tmpdir, mock_point_skies):
     sky = mock_point_skies("full")
     ofile = str(tmpdir.join("full_point.txt"))
     sky.write_text_catalog(ofile)
-    sky2 = SkyModel.from_text_catalog(ofile)
+    sky2 = SkyModel.from_file(ofile)
     new = sky.at_frequencies(sky2.freq_array, inplace=False, atol=1 * units.Hz)
     assert new == sky2
 
 
 @pytest.mark.parametrize("nan_handling", ["propagate", "interp", "clip"])
 def test_at_frequencies_nan_handling(nan_handling):
-    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot)
+    skyobj = SkyModel.from_file(GLEAM_vot)
     interp_freqs = np.asarray([77, 154, 225]) * units.MHz
     skyobj_interp = skyobj.at_frequencies(interp_freqs, inplace=False)
 
@@ -3982,7 +3990,7 @@ def test_at_frequencies_nan_handling(nan_handling):
 
 @pytest.mark.parametrize("nan_handling", ["propagate", "interp", "clip"])
 def test_at_frequencies_nan_handling_allsrc(nan_handling):
-    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot)
+    skyobj = SkyModel.from_file(GLEAM_vot)
     interp_freqs = np.asarray([77, 154, 225]) * units.MHz
     skyobj_interp = skyobj.at_frequencies(interp_freqs, inplace=False)
 
@@ -4040,7 +4048,7 @@ def test_skyh5_file_loop(mock_point_skies, stype, tmpdir):
 
     sky.write_skyh5(testfile)
 
-    sky2 = SkyModel.from_skyh5(testfile)
+    sky2 = SkyModel.from_file(testfile, filetype="skyh5")
 
     assert sky2.filename == ["testfile.skyh5"]
     assert sky2 == sky
@@ -4048,15 +4056,13 @@ def test_skyh5_file_loop(mock_point_skies, stype, tmpdir):
 
 @pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index"])
 def test_skyh5_file_loop_gleam(spec_type, tmpdir):
-    sky = SkyModel.from_gleam_catalog(
-        GLEAM_vot, spectral_type=spec_type, with_error=True
-    )
+    sky = SkyModel.from_file(GLEAM_vot, spectral_type=spec_type, with_error=True)
 
-    testfile = str(tmpdir.join("testfile.hdf5"))
+    testfile = str(tmpdir.join("testfile.skyh5"))
 
     sky.write_skyh5(testfile)
 
-    sky2 = SkyModel.from_skyh5(testfile)
+    sky2 = SkyModel.from_file(testfile)
 
     assert sky2 == sky
 
@@ -4075,7 +4081,7 @@ def test_skyh5_file_loop_healpix(healpix_disk_new, history, tmpdir):
     testfile = str(tmpdir.join("testfile.skyh5"))
     sky.write_skyh5(testfile, run_check=run_check)
 
-    sky2 = SkyModel.from_skyh5(testfile)
+    sky2 = SkyModel.from_file(testfile)
 
     assert sky2 == sky
 
@@ -4089,7 +4095,7 @@ def test_skyh5_file_loop_healpix_cut_sky(healpix_disk_new, tmpdir):
     testfile = str(tmpdir.join("testfile.skyh5"))
     sky.write_skyh5(testfile)
 
-    sky2 = SkyModel.from_skyh5(testfile)
+    sky2 = SkyModel.from_file(testfile)
 
     assert sky2 == sky
 
@@ -4103,7 +4109,7 @@ def test_skyh5_file_loop_healpix_to_point(healpix_disk_new, tmpdir):
     testfile = str(tmpdir.join("testfile.skyh5"))
     sky.write_skyh5(testfile)
 
-    sky2 = SkyModel.from_skyh5(testfile)
+    sky2 = SkyModel.from_file(testfile)
 
     assert sky2 == sky
 
@@ -4130,7 +4136,7 @@ def test_skyh5_units(tmpdir):
     filename = str(tmpdir.join("testfile.skyh5"))
     sky.write_skyh5(filename)
 
-    sky2 = SkyModel.from_skyh5(filename)
+    sky2 = SkyModel.from_file(filename)
 
     assert sky2 == sky
 
@@ -4158,7 +4164,7 @@ def test_skyh5_read_errors(mock_point_skies, param, value, errormsg, tmpdir):
             data[...] = value
 
     with pytest.raises(ValueError, match=errormsg):
-        SkyModel.from_skyh5(testfile)
+        SkyModel.from_file(testfile)
 
 
 @pytest.mark.parametrize(
@@ -4188,14 +4194,16 @@ def test_skyh5_read_errors_healpix(healpix_disk_new, param, value, errormsg, tmp
             data[...] = value
 
     with pytest.raises(ValueError, match=errormsg):
-        SkyModel.from_skyh5(testfile)
+        SkyModel.from_file(testfile)
 
 
 def test_skyh5_read_errors_oldstyle_healpix():
     with pytest.raises(
         ValueError, match="This is an old 'healvis' style healpix HDF5 file"
     ):
-        SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5"))
+        SkyModel.from_file(
+            os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5"), filetype="skyh5"
+        )
 
 
 def test_healpix_hdf5_read_errors_newstyle_healpix():
@@ -4257,7 +4265,7 @@ def test_write_clobber(mock_point_skies, tmpdir):
     testfile = str(tmpdir.join("testfile.skyh5"))
 
     sky.write_skyh5(testfile)
-    sky2 = SkyModel.from_skyh5(testfile)
+    sky2 = SkyModel.from_file(testfile)
 
     assert sky2 == sky
 
@@ -4266,7 +4274,7 @@ def test_write_clobber(mock_point_skies, tmpdir):
     assert sky != sky2
 
     sky.write_skyh5(testfile, clobber=True)
-    sky3 = SkyModel.from_skyh5(testfile)
+    sky3 = SkyModel.from_file(testfile)
 
     assert sky3 == sky
     assert sky3 != sky2
@@ -4380,7 +4388,7 @@ def test_skyh5_write_frames(healpix_disk_new, tmpdir, frame):
     outfile = tmpdir.join("testfile.skyh5")
     sky.write_skyh5(outfile)
 
-    new_sky = SkyModel.from_skyh5(outfile)
+    new_sky = SkyModel.from_file(outfile)
     assert new_sky.frame == frame
 
 
@@ -4401,7 +4409,7 @@ def test_skyh5_write_read_no_frame(healpix_disk_new, tmpdir):
             "No frame available in this file, assuming 'icrs'.",
         ],
     ):
-        new_sky = SkyModel.from_skyh5(outfile)
+        new_sky = SkyModel.from_file(outfile)
 
     assert new_sky.frame == "icrs"
 
@@ -4487,5 +4495,5 @@ def test_old_skyh5_reading_ra_dec():
             "Parameter lat not found in skyh5 file.",
         ],
     ):
-        sky = SkyModel.from_skyh5(testfile)
+        sky = SkyModel.from_file(testfile)
     assert sky.check()

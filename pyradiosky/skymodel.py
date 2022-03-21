@@ -4474,8 +4474,7 @@ class SkyModel(UVBase):
             Path to IDL .sav file.
 
         expand_extended: bool
-            If True, return extended source components.
-            Default: True
+            If True, include extended source components.
         source_select_kwds : dict, optional
             This parameter is Deprecated, please use the `select` and/or the
             :meth:`cut_nonrising` methods as appropriate.
@@ -4673,8 +4672,7 @@ class SkyModel(UVBase):
             Path to IDL .sav file.
 
         expand_extended: bool
-            If True, return extended source components.
-            Default: True
+            If True, include extended source components.
         source_select_kwds : dict, optional
             This parameter is Deprecated, please use the `select` and/or the
             :meth:`cut_nonrising` methods as appropriate.
@@ -4715,6 +4713,283 @@ class SkyModel(UVBase):
             check_extra=check_extra,
             run_check_acceptability=run_check_acceptability,
         )
+
+    def read(
+        self,
+        filename,
+        filetype=None,
+        run_check=True,
+        check_extra=True,
+        run_check_acceptability=True,
+        # Gleam vot
+        spectral_type=None,
+        with_error=False,
+        # fhd
+        expand_extended=True,
+        # vot
+        table_name=None,
+        id_column=None,
+        ra_column=None,
+        dec_column=None,
+        flux_columns=None,
+        reference_frequency=None,
+        freq_array=None,
+        spectral_index_column=None,
+        flux_error_columns=None,
+        history="",
+    ):
+        """
+        Read in any file supported by SkyModel.
+
+        Parameters
+        ----------
+        filename : str
+            File to read in.
+        filetype : str, optional
+            One of ['skyh5', 'gleam', 'vot', 'text', 'fhd'] or None.
+            If None, the code attempts to guess what the file type is.
+        run_check : bool
+            Option to check for the existence and proper shapes of parameters
+            after downselecting data on this object (the default is True,
+            meaning the check will be run).
+        check_extra : bool
+            Option to check optional parameters as well as required ones (the
+            default is True, meaning the optional parameters will be checked).
+        run_check_acceptability : bool
+            Option to check acceptable range of the values of parameters after
+            downselecting data on this object (the default is True, meaning the
+            acceptable range check will be done).
+
+        spectral_type : str
+            Option to specify the GLEAM spectral_type to read in. Default is 'subband'.
+            Only used for GLEAM vot files.
+        with_error : bool
+            Option to include the errors on the stokes array on the object in the
+            `stokes_error` parameter. Note that the values assigned to this parameter
+            are the flux fitting errors. The GLEAM paper (Hurley-Walker et al., 2019)
+            specifies that flux scale errors should be added in quadrature to these
+            fitting errors, but that the size of the flux scale errors depends on
+            whether the comparison is between GLEAM sub-bands or with another catalog.
+            Between GLEAM sub-bands, the flux scale error is 2-3% of the component flux
+            (depending on declination), while flux scale errors between GLEAM and other
+            catalogs is 8-80% of the component flux (depending on declination).
+
+        expand_extended: bool
+            If True, include the extended source components in FHD files. Only used for
+            FHD files.
+
+        table_name : str
+            Part of expected vot table name. Should match only one table name in the
+            file. Only used for vot files.
+        id_column : str
+            Part of expected vot ID column. Should match only one column in the file.
+            Only used for vot files.
+        ra_column : str
+            Part of expected vot RA column. Should match only one column in the file.
+            Only used for vot files.
+        dec_column : str
+            Part of expected vot Dec column. Should match only one column in the file.
+            Only used for vot files.
+        flux_columns : str or list of str
+            Part of expected vot Flux column(s). Each one should match only one column
+            in the file. Only used for vot files.
+        reference_frequency : :class:`astropy.Quantity`
+            Reference frequency for vot flux values, assumed to be the same value for
+            all components. Only used for vot files.
+        freq_array : :class:`astropy.Quantity`
+            Frequencies corresponding to vot flux_columns (should be same length).
+            Required for multiple flux columns. Only used for vot files.
+        spectral_index_column : str
+            Part of expected vot spectral index column. Should match only one column in
+            the file. Only used for vot files.
+        flux_error_columns : str or list of str
+            Part of expected vot flux error column(s). Each one should match only one
+            column in the file. Only used for vot files.
+        history : str
+            History to add to object for vot files.
+
+        """
+        allowed_filetypes = ["skyh5", "gleam", "vot", "text", "fhd"]
+        if filetype is not None:
+            if filetype not in allowed_filetypes:
+                raise ValueError(
+                    f"Invalid filetype. Filetype options are: {allowed_filetypes}"
+                )
+        else:
+            _, extension = os.path.splitext(filename)
+            if extension == ".txt":
+                filetype = "text"
+            elif extension == ".vot":
+                if "gleam" in filename.lower():
+                    filetype = "gleam"
+                else:
+                    filetype = "vot"
+            elif extension == ".skyh5":
+                filetype = "skyh5"
+            elif extension == ".sav":
+                filetype = "fhd"
+
+        if filetype == "text":
+            self.read_text_catalog(filename)
+        elif filetype == "gleam":
+            if spectral_type is None:
+                spectral_type = "subband"
+            self.read_gleam_catalog(
+                filename, spectral_type=spectral_type, with_error=with_error
+            )
+        elif filetype == "vot":
+            self.read_votable_catalog(
+                filename,
+                table_name,
+                id_column,
+                ra_column,
+                dec_column,
+                flux_columns,
+                reference_frequency=reference_frequency,
+                freq_array=freq_array,
+                spectral_index_column=spectral_index_column,
+                flux_error_columns=flux_error_columns,
+                history=history,
+                run_check=run_check,
+                check_extra=check_extra,
+                run_check_acceptability=run_check_acceptability,
+            )
+        elif filetype == "skyh5":
+            self.read_skyh5(
+                filename,
+                run_check=run_check,
+                check_extra=check_extra,
+                run_check_acceptability=run_check_acceptability,
+            )
+        elif filetype == "fhd":
+            self.read_fhd_catalog(
+                filename,
+                expand_extended=expand_extended,
+                run_check=run_check,
+                check_extra=check_extra,
+                run_check_acceptability=run_check_acceptability,
+            )
+        else:
+            raise ValueError(
+                "Cannot determine the file type. Please specify using the filetype parameter."
+            )
+
+    @classmethod
+    def from_file(
+        cls,
+        filename,
+        filetype=None,
+        run_check=True,
+        check_extra=True,
+        run_check_acceptability=True,
+        # Gleam vot
+        spectral_type=None,
+        with_error=False,
+        # fhd
+        expand_extended=True,
+        # vot
+        table_name=None,
+        id_column=None,
+        ra_column=None,
+        dec_column=None,
+        flux_columns=None,
+        reference_frequency=None,
+        freq_array=None,
+        spectral_index_column=None,
+        flux_error_columns=None,
+        history="",
+    ):
+        """
+        Create a :class:`SkyModel` from any file supported by SkyModel.
+
+        Parameters
+        ----------
+        filename : str
+            File to read in.
+        filetype : str, optional
+            One of ['skyh5', 'gleam', 'vot', 'text', 'fhd'] or None.
+            If None, the code attempts to guess what the file type is.
+        run_check : bool
+            Option to check for the existence and proper shapes of parameters
+            after downselecting data on this object (the default is True,
+            meaning the check will be run).
+        check_extra : bool
+            Option to check optional parameters as well as required ones (the
+            default is True, meaning the optional parameters will be checked).
+        run_check_acceptability : bool
+            Option to check acceptable range of the values of parameters after
+            downselecting data on this object (the default is True, meaning the
+            acceptable range check will be done).
+
+        spectral_type : str
+            Option to specify the GLEAM spectral_type to read in. Default is 'subband'.
+            Only used for GLEAM vot files.
+
+        expand_extended: bool
+            If True, include the extended source components in FHD files. Only used for
+            FHD files.
+
+        table_name : str
+            Part of expected vot table name. Should match only one table name in the
+            file. Only used for vot files.
+        id_column : str
+            Part of expected vot ID column. Should match only one column in the file.
+            Only used for vot files.
+        ra_column : str
+            Part of expected vot RA column. Should match only one column in the file.
+            Only used for vot files.
+        dec_column : str
+            Part of expected vot Dec column. Should match only one column in the file.
+            Only used for vot files.
+        flux_columns : str or list of str
+            Part of expected vot Flux column(s). Each one should match only one column
+            in the file. Only used for vot files.
+        reference_frequency : :class:`astropy.Quantity`
+            Reference frequency for vot flux values, assumed to be the same value for
+            all components. Only used for vot files.
+        freq_array : :class:`astropy.Quantity`
+            Frequencies corresponding to vot flux_columns (should be same length).
+            Required for multiple flux columns. Only used for vot files.
+        spectral_index_column : str
+            Part of expected vot spectral index column. Should match only one column in
+            the file. Only used for vot files.
+        flux_error_columns : str or list of str
+            Part of expected vot flux error column(s). Each one should match only one
+            column in the file. Only used for vot files.
+        history : str
+            History to add to object for vot files.
+
+        Returns
+        -------
+        sky_model : :class:`SkyModel`
+            The object instantiated using the file.
+
+        """
+        self = cls()
+        self.read(
+            filename,
+            filetype=filetype,
+            run_check=run_check,
+            check_extra=check_extra,
+            run_check_acceptability=run_check_acceptability,
+            # Gleam vot
+            spectral_type=spectral_type,
+            with_error=with_error,
+            # fhd
+            expand_extended=expand_extended,
+            # vot
+            table_name=table_name,
+            id_column=id_column,
+            ra_column=ra_column,
+            dec_column=dec_column,
+            flux_columns=flux_columns,
+            reference_frequency=reference_frequency,
+            freq_array=freq_array,
+            spectral_index_column=spectral_index_column,
+            flux_error_columns=flux_error_columns,
+            history=history,
+        )
+        return self
 
     def write_skyh5(
         self,
