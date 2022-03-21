@@ -8,6 +8,10 @@
 ## [0.1.3] - 2022-02-22
 
 ### Added
+- Generic `read` and `from_file` methods to SkyModel objects that accept any file type
+supported by SkyModel.
+
+### Added
 - A `filename` attribute to SkyModel objects.
 - The `nan_handling` keyword to the `at_frequencies` method to control how NaNs in the
 stokes array on subband objects are handled during interpolation.
