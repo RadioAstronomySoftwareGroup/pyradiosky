@@ -222,7 +222,7 @@ def healpix_disk_old():
 @pytest.fixture(scope="function")
 def healpix_disk_new():
     pytest.importorskip("astropy_healpix")
-    sky = SkyModel.from_file(os.path.join(SKY_DATA_PATH, "healpix_disk.skyh5"))
+    sky = SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "healpix_disk.skyh5"))
 
     yield sky
 
@@ -342,7 +342,7 @@ def test_init_error_freqparams(zenith_skycoord, spec_type):
 
 
 def test_check_errors():
-    skyobj = SkyModel.from_file(GLEAM_vot, with_error=True)
+    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, with_error=True)
 
     # Change units on stokes_error
     skyobj.stokes_error = skyobj.stokes_error / units.sr
@@ -3170,13 +3170,13 @@ def test_read_gleam_errors():
 def test_read_votable():
     votable_file = os.path.join(SKY_DATA_PATH, "simple_test.vot")
 
-    skyobj = SkyModel.from_file(
+    skyobj = SkyModel.from_votable_catalog(
         votable_file,
-        table_name="VIII_1000_single",
-        id_column="source_id",
-        ra_column="RAJ2000",
-        dec_column="DEJ2000",
-        flux_columns="Si",
+        "VIII_1000_single",
+        "source_id",
+        "RAJ2000",
+        "DEJ2000",
+        "Si",
     )
 
     assert skyobj.Ncomponents == 2
@@ -3366,7 +3366,7 @@ def test_fhd_catalog_reader():
     with uvtest.check_warnings(
         UserWarning, match="WARNING: Source IDs are not unique. Defining unique IDs."
     ):
-        skyobj = SkyModel.from_file(catfile, expand_extended=False)
+        skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
 
     assert skyobj.filename == ["fhd_catalog.sav"]
     catalog = scipy.io.readsav(catfile)["catalog"]
@@ -3582,7 +3582,7 @@ def test_catalog_file_writer(tmp_path):
     fname = os.path.join(tmp_path, "temp_cat.txt")
 
     zenith_source.write_text_catalog(fname)
-    zenith_loop = SkyModel.from_file(fname, filetype="text")
+    zenith_loop = SkyModel.from_text_catalog(fname)
     assert np.all(zenith_loop == zenith_source)
     os.remove(fname)
 
@@ -3641,7 +3641,7 @@ def test_text_catalog_loop_other_freqs(tmp_path, freq_mult):
 
     fname = os.path.join(tmp_path, "temp_cat.txt")
     skyobj.write_text_catalog(fname)
-    skyobj2 = SkyModel.from_file(fname)
+    skyobj2 = SkyModel.from_file(fname, filetype="text")
     os.remove(fname)
 
     assert skyobj == skyobj2

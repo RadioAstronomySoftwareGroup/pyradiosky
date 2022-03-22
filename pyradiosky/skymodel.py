@@ -4760,7 +4760,7 @@ class SkyModel(UVBase):
         history="",
     ):
         """
-        Read in any file supported by SkyModel.
+        Read in any file supported by :class:`SkyModel`.
 
         Parameters
         ----------
