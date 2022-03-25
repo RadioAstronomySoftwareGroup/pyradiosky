@@ -3178,8 +3178,18 @@ def test_read_votable():
         "DEJ2000",
         "Si",
     )
-
     assert skyobj.Ncomponents == 2
+
+    skyobj2 = SkyModel.from_file(
+        votable_file,
+        table_name="VIII_1000_single",
+        id_column="source_id",
+        ra_column="RAJ2000",
+        dec_column="DEJ2000",
+        flux_columns="Si",
+    )
+    assert skyobj == skyobj2
+
     msg_expected = [
         "This function is deprecated, use `SkyModel.read_votable_catalog` instead."
     ]
