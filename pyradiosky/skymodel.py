@@ -4747,7 +4747,7 @@ class SkyModel(UVBase):
         with_error=False,
         # fhd
         expand_extended=True,
-        # vot
+        # VOTable
         table_name=None,
         id_column=None,
         ra_column=None,
@@ -4761,6 +4761,10 @@ class SkyModel(UVBase):
     ):
         """
         Read in any file supported by :class:`SkyModel`.
+
+        This method supports a number of different types of files.
+        Universal parameters (required and optional) are listed directly below,
+        followed by parameters specific to each file type.
 
         Parameters
         ----------
@@ -4781,9 +4785,10 @@ class SkyModel(UVBase):
             downselecting data on this object (the default is True, meaning the
             acceptable range check will be done).
 
+        GLEAM
+        -----
         spectral_type : str
             Option to specify the GLEAM spectral_type to read in. Default is 'subband'.
-            Only used for GLEAM vot files.
         with_error : bool
             Option to include the errors on the stokes array on the object in the
             `stokes_error` parameter. Note that the values assigned to this parameter
@@ -4795,39 +4800,38 @@ class SkyModel(UVBase):
             (depending on declination), while flux scale errors between GLEAM and other
             catalogs is 8-80% of the component flux (depending on declination).
 
+        FHD
+        ---
         expand_extended: bool
-            If True, include the extended source components in FHD files. Only used for
-            FHD files.
+            If True, include the extended source components in FHD files.
 
+        VOTable
+        -------
         table_name : str
-            Part of expected vot table name. Should match only one table name in the
-            file. Only used for vot files.
+            Part of expected VOTable name. Should match only one table name in the file.
         id_column : str
-            Part of expected vot ID column. Should match only one column in the file.
-            Only used for vot files.
+            Part of expected VOTable ID column. Should match only one column in the file.
         ra_column : str
-            Part of expected vot RA column. Should match only one column in the file.
-            Only used for vot files.
+            Part of expected VOTable RA column. Should match only one column in the file.
         dec_column : str
-            Part of expected vot Dec column. Should match only one column in the file.
-            Only used for vot files.
+            Part of expected VOTable Dec column. Should match only one column in the file.
         flux_columns : str or list of str
             Part of expected vot Flux column(s). Each one should match only one column
             in the file. Only used for vot files.
         reference_frequency : :class:`astropy.Quantity`
-            Reference frequency for vot flux values, assumed to be the same value for
-            all components. Only used for vot files.
+            Reference frequency for VOTable flux values, assumed to be the same value
+            for all components.
         freq_array : :class:`astropy.Quantity`
-            Frequencies corresponding to vot flux_columns (should be same length).
-            Required for multiple flux columns. Only used for vot files.
+            Frequencies corresponding to VOTable flux_columns (should be same length).
+            Required for multiple flux columns.
         spectral_index_column : str
-            Part of expected vot spectral index column. Should match only one column in
-            the file. Only used for vot files.
+            Part of expected VOTable spectral index column. Should match only one
+            column in the file.
         flux_error_columns : str or list of str
-            Part of expected vot flux error column(s). Each one should match only one
-            column in the file. Only used for vot files.
+            Part of expected VOTable flux error column(s). Each one should match only
+            one column in the file.
         history : str
-            History to add to object for vot files.
+            History to add to object for VOTable files.
 
         """
         allowed_filetypes = ["skyh5", "gleam", "vot", "text", "fhd"]
@@ -4908,7 +4912,7 @@ class SkyModel(UVBase):
         with_error=False,
         # fhd
         expand_extended=True,
-        # vot
+        # VOTable
         table_name=None,
         id_column=None,
         ra_column=None,
@@ -4922,6 +4926,10 @@ class SkyModel(UVBase):
     ):
         """
         Create a :class:`SkyModel` from any file supported by SkyModel.
+
+        This method supports a number of different types of files.
+        Universal parameters (required and optional) are listed directly below,
+        followed by parameters specific to each file type.
 
         Parameters
         ----------
@@ -4942,48 +4950,53 @@ class SkyModel(UVBase):
             downselecting data on this object (the default is True, meaning the
             acceptable range check will be done).
 
+        GLEAM
+        -----
         spectral_type : str
             Option to specify the GLEAM spectral_type to read in. Default is 'subband'.
-            Only used for GLEAM vot files.
+        with_error : bool
+            Option to include the errors on the stokes array on the object in the
+            `stokes_error` parameter. Note that the values assigned to this parameter
+            are the flux fitting errors. The GLEAM paper (Hurley-Walker et al., 2019)
+            specifies that flux scale errors should be added in quadrature to these
+            fitting errors, but that the size of the flux scale errors depends on
+            whether the comparison is between GLEAM sub-bands or with another catalog.
+            Between GLEAM sub-bands, the flux scale error is 2-3% of the component flux
+            (depending on declination), while flux scale errors between GLEAM and other
+            catalogs is 8-80% of the component flux (depending on declination).
 
+        FHD
+        ---
         expand_extended: bool
-            If True, include the extended source components in FHD files. Only used for
-            FHD files.
+            If True, include the extended source components in FHD files.
 
+        VOTable
+        -------
         table_name : str
-            Part of expected vot table name. Should match only one table name in the
-            file. Only used for vot files.
+            Part of expected VOTable name. Should match only one table name in the file.
         id_column : str
-            Part of expected vot ID column. Should match only one column in the file.
-            Only used for vot files.
+            Part of expected VOTable ID column. Should match only one column in the file.
         ra_column : str
-            Part of expected vot RA column. Should match only one column in the file.
-            Only used for vot files.
+            Part of expected VOTable RA column. Should match only one column in the file.
         dec_column : str
-            Part of expected vot Dec column. Should match only one column in the file.
-            Only used for vot files.
+            Part of expected VOTable Dec column. Should match only one column in the file.
         flux_columns : str or list of str
             Part of expected vot Flux column(s). Each one should match only one column
             in the file. Only used for vot files.
         reference_frequency : :class:`astropy.Quantity`
-            Reference frequency for vot flux values, assumed to be the same value for
-            all components. Only used for vot files.
+            Reference frequency for VOTable flux values, assumed to be the same value
+            for all components.
         freq_array : :class:`astropy.Quantity`
-            Frequencies corresponding to vot flux_columns (should be same length).
-            Required for multiple flux columns. Only used for vot files.
+            Frequencies corresponding to VOTable flux_columns (should be same length).
+            Required for multiple flux columns.
         spectral_index_column : str
-            Part of expected vot spectral index column. Should match only one column in
-            the file. Only used for vot files.
+            Part of expected VOTable spectral index column. Should match only one
+            column in the file.
         flux_error_columns : str or list of str
-            Part of expected vot flux error column(s). Each one should match only one
-            column in the file. Only used for vot files.
+            Part of expected VOTable flux error column(s). Each one should match only
+            one column in the file.
         history : str
-            History to add to object for vot files.
-
-        Returns
-        -------
-        sky_model : :class:`SkyModel`
-            The object instantiated using the file.
+            History to add to object for VOTable files.
 
         """
         self = cls()
@@ -5650,7 +5663,7 @@ def read_votable_catalog(
     return_table=False,
 ):
     """
-    Create a SkyModel object from a votable catalog.
+    Create a SkyModel object from a VOTable catalog.
 
     Deprecated. Use `SkyModel.read_votable_catalog` instead.
 
