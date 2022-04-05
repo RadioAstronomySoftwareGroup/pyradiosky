@@ -9,10 +9,7 @@
 import sys
 import os
 
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
+from io import StringIO
 
 from sphinx.util.docutils import SphinxDirective
 from docutils import nodes, statemachine
@@ -25,7 +22,7 @@ import pyradiosky
 sys.path.insert(0, os.path.abspath("../pyradiosky/"))
 readme_file = os.path.join(os.path.abspath("../"), "README.md")
 index_file = os.path.join(os.path.abspath("../docs"), "index.rst")
-skymodelparams_file = os.path.join(os.path.abspath("../docs"), "skymodel_parameters.rst")
+skymodel_file = os.path.join(os.path.abspath("../docs"), "skymodel.rst")
 
 
 # -- Path setup --------------------------------------------------------------
@@ -62,6 +59,7 @@ extensions = [
     "sphinx.ext.coverage",
     "sphinx.ext.viewcode",
     "sphinx.ext.napoleon",
+    "sphinx.ext.intersphinx",
 ]
 # set this to properly handle multiple input params with the same type/shape
 napoleon_use_param = False
@@ -106,10 +104,10 @@ html_static_path = ['_static']
 def build_custom_docs(app):
     sys.path.append(os.getcwd())
     import make_index
-    import make_parameters
+    import make_skymodel
 
     make_index.write_index_rst(readme_file=readme_file, write_file=index_file)
-    make_parameters.write_skymodelparams_rst(write_file=skymodelparams_file)
+    make_skymodel.write_skymodel_rst(write_file=skymodel_file)
 
 
 # this is to enable running python in the rst files.
@@ -155,3 +153,14 @@ class ExecDirective(SphinxDirective):
 def setup(app):
     app.connect("builder-inited", build_custom_docs)
     app.add_directive("exec", ExecDirective)
+
+# -- Options for intersphinx extension ---------------------------------------
+
+
+# Example configuration for intersphinx: refer to the Python standard library.
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3/", None),
+    "pyuvdata": ("https://pyuvdata.readthedocs.io/en/latest/", None),
+    "astropy": ("https://docs.astropy.org/en/stable/", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+}
