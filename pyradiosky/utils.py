@@ -7,12 +7,7 @@ import warnings
 
 import numpy as np
 
-try:
-    import erfa
-except ModuleNotFoundError:
-    # TODO: This is for backwards compatibility with astropy < 4.2.
-    # When pyuvdata requires 4.2 or greater it should be removed.
-    from astropy import _erfa as erfa
+import erfa
 from astropy.coordinates.builtin_frames.utils import get_jd12
 from astropy.time import Time
 from astropy.coordinates import Angle
