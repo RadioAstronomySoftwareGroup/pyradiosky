@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## Changed
+- Updated the astropy requirement to >= 5.0.4
+- Dropped support for python 3.7
+
 ### Deprecated
 - The `to_recarray` and `from_recarray` methods.
 
