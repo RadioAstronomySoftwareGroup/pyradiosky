@@ -107,4 +107,4 @@ venv.bak/
 docs/_static/
 docs/_templates/
 docs/index.rst
-docs/skymodel_parameters.rst
+docs/skymodel.rst
