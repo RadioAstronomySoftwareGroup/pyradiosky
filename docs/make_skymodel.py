@@ -33,7 +33,7 @@ def write_skymodel_rst(write_file=None):
         ":meth:`pyradiosky.SkyModel.check` method can be called on the object to\n"
         "verify that all of the required attributes have been set in a consistent way.\n\n"
     )
-    out += "Required\n----------------\n"
+    out += "Required\n********\n"
     out += (
         "These parameters are required to have a sensible SkyModel object and \n"
         "are required for most kinds of catalog files."
@@ -45,7 +45,7 @@ def write_skymodel_rst(write_file=None):
         out += "     {desc}\n".format(desc=obj.description)
         out += "\n"
 
-    out += "Optional\n----------------\n"
+    out += "Optional\n********\n"
     out += (
         "These parameters are defined by one or more file standard but are not "
         "always required.\nSome of them are required depending on the "
