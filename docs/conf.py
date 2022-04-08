@@ -162,5 +162,6 @@ intersphinx_mapping = {
     "python": ("https://docs.python.org/3/", None),
     "pyuvdata": ("https://pyuvdata.readthedocs.io/en/latest/", None),
     "astropy": ("https://docs.astropy.org/en/stable/", None),
+    "astropy_healpix": ("https://astropy-healpix.readthedocs.io/en/latest/", None),
     "numpy": ("https://numpy.org/doc/stable/", None),
 }

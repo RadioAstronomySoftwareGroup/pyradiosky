@@ -124,24 +124,24 @@ class SkyModel(UVBase):
     name : array_like of str
         Unique identifier for each source component, shape (Ncomponents,).
         Not used if nside is set.
-    lon : :class:`astropy.Longitude`
+    lon : :class:`astropy.coordinates.Longitude`
         Source longitude in frame specified by keyword `frame`, shape (Ncomponents,).
-    lat : :class:`astropy.Latitude`
+    lat : :class:`astropy.coordinates.Latitude`
         Source latitude in frame specified by keyword `frame`, shape (Ncomponents,).
-    ra : :class:`astropy.Longitude`
+    ra : :class:`astropy.coordinates.Longitude`
         source RA in J2000 (or ICRS) coordinates, shape (Ncomponents,).
-    dec : :class:`astropy.Latitude`
+    dec : :class:`astropy.coordinates.Latitude`
         source Dec in J2000 (or ICRS) coordinates, shape (Ncomponents,).
-    gl : :class:`astropy.Longitude`
+    gl : :class:`astropy.coordinates.Longitude`
         source longitude in Galactic coordinates, shape (Ncomponents,).
-    gb : :class:`astropy.Latitude`
+    gb : :class:`astropy.coordinates.Latitude`
         source latitude in Galactic coordinates, shape (Ncomponents,).
     frame : str
         Name of coordinates frame of source positions.
         If ra/dec or gl/gb are provided, this will be set to `icrs` or `galactic` by default.
-        Must be interpretable by `astropy.coordinates.frame_transform_graph.lookup_name()`.
+        Must be interpretable by :meth:`astropy.coordinates.TransformGraph.lookup_name()`.
         Required if keywords `lon` and `lat` are used.
-    stokes : :class:`astropy.Quantity` or array_like of float (Deprecated)
+    stokes : :class:`astropy.units.Quantity` or array_like of float (Deprecated)
         The source flux, shape (4, Nfreqs, Ncomponents). The first axis indexes
         the polarization as [I, Q, U, V].
     spectral_type : str
@@ -149,21 +149,21 @@ class SkyModel(UVBase):
 
         Options:
 
-        - 'flat' : Flat spectrum.
-        - 'full' : Flux is defined by a saved value at each frequency.
-        - 'subband' : Flux is given at a set of band centers.
-        - 'spectral_index' : Flux is given at a reference frequency.
+            - 'flat' : Flat spectrum.
+            - 'full' : Flux is defined by a saved value at each frequency.
+            - 'subband' : Flux is given at a set of band centers.
+            - 'spectral_index' : Flux is given at a reference frequency.
 
-    freq_array : :class:`astropy.Quantity`
+    freq_array : :class:`astropy.units.Quantity`
         Array of frequencies that fluxes are provided for, shape (Nfreqs,).
-    reference_frequency : :class:`astropy.Quantity`
+    reference_frequency : :class:`astropy.units.Quantity`
         Reference frequencies of flux values, shape (Ncomponents,).
     spectral_index : array_like of float
         Spectral index of each source, shape (Ncomponents).
         None if spectral_type is not 'spectral_index'.
     component_type : str
         Component type, either 'point' or 'healpix'. If this is not set, the type is
-        inferred from whether `nside` is set.
+        inferred from whether ``nside`` is set.
     nside : int
         nside parameter for HEALPix maps.
     hpx_inds : array_like of int
@@ -907,7 +907,7 @@ class SkyModel(UVBase):
         ]
 
     def clear_time_position_specific_params(self):
-        """Set  parameters which are time & position specific to None."""
+        """Set  parameters which are time & position specific to ``None``."""
         for param_name in self._time_position_params:
             setattr(self, param_name, None)
 
@@ -1054,7 +1054,8 @@ class SkyModel(UVBase):
         return equal
 
     def copy(self):
-        """Overload this method to filter ra/dec warnings that shouldn't be issued."""
+        """Return a copy of this object."""
+        # Overload this method to filter ra/dec warnings that shouldn't be issued.
         # this method should be removed in version 0.3.0
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message="lon is no longer")
@@ -1064,7 +1065,7 @@ class SkyModel(UVBase):
     def transform_to(self, frame):
         """Transform to a difference coordinate frame using underlying Astropy function.
 
-        This function is a thin wrapper on astropy.coordinates.SkyCoord.transform_to
+        This function is a thin wrapper on :meth:`astropy.coordinates.SkyCoord.transform_to`
         please refer to that function for full documentation.
 
         Parameters
@@ -1073,12 +1074,11 @@ class SkyModel(UVBase):
             The frame to transform this coordinate into.
             Currently frame must be one of ["galactic", "icrs"].
 
-
         """
         if self.component_type == "healpix":
             raise ValueError(
-                "Direct coordinate transformation between frames is not valid"
-                " for `healpix` type catalogs. Please use the `healpix_interp_transform` "
+                "Direct coordinate transformation between frames is not valid "
+                "for `healpix` type catalogs. Please use the `healpix_interp_transform` "
                 "to transform to a new frame and interpolate to the new pixel centers. "
                 "Alternatively, you can call `healpix_to_point` to convert the healpix map "
                 "to a point source catalog before calling this function."
@@ -1114,11 +1114,12 @@ class SkyModel(UVBase):
         check_extra=True,
         run_check_acceptability=True,
     ):
-        """Transform a HEALPix map to a new frame and interp to new pixel centers.
+        """
+        Transform a HEALPix map to a new frame and interpolate to new pixel centers.
 
         This method is only available for a healpix type sky model.
         Computes the pixel centers for a HEALPix map in the new frame,
-        then interpolates the old map using `astropy_healpix.interpolate_bilinear_skycoord`.
+        then interpolates the old map using :meth:`astropy_healpix.HEALPix.interpolate_bilinear_skycoord`.
 
         Conversion with this method may take some time as it must iterate over every
         frequency and stokes parameter individually.
@@ -1128,12 +1129,12 @@ class SkyModel(UVBase):
         since this would induce a Q <--> U rotation.
 
         Current implementation is equal to using a healpy.Rotator class to 1 part in 10^-5
-        (e.g `numpy.allclose(healpy_rotated_map, interpolate_bilinear_skycoord, rtol=1e-5) is True`).
+        (e.g :func:`numpy.allclose(healpy_rotated_map, interpolate_bilinear_skycoord, rtol=1e-5) is True`).
 
 
         Parameters
         ----------
-        frame : str, `BaseCoordinateFrame` class or instance.
+        frame : str, :class:`astropy.coordinates.BaseCoordinateFrame` class or instance.
             The frame to transform this coordinate into.
             Currently frame must be one of ["galactic", "icrs"].
         full_sky : bool
@@ -1153,6 +1154,13 @@ class SkyModel(UVBase):
             Option to check acceptable range of the values of parameters after
             downselecting data on this object (the default is True, meaning the
             acceptable range check will be done).
+
+        Returns
+        -------
+        :class:`SkyModel` object or ``None``
+            Returns ``None`` if ``inplace`` is True (the calling object is updated),
+            otherwise the modified :class:`SkyModel` object is returned.
+
         """
         if inplace:
             this = self
@@ -1358,11 +1366,11 @@ class SkyModel(UVBase):
 
     def get_lon_lat(self):
         """
-        Retrieve ra and dec values for components.
+        Retrieve longitudinal and latitudinal (e.g. RA and Dec) values for components.
 
-        This is mostly useful for healpix objects where the ra, dec values are not
+        This is mostly useful for healpix objects where the coordinates are not
         stored on the object (only the healpix inds are stored, which can be converted
-        to ra/dec using this method).
+        to coordinates using this method).
 
         """
         if self.component_type == "healpix":
@@ -1465,14 +1473,14 @@ class SkyModel(UVBase):
         Convert a point component_type object to a healpix component_type.
 
         This method only works for objects that were originally healpix objects but
-        were converted to `point` component type using `healpix_to_point`. This
+        were converted to `point` component type using :meth:`healpix_to_point`. This
         method undoes that conversion.
         It does NOT assign general point components to a healpix grid.
 
-        Requires that the `hpx_inds` and `nside` parameters are set on the object.
+        Requires that the ``hpx_inds`` and ``nside`` parameters are set on the object.
         Divide by the pixel area and optionally convert to K.
         This method is provided as a convenience for users to be able to undo
-        the `healpix_to_point` method.
+        the :meth:`healpix_to_point` method.
 
         Parameters
         ----------
@@ -1536,15 +1544,15 @@ class SkyModel(UVBase):
         """
         Convert a point component_type object to a healpix component_type.
 
-        Deprecated. Use `assign_to_healpix` to assign point components to a healpix
-        grid. Use `_point_to_healpix` to undo a `healpix_to_point` conversion.
+        Deprecated. Use :meth:`assign_to_healpix` to assign point components to a healpix
+        grid. Use :meth:`_point_to_healpix` to undo a :meth:`healpix_to_point` conversion.
 
         This method only works for objects that were originally healpix objects but
-        were converted to `point` component type using `healpix_to_point`. This
+        were converted to `point` component type using :meth:`healpix_to_point`. This
         method undoes that conversion.
         It does NOT assign general point components to a healpix grid.
 
-        Requires that the `hpx_inds` and `nside` parameters are set on the object.
+        Requires that the ``hpx_inds`` and ``nside`` parameters are set on the object.
         Divide by the pixel area and optionally convert to K.
         This method is provided as a convenience for users to be able to undo
         the `healpix_to_point` method.
@@ -1602,10 +1610,10 @@ class SkyModel(UVBase):
         resolution of the telescope, so it should be used with care, but it is
         provided here as a convenience.
 
-        Note that the time and position specific parameters [time, telescope_location,
-        alt_az, pos_lmn and above_horizon] will be set to None as part of this method.
-        They can be recalculated afterwards if desired using the `update_positions`
-        method.
+        Note that the time and position specific parameters [``time``,
+        ``telescope_location``, ``alt_az``, ``pos_lmn`` and ``above_horizon``] will be
+        set to ``None`` as part of this method. They can be recalculated afterwards if
+        desired using the :meth:`update_positions` method.
 
         Parameters
         ----------
@@ -1639,6 +1647,12 @@ class SkyModel(UVBase):
             Option to check acceptable range of the values of parameters after
             downselecting data on this object (the default is True, meaning the
             acceptable range check will be done).
+
+        Returns
+        -------
+        :class:`SkyModel` object or ``None``
+            Returns ``None`` if ``inplace`` is True (the calling object is updated),
+            otherwise the modified :class:`SkyModel` object is returned.
 
         """
         if self.component_type != "point":
@@ -1913,10 +1927,11 @@ class SkyModel(UVBase):
 
         Produces a SkyModel object that is in the `full` frequency spectral type, based on
         the current spectral type:
-        - full: Extract a subset of existing frequencies.
-        - subband: Interpolate to new frequencies.
-        - spectral_index: Evaluate at the new frequencies.
-        - flat: Copy to new frequencies.
+
+            - full: Extract a subset of existing frequencies.
+            - subband: Interpolate to new frequencies.
+            - spectral_index: Evaluate at the new frequencies.
+            - flat: Copy to new frequencies.
 
         Parameters
         ----------
@@ -1950,6 +1965,13 @@ class SkyModel(UVBase):
             Default True.
         atol: Quantity
             Tolerance for frequency comparison. Defaults to 1 Hz.
+
+        Returns
+        -------
+        :class:`SkyModel` object or ``None``
+            Returns ``None`` if ``inplace`` is True (the calling object is updated),
+            otherwise the modified :class:`SkyModel` object is returned.
+
         """
         sky = self if inplace else self.copy()
 
@@ -2170,15 +2192,16 @@ class SkyModel(UVBase):
         From alt/az, calculate direction cosines (lmn)
 
         Doesn't return anything but updates the following attributes in-place:
-        * ``pos_lmn``
-        * ``alt_az``
-        * ``time``
+
+            * ``pos_lmn``
+            * ``alt_az``
+            * ``time``
 
         Parameters
         ----------
-        time : :class:`astropy.Time`
+        time : :class:`astropy.time.Time`
             Time to update positions for.
-        telescope_location : :class:`astropy.EarthLocation`
+        telescope_location : :class:`astropy.coordinates.EarthLocation`
             Telescope location to update positions for.
         """
         if not isinstance(time, Time):
@@ -2375,7 +2398,7 @@ class SkyModel(UVBase):
 
         Parameters
         ----------
-        deprecated_location : :class:`astropy.EarthLocation`
+        deprecated_location : :class:`astropy.coordinates.EarthLocation`
             This keyword is deprecated. It is preserved to maintain backwards
             compatibility and sets the EarthLocation on this SkyModel object.
 
@@ -2483,6 +2506,12 @@ class SkyModel(UVBase):
         run_check_acceptability : bool
             Option to check acceptable range of the values of parameters after
             combining objects.
+
+        Returns
+        -------
+        :class:`SkyModel` object or ``None``
+            Returns ``None`` if ``inplace`` is True (the calling object is updated),
+            otherwise the combined :class:`SkyModel` object is returned.
 
         Raises
         ------
@@ -2882,20 +2911,20 @@ class SkyModel(UVBase):
         ----------
         component_inds : array_like of int
             Component indices to keep on the object.
-        lat_range : :class:`astropy.Latitude`
+        lat_range : :class:`astropy.coordinates.Latitude`
             Range of Dec or galactic latitude, depending on the object `frame`
             attribute, to keep on the object, shape (2,).
-        lon_range : :class:`astropy.Longitude`
+        lon_range : :class:`astropy.coordinates.Longitude`
             Range of RA or galactic longitude, depending on the object `frame`
             attribute, to keep on the object, shape (2,). If the second value is
             smaller than the first, the lons are treated as being wrapped around
             lon = 0, and the lons kept on the object will run from the larger value,
             through 0, and end at the smaller value.
-        min_brightness : :class:`astropy.Quantity`
+        min_brightness : :class:`astropy.units.Quantity`
             Minimum brightness in stokes I to keep on object (implemented as a >= cut).
-        max_brightness : :class:`astropy.Quantity`
+        max_brightness : :class:`astropy.units.Quantity`
             Maximum brightness in stokes I to keep on object (implemented as a <= cut).
-        brightness_freq_range : :class:`astropy.Quantity`
+        brightness_freq_range : :class:`astropy.units.Quantity`
             Frequency range over which the min and max brightness tests should be
             performed. Must be length 2. If None, use the range over which the object
             is defined.
@@ -2914,6 +2943,13 @@ class SkyModel(UVBase):
             Option to perform the select directly on self or return a new SkyModel
             object with just the selected data (the default is True, meaning the
             select will be done on self).
+
+        Returns
+        -------
+        :class:`SkyModel` object or ``None``
+            Returns ``None`` if ``inplace`` is True (the calling object is updated),
+            otherwise the modified :class:`SkyModel` object is returned.
+
         """
         skyobj = self if inplace else self.copy()
 
@@ -3060,6 +3096,12 @@ class SkyModel(UVBase):
             downselecting data on this object (the default is True, meaning the
             acceptable range check will be done).
 
+        Returns
+        -------
+        :class:`SkyModel` object or ``None``
+            Returns ``None`` if ``inplace`` is True (the calling object is updated),
+            otherwise the modified :class:`SkyModel` object is returned.
+
         """
         if not isinstance(telescope_latitude, Latitude):
             raise TypeError("telescope_latitude must be an astropy Latitude object.")
@@ -3121,7 +3163,7 @@ class SkyModel(UVBase):
             Minimum stokes I flux to select. If not a Quantity, assumed to be in Jy.
         max_flux : Quantity or float
             Maximum stokes I flux to select. If not a Quantity, assumed to be in Jy.
-        freq_range : :class:`astropy.Quantity`
+        freq_range : :class:`astropy.units.Quantity`
             Frequency range over which the min and max flux tests should be performed.
             Must be length 2. If None, use the range over which the object is defined.
         run_check : bool
@@ -3138,6 +3180,12 @@ class SkyModel(UVBase):
         inplace : bool
             Option to do the cuts on the object in place or to return a copy
             with the cuts applied.
+
+        Returns
+        -------
+        :class:`SkyModel` object or ``None``
+            Returns ``None`` if ``inplace`` is True (the calling object is updated),
+            otherwise the modified :class:`SkyModel` object is returned.
 
         """
         warnings.warn(
@@ -3874,9 +3922,9 @@ class SkyModel(UVBase):
             Part of expected Dec column. Should match only one column in the table.
         flux_columns : str or list of str
             Part of expected Flux column(s). Each one should match only one column in the table.
-        reference_frequency : :class:`astropy.Quantity`
+        reference_frequency : :class:`astropy.units.Quantity`
             Reference frequency for flux values, assumed to be the same value for all rows.
-        freq_array : :class:`astropy.Quantity`
+        freq_array : :class:`astropy.units.Quantity`
             Frequencies corresponding to flux_columns (should be same length).
             Required for multiple flux columns.
         spectral_index_column : str
@@ -4814,10 +4862,10 @@ class SkyModel(UVBase):
         flux_columns : str or list of str
             Part of expected vot Flux column(s). Each one should match only one column
             in the file. Only used for vot files.
-        reference_frequency : :class:`astropy.Quantity`
+        reference_frequency : :class:`astropy.units.Quantity`
             Reference frequency for VOTable flux values, assumed to be the same value
             for all components.
-        freq_array : :class:`astropy.Quantity`
+        freq_array : :class:`astropy.units.Quantity`
             Frequencies corresponding to VOTable flux_columns (should be same length).
             Required for multiple flux columns.
         spectral_index_column : str
@@ -4979,10 +5027,10 @@ class SkyModel(UVBase):
         flux_columns : str or list of str
             Part of expected vot Flux column(s). Each one should match only one column
             in the file. Only used for vot files.
-        reference_frequency : :class:`astropy.Quantity`
+        reference_frequency : :class:`astropy.units.Quantity`
             Reference frequency for VOTable flux values, assumed to be the same value
             for all components.
-        freq_array : :class:`astropy.Quantity`
+        freq_array : :class:`astropy.units.Quantity`
             Frequencies corresponding to VOTable flux_columns (should be same length).
             Required for multiple flux columns.
         spectral_index_column : str
@@ -5602,7 +5650,7 @@ def source_cuts(
         Minimum stokes I flux to select [Jy]
     max_flux : float
         Maximum stokes I flux to select [Jy]
-    freq_range : :class:`astropy.Quantity`
+    freq_range : :class:`astropy.units.Quantity`
         Frequency range over which the min and max flux tests should be performed.
         Must be length 2. If None, use the range over which the object is defined.
 
@@ -5677,9 +5725,9 @@ def read_votable_catalog(
         Part of expected Dec column. Should match only one column in the table.
     flux_columns : str or list of str
         Part of expected Flux column(s). Each one should match only one column in the table.
-    reference_frequency : :class:`astropy.Quantity`
+    reference_frequency : :class:`astropy.units.Quantity`
         Reference frequency for flux values, assumed to be the same value for all rows.
-    freq_array : :class:`astropy.Quantity`
+    freq_array : :class:`astropy.units.Quantity`
         Frequencies corresponding to flux_columns (should be same length).
         Required for multiple flux columns.
     return_table : bool, optional
