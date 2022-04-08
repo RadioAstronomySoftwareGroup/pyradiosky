@@ -112,16 +112,12 @@ class SkyModel(UVBase):
     """
     Object to hold point source and diffuse models.
 
-    Defines a set of components at given ICRS ra/dec coordinates,
-    with flux densities defined by stokes parameters.
-
-    Flux densities defined are by stokes parameters.
-    The attribute Ncomponents gives the number of source components.
-
-    Contains methods to:
-        - Read and write different catalog formats.
-        - Calculate source positions.
-        - Calculate local coherency matrix in a local topocentric frame.
+    Can be initialized using the :meth:`from_file` class method or :meth:`read` method,
+    or by passing parameters listed below on object initialization. It can also be
+    initialized as an empty object (by passing no parameters on object initialization),
+    which will have all the attributes set to ``None`` so that the attributes can be set
+    directly on the object at a later time. After setting attributes on the object, use
+    the :meth:`check` method to verify that the object is self-consistent.
 
     Parameters
     ----------
