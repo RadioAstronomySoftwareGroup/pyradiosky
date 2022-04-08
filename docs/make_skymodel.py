@@ -24,7 +24,7 @@ def write_skymodel_rst(write_file=None):
         ":meth:`pyradiosky.SkyModel.from_file` class method\n"
         "(as ``sky = SkyModel.from_file(<filename>)``) or be initialized by passing\n"
         "in all the information to the constructor. SkyModel objects can also be\n"
-        "initializedas an empty object (as ``sky = SkyModel()``). When an empty\n"
+        "initialized as an empty object (as ``sky = SkyModel()``). When an empty\n"
         "SkyModel object is initialized, it has all of these attributes defined but\n"
         "set to ``None``. The attributes can be set by reading in a data file using\n"
         "the :meth:`pyradiosky.SkyModel.read` method or by setting them directly on\n"
