@@ -129,18 +129,25 @@ class SkyModel(UVBase):
     lat : :class:`astropy.coordinates.Latitude`
         Source latitude in frame specified by keyword `frame`, shape (Ncomponents,).
     ra : :class:`astropy.coordinates.Longitude`
-        source RA in J2000 (or ICRS) coordinates, shape (Ncomponents,).
+        source RA in J2000 (or ICRS) coordinates, shape (Ncomponents,). Not needed if
+        the `skycoord` is passed.
     dec : :class:`astropy.coordinates.Latitude`
-        source Dec in J2000 (or ICRS) coordinates, shape (Ncomponents,).
+        source Dec in J2000 (or ICRS) coordinates, shape (Ncomponents,). Not needed if
+        the `skycoord` is passed.
     gl : :class:`astropy.coordinates.Longitude`
-        source longitude in Galactic coordinates, shape (Ncomponents,).
+        source longitude in Galactic coordinates, shape (Ncomponents,). Not needed if
+        the `skycoord` is passed.
     gb : :class:`astropy.coordinates.Latitude`
-        source latitude in Galactic coordinates, shape (Ncomponents,).
+        source latitude in Galactic coordinates, shape (Ncomponents,). Not needed if
+        the `skycoord` is passed.
     frame : str
         Name of coordinates frame of source positions.
         If ra/dec or gl/gb are provided, this will be set to `icrs` or `galactic` by default.
-        Must be interpretable by :meth:`astropy.coordinates.TransformGraph.lookup_name()`.
-        Required if keywords `lon` and `lat` are used.
+        Must be interpretable by `astropy.coordinates.frame_transform_graph.lookup_name()`.
+        Required if keywords `lon` and `lat` are used. Not needed if  the `skycoord` is
+        passed.
+    skycoord : :class:`astropy.coordinates.SkyCoord`
+        SkyCoord object giving the component positions.
     stokes : :class:`astropy.units.Quantity` or array_like of float (Deprecated)
         The source flux, shape (4, Nfreqs, Ncomponents). The first axis indexes
         the polarization as [I, Q, U, V].
@@ -218,20 +225,21 @@ class SkyModel(UVBase):
         gl=None,
         gb=None,
         frame=None,
+        skycoord=None,
         reference_frequency=None,
         spectral_index=None,
         component_type=None,
         nside=None,
         hpx_inds=None,
-        stokes_error=None,
         hpx_order=None,
+        stokes_error=None,
         extended_model_group=None,
         beam_amp=None,
         history="",
         filename=None,
     ):
         # standard angle tolerance: 1 mas in radians.
-        angle_tol = Angle(1, units.arcsec)
+        self.angle_tol = Angle(1, units.arcsec)
         self.future_angle_tol = Angle(1e-3, units.arcsec)
 
         # Frequency tolerance: 1 Hz
@@ -247,35 +255,13 @@ class SkyModel(UVBase):
         )
         self._Nfreqs = UVParameter("Nfreqs", description=desc, expected_type=int)
 
-        desc = "Name of the source coordinate frame."
-        self._frame = UVParameter(
-            "frame",
-            description=desc,
-            expected_type=str,
-        )
-
         desc = (
-            "Longitudes of source component positions in frame specified by frame "
-            "attribute. shape (Ncomponents,)"
+            ":class:`astropy.coordinates.SkyCoord` object that contains the component"
+            "positions, shape (Ncomponents,)."
         )
-        self._lon = UVParameter(
-            "lon",
-            description=desc,
-            form=("Ncomponents",),
-            expected_type=Longitude,
-            tols=angle_tol,
-        )
-
-        desc = (
-            "Latitudes of source component positions in frame specified by frame "
-            "attribute. shape (Ncomponents,)"
-        )
-        self._lat = UVParameter(
-            "lat",
-            description=desc,
-            form=("Ncomponents",),
-            expected_type=Latitude,
-            tols=angle_tol,
+        # TODO: think about tolerances
+        self._skycoord = UVParameter(
+            "skycoord", description=desc, expected_type=SkyCoord, form=("Ncomponents",)
         )
 
         desc = (
@@ -319,6 +305,13 @@ class SkyModel(UVBase):
             expected_type=str,
             required=False,
             acceptable_vals=["ring", "nested"],
+        )
+        desc = "Name of the Healpix coordinate frame."
+        self._hpx_frame = UVParameter(
+            "hpx_frame",
+            description=desc,
+            expected_type=str,
+            required=False,
         )
 
         desc = "Healpix indices, only required for HEALPix maps."
@@ -520,55 +513,61 @@ class SkyModel(UVBase):
                 freq_array = freqs_use
                 reference_frequency = None
 
-        # Raise error if missing the right combination.
-        coords_given = {
-            "lon": lon is not None,
-            "lat": lat is not None,
-            "ra": ra is not None,
-            "dec": dec is not None,
-            "gl": gl is not None,
-            "gb": gb is not None,
-        }
+        if skycoord is not None:
+            location_params = [lon, lat, ra, dec, gl, gb, frame]
+            for param in location_params:
+                if param is not None:
+                    raise ValueError(f"Cannot set {param} if the skycoord is set.")
 
-        valid_combos = [{"ra", "dec"}, {"lat", "lon"}, {"gl", "gb"}, set()]
-        input_combo = {k for k, v in coords_given.items() if v}
+            self.skycoord = skycoord
+        else:
+            # Raise error if missing the right combination.
+            coords_given = {
+                "lon": lon is not None,
+                "lat": lat is not None,
+                "ra": ra is not None,
+                "dec": dec is not None,
+                "gl": gl is not None,
+                "gb": gb is not None,
+            }
 
-        if input_combo not in valid_combos:
-            raise ValueError(f"Invalid input coordinate combination: {input_combo}")
+            valid_combos = [{"ra", "dec"}, {"lat", "lon"}, {"gl", "gb"}, set()]
+            input_combo = {k for k, v in coords_given.items() if v}
 
-        if input_combo == {"lat", "lon"} and frame is None:
-            raise ValueError(
-                "The 'frame' keyword must be set to initialize from lat/lon."
-            )
+            if input_combo not in valid_combos:
+                raise ValueError(f"Invalid input coordinate combination: {input_combo}")
 
-        frame_guess = None
-        if (ra is not None) and (dec is not None):
-            lon = ra
-            lat = dec
-            frame_guess = "icrs"
-        elif (gl is not None) and (gb is not None):
-            lon = gl
-            lat = gb
-            frame_guess = "galactic"
-            if frame is not None and frame.lower() != "galactic":
-                warnings.warn(
-                    f"Warning: Galactic coordinates gl and gb were given, but the frame keyword is {frame}. "
-                    "Ignoring frame keyword and interpreting coordinates as Galactic."
+            if input_combo == {"lat", "lon"} and frame is None:
+                raise ValueError(
+                    "The 'frame' keyword must be set to initialize from lat/lon."
                 )
-                frame = None
 
-        # Set frame if unset
-        frame = frame_guess if frame is None else frame
+            frame_guess = None
+            if (ra is not None) and (dec is not None):
+                lon = ra
+                lat = dec
+                frame_guess = "icrs"
+            elif (gl is not None) and (gb is not None):
+                lon = gl
+                lat = gb
+                frame_guess = "galactic"
+                if frame is not None and frame.lower() != "galactic":
+                    warnings.warn(
+                        f"Warning: Galactic coordinates gl and gb were given, but the frame keyword is {frame}. "
+                        "Ignoring frame keyword and interpreting coordinates as Galactic."
+                    )
+                    frame = None
 
-        if isinstance(frame, str):
-            frame_class = frame_transform_graph.lookup_name(frame)
-            if frame_class is None:
-                raise ValueError(f"Invalid frame name {frame}.")
-            frame = frame_class()
+            # Set frame if unset
+            frame = frame_guess if frame is None else frame
 
-        self._frame_inst = frame
-        if frame is not None:
-            self._frame.value = frame.name
+            if isinstance(frame, str):
+                frame_class = frame_transform_graph.lookup_name(frame)
+                if frame_class is None:
+                    raise ValueError(f"Invalid frame name {frame}.")
+                frame = frame_class()
+
+            skycoord = SkyCoord(lon, lat, frame)
 
         if component_type is not None:
             if component_type not in self._component_type.acceptable_vals:
@@ -594,8 +593,7 @@ class SkyModel(UVBase):
             req_args = ["name", "lon", "lat", "stokes", "spectral_type"]
             args_set_req = [
                 name is not None,
-                lon is not None,
-                lat is not None,
+                skycoord is not None,
                 stokes is not None,
                 spectral_type is not None,
             ]
@@ -642,15 +640,16 @@ class SkyModel(UVBase):
                 if self.hpx_order is None:
                     self.hpx_order = "ring"
 
-                if self.frame is None:
+                if frame is None:
                     warnings.warn(
                         "In version 0.3.0, the frame keyword will be required for HEALPix maps. "
                         "Defaulting to ICRS",
                         category=DeprecationWarning,
                     )
-                    self.frame = "icrs"
+                    self.hpx_frame = "icrs"
                     frame = frame_transform_graph.lookup_name(self.frame)()
-                    self._frame_inst = frame
+                else:
+                    self.hpx_frame = frame
 
                 self.Ncomponents = self.hpx_inds.size
 
