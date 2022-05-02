@@ -129,11 +129,11 @@ class SkyModel(UVBase):
     lat : :class:`astropy.coordinates.Latitude`
         Source latitude in frame specified by keyword `frame`, shape (Ncomponents,).
     ra : :class:`astropy.coordinates.Longitude`
-        source RA in J2000 (or ICRS) coordinates, shape (Ncomponents,). Not needed if
-        the `skycoord` is passed.
+        Source RA in the frame specified in the `frame` parameter, shape (Ncomponents,).
+        Not needed if the `skycoord` is passed.
     dec : :class:`astropy.coordinates.Latitude`
-        source Dec in J2000 (or ICRS) coordinates, shape (Ncomponents,). Not needed if
-        the `skycoord` is passed.
+        Source Dec in the frame specified in the `frame` parameter, shape (Ncomponents,).
+        Not needed if the `skycoord` is passed.
     gl : :class:`astropy.coordinates.Longitude`
         source longitude in Galactic coordinates, shape (Ncomponents,). Not needed if
         the `skycoord` is passed.
@@ -142,8 +142,8 @@ class SkyModel(UVBase):
         the `skycoord` is passed.
     frame : str
         Name of coordinates frame of source positions.
-        If ra/dec or gl/gb are provided, this will be set to `icrs` or `galactic` by default.
-        Must be interpretable by `astropy.coordinates.frame_transform_graph.lookup_name()`.
+        If ra/dec or gl/gb are provided, this will be set to `icrs` or `galactic` by
+        default. Must be interpretable by `astropy.coordinates.frame_transform_graph.lookup_name()`.
         Required if keywords `lon` and `lat` are used. Not needed if  the `skycoord` is
         passed.
     skycoord : :class:`astropy.coordinates.SkyCoord`
@@ -199,15 +199,13 @@ class SkyModel(UVBase):
 
         if component_type == "healpix":
             self._name.required = False
-            self._lon.required = False
-            self._lat.required = False
+            self._skycoord.required = False
             self._hpx_inds.required = True
             self._nside.required = True
             self._hpx_order.required = True
         else:
             self._name.required = True
-            self._lon.required = True
-            self._lat.required = True
+            self._skycoord.required = True
             self._hpx_inds.required = False
             self._nside.required = False
             self._hpx_order.required = False
@@ -542,24 +540,26 @@ class SkyModel(UVBase):
                     "The 'frame' keyword must be set to initialize from lat/lon."
                 )
 
-            frame_guess = None
             if (ra is not None) and (dec is not None):
                 lon = ra
                 lat = dec
-                frame_guess = "icrs"
+                if frame is None:
+                    warnings.warn(
+                        "No frame was specified for RA and Dec. Defaulting to ICRS, but"
+                        "this will become an error in version 0.3 and later.",
+                        DeprecationWarning,
+                    )
+                    frame = "icrs"
             elif (gl is not None) and (gb is not None):
                 lon = gl
                 lat = gb
-                frame_guess = "galactic"
-                if frame is not None and frame.lower() != "galactic":
+                if frame is None:
                     warnings.warn(
-                        f"Warning: Galactic coordinates gl and gb were given, but the frame keyword is {frame}. "
-                        "Ignoring frame keyword and interpreting coordinates as Galactic."
+                        "No frame was specified for gl and gb. Defaulting to galactic, "
+                        "but this will become an error in version 0.3 and later.",
+                        DeprecationWarning,
                     )
-                    frame = None
-
-            # Set frame if unset
-            frame = frame_guess if frame is None else frame
+                    frame = "galactic"
 
             if isinstance(frame, str):
                 frame_class = frame_transform_graph.lookup_name(frame)
@@ -642,8 +642,8 @@ class SkyModel(UVBase):
 
                 if frame is None:
                     warnings.warn(
-                        "In version 0.3.0, the frame keyword will be required for HEALPix maps. "
-                        "Defaulting to ICRS",
+                        "In version 0.3.0, the frame keyword will be required for "
+                        "HEALPix maps. Defaulting to ICRS",
                         category=DeprecationWarning,
                     )
                     self.hpx_frame = "icrs"
@@ -822,29 +822,49 @@ class SkyModel(UVBase):
 
             self.check()
 
-    def __getattribute__(self, name):
-        """Provide ra and dec for healpix objects with deprecation warnings."""
-        if name == "lon" and not self._lon.required and self._lon.value is None:
-            warnings.warn(
-                "lon is no longer a required parameter on Healpix objects and the "
-                "value is currently None. Use `get_lon_lat` to get the lon and lat "
-                "values for Healpix components. Starting in version 0.3.0 this call "
-                "will return None.",
-                category=DeprecationWarning,
-            )
-            lon, _ = self.get_lon_lat()
-            return lon
-        elif name == "lat" and not self._lat.required and self._lat.value is None:
-            warnings.warn(
-                "lat is no longer a required parameter on Healpix objects and the "
-                "value is currently None. Use `get_lon_lat` to get the lon and lat "
-                "values for Healpix components. Starting in version 0.3.0 this call "
-                "will return None.",
-                category=DeprecationWarning,
-            )
-            _, lat = self.get_lon_lat()
-            return lat
+    def __getattr__(self, name):
+        """
+        Handle references to frame coordinates (ra/dec/gl/gb, etc.).
 
+        Also Provide ra and dec for healpix objects with deprecation warnings.
+        """
+        if self.component_type == "healpix":
+            if name == "lon":
+                warnings.warn(
+                    "lon is no longer a required parameter on Healpix objects and the "
+                    "value is currently None. Use `get_lon_lat` to get the lon and lat "
+                    "values for Healpix components. Starting in version 0.3.0 this call "
+                    "will return None.",
+                    category=DeprecationWarning,
+                )
+                lon, _ = self.get_lon_lat()
+                return lon
+            elif name == "lat":
+                warnings.warn(
+                    "lat is no longer a required parameter on Healpix objects and the "
+                    "value is currently None. Use `get_lon_lat` to get the lon and lat "
+                    "values for Healpix components. Starting in version 0.3.0 this call "
+                    "will return None.",
+                    category=DeprecationWarning,
+                )
+                _, lat = self.get_lon_lat()
+                return lat
+
+        if (not name.startswith("__")) and self.skycoord.frame is not None:
+            comp_dict = self.skycoord.frame.get_representation_component_names()
+            # Naming for galactic is different from astropy:
+            if name == "gl":
+                name = "l"
+            if name == "gb":
+                name = "b"
+            if name in comp_dict:
+                coord = comp_dict[name]
+                return getattr(self, coord)
+
+        # TODO: capture Attribute error from asking for wrong coord type and suggest
+        # using the transform_to method
+
+        # Error if attribute not found
         return super().__getattribute__(name)
 
     def _set_spectral_type_params(self, spectral_type):
@@ -981,22 +1001,6 @@ class SkyModel(UVBase):
 
         return True
 
-    def __getattr__(self, name):
-        """Handle references to frame coordinates (ra/dec/gl/gb, etc.)."""
-        if (not name.startswith("__")) and self._frame_inst is not None:
-            comp_dict = self._frame_inst.get_representation_component_names()
-            # Naming for galactic is different from astropy:
-            if name == "gl":
-                name = "l"
-            if name == "gb":
-                name = "b"
-            if name in comp_dict:
-                lonlat = comp_dict[name]
-                return getattr(self, lonlat)  # Should return either lon or lat.
-
-        # Error if attribute not found
-        return self.__getattribute__(name)
-
     def __eq__(
         self, other, check_extra=True, allowed_failures="filename", silent=False
     ):
@@ -1020,6 +1024,7 @@ class SkyModel(UVBase):
                     other, check_extra=check_extra, allowed_failures=allowed_failures
                 )
 
+            # TODO: figure out how to handle skycoords with tolerances
             # Issue deprecation warning if ra/decs aren't close to future_angle_tol levels
             if self._lon.value is not None and not units.quantity.allclose(
                 self.lon, other.lon, rtol=0, atol=self.future_angle_tol
@@ -1076,7 +1081,7 @@ class SkyModel(UVBase):
             return super(SkyModel, self).copy()
 
     def transform_to(self, frame):
-        """Transform to a difference coordinate frame using underlying Astropy function.
+        """Transform to a different skycoord coordinate frame.
 
         This function is a thin wrapper on :meth:`astropy.coordinates.SkyCoord.transform_to`
         please refer to that function for full documentation.
@@ -1096,25 +1101,9 @@ class SkyModel(UVBase):
                 "Alternatively, you can call `healpix_to_point` to convert the healpix map "
                 "to a point source catalog before calling this function."
             )
-        # let astropy coordinates do the checking for correctness on frames first
-        # this is a little cheaty since it will convert to frames we do not yet
-        # support but allows us not to have to do input frame validation again.
-        coords = SkyCoord(self.lon, self.lat, frame=self.frame).transform_to(frame)
 
-        frame = coords.frame
-
-        if not isinstance(frame, (Galactic, ICRS)):
-            raise ValueError(
-                f"Supplied frame {frame.__class__.__name__} is not supported at "
-                "this time. Only 'galactic' and 'icrs' frames are currently supported.",
-            )
-        comp_dict = coords.frame.get_representation_component_names()
-        inv_dict = {val: key for key, val in comp_dict.items()}
-
-        self.lon = getattr(coords, inv_dict["lon"])
-        self.lat = getattr(coords, inv_dict["lat"])
-        self._frame_inst = frame
-        self._frame.value = frame.name
+        new_skycoord = self.skycoord.transform_to(frame)
+        self.skycoord = new_skycoord
 
         return
 
