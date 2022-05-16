@@ -203,6 +203,7 @@ class SkyModel(UVBase):
             self._hpx_inds.required = True
             self._nside.required = True
             self._hpx_order.required = True
+            self._hpx_frame.required = True
         else:
             self._name.required = True
             self._skycoord.required = True
@@ -859,7 +860,7 @@ class SkyModel(UVBase):
                 name = "b"
             if name in comp_dict:
                 coord = comp_dict[name]
-                return getattr(self, coord)
+                return getattr(self.skycoord, coord)
 
         # TODO: capture Attribute error from asking for wrong coord type and suggest
         # using the transform_to method
@@ -1186,9 +1187,9 @@ class SkyModel(UVBase):
                 "with polarization information."
             )
         #  quickly check the validity of the transformation using a dummy SkyCoord object.
-        coords = SkyCoord(0, 0, unit="rad", frame=this.frame)
+        coords = SkyCoord(0, 0, unit="rad", frame=this.hpx_frame)
 
-        # we will need the starting frame for some interpolation later
+        # we will need the starting frame object for some interpolation later
         old_frame = coords.frame
 
         # This filter can be removed when lunarsky is updated to not trigger this
@@ -1373,6 +1374,18 @@ class SkyModel(UVBase):
 
         self.coherency_radec = skyutils.stokes_to_coherency(self.stokes)
 
+    def _get_lon_lat_component_names(self):
+        if self.component_type == "healpix":
+            coord = SkyCoord(0, 0, frame=self.hpx_frame, units="deg")
+            frame_obj = coord.frame_obj
+        else:
+            frame_obj = self.skycoord.frame
+
+        comp_dict = frame_obj.get_representation_component_names()
+        inv_dict = {val: key for key, val in comp_dict.items()}
+
+        return inv_dict["lon"], inv_dict["lat"]
+
     def get_lon_lat(self):
         """
         Retrieve longitudinal and latitudinal (e.g. RA and Dec) values for components.
@@ -1382,6 +1395,7 @@ class SkyModel(UVBase):
         to coordinates using this method).
 
         """
+        comp_names = self._get_lon_lat_component_names()
         if self.component_type == "healpix":
             try:
                 import astropy_healpix
@@ -1393,18 +1407,17 @@ class SkyModel(UVBase):
             hp_obj = astropy_healpix.HEALPix(
                 nside=self.nside,
                 order=self.hpx_order,
-                frame=self._frame_inst,
+                frame=self.hpx_frame,
             )
             coords = hp_obj.healpix_to_skycoord(
                 self.hpx_inds,
             )
 
-            comp_dict = coords.frame.get_representation_component_names()
-            inv_dict = {val: key for key, val in comp_dict.items()}
-
-            return getattr(coords, inv_dict["lon"]), getattr(coords, inv_dict["lat"])
+            return getattr(coords, comp_names[0]), getattr(coords, comp_names[1])
         else:
-            return self.lon, self.lat
+            return getattr(self.skycoord, comp_names[0]), getattr(
+                self.skycoord, comp_names[1]
+            )
 
     def healpix_to_point(
         self,
@@ -1679,30 +1692,18 @@ class SkyModel(UVBase):
         sky = self if inplace else self.copy()
 
         if frame is None:
-            if sky.frame is None and sky._frame_inst is None:
-                raise ValueError(
-                    "This method requires a coordinate frame but None was supplied "
-                    "and the SkyModel object has no frame attribute set. Please "
-                    "call this function with a specific frame."
-                )
-            elif sky.frame is not None and sky._frame_inst is None:
-                # this is an unexpected state where the frame name is set
-                # but the instance has been destroyed somehow.
-                # Use the name to rebuild the instance
-
-                # easiest way to do frame checking is through making a dummy skycoord
-                coords = SkyCoord(0, 0, unit="deg", frame=self.frame)
-
-                frame = coords.frame
-                sky._frame_inst = frame
-            else:
-                # use the frame associated with the object already
-                frame = sky._frame_inst
+            frame_obj = sky.skycoord.frame
+            sky.hpx_frame = sky.skycoord.frame.name
         else:
+            warnings.warn(
+                "The frame keyword is deprecated, in the future this method will use "
+                "the frame of this object's skycoord attribute.",
+                DeprecationWarning,
+            )
             # easiest way to do frame checking is through making a dummy skycoord
             coords = SkyCoord(0, 0, unit="deg", frame=frame)
 
-            frame = coords.frame
+            frame_obj = coords.frame
 
             if not isinstance(frame, (Galactic, ICRS)):
                 raise ValueError(
@@ -1710,21 +1711,18 @@ class SkyModel(UVBase):
                     "this time. Only 'galactic' and 'icrs' frames are currently supported.",
                 )
 
-            if sky.frame is not None:
-                if sky.frame.lower() != frame.name.lower():
-                    warnings.warn(
-                        f"Input parameter frame (value: {frame.name.lower()}) differs "
-                        f"from the frame attribute on this object (value: {self.frame.lower()}). "
-                        "Using input frame for coordinate calculations."
-                    )
-                    sky.frame = frame.name
-                    sky._frame_inst = frame
+            if sky.skycoord.frame != coords.frame:
+                warnings.warn(
+                    f"Input parameter frame (value: {frame.name.lower()}) differs "
+                    f"from the frame attribute on this object (value: {self.frame.lower()}). "
+                    "Using input frame for coordinate calculations."
+                )
+                sky.hpx_frame = frame
 
         # clear time & position specific parameters
         sky.clear_time_position_specific_params()
 
-        hpx_obj = astropy_healpix.HEALPix(nside, order=order, frame=frame)
-        coords = SkyCoord(self.lon, self.lat, frame=frame)
+        hpx_obj = astropy_healpix.HEALPix(nside, order=order, frame=frame_obj)
         # This filter can be removed when lunarsky is updated to not trigger this
         # astropy deprecation warning.
         with warnings.catch_warnings():
@@ -1732,7 +1730,7 @@ class SkyModel(UVBase):
                 "ignore",
                 message="The get_frame_attr_names",
             )
-            hpx_inds = hpx_obj.skycoord_to_healpix(coords)
+            hpx_inds = hpx_obj.skycoord_to_healpix(self.skycoord)
 
         sky._set_component_type_params("healpix")
         sky.nside = nside
@@ -1845,8 +1843,7 @@ class SkyModel(UVBase):
                     sky.stokes_error / astropy_healpix.nside_to_pixel_area(sky.nside)
                 )
         sky.name = None
-        sky.lon = None
-        sky.lat = None
+        sky.skycoord = None
 
         if full_sky and sky.Ncomponents < hpx_obj.npix:
             # add in zero flux pixels
@@ -1889,7 +1886,7 @@ class SkyModel(UVBase):
             )
             new_obj = SkyModel(
                 component_type="healpix",
-                frame=frame,
+                hpx_frame=sky.hpx_frame,
                 nside=sky.nside,
                 hpx_order=sky.hpx_order,
                 spectral_type=sky.spectral_type,
@@ -2201,6 +2198,7 @@ class SkyModel(UVBase):
         if not inplace:
             return sky
 
+    # TODO: work on skycoord starting here next time
     def update_positions(self, time, telescope_location):
         """
         Calculate the altitude/azimuth positions for source components.
