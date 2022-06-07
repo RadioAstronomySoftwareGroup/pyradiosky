@@ -24,7 +24,7 @@ jobs:
           fetch-depth: 1
 
       - name: Setup Minimamba
-        uses: conda-incubator/setup-miniconda@v2.0.0
+        uses: conda-incubator/setup-miniconda@v2
         with:
           miniforge-variant: Mambaforge
           miniforge-version: latest
@@ -79,7 +79,7 @@ jobs:
           fetch-depth: 1
 
       - name: Setup Minimamba
-        uses: conda-incubator/setup-miniconda@v2.0.0
+        uses: conda-incubator/setup-miniconda@v2
         with:
           miniforge-variant: Mambaforge
           miniforge-version: latest
@@ -127,7 +127,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Minimamba
-        uses: conda-incubator/setup-miniconda@v2.0.0
+        uses: conda-incubator/setup-miniconda@v2
         with:
           miniforge-variant: Mambaforge
           miniforge-version: latest
