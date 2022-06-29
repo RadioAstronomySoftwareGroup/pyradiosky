@@ -7,7 +7,7 @@ Add description
 SkyModel: Reading in files and creating SkyModel objects
 --------------------------------------------------------
 
-a) FHD 
+a) FHD
 ******
 .. code-block:: python
 
@@ -16,7 +16,7 @@ a) FHD
   >>> from pyradiosky.data import DATA_PATH
   >>> sm = SkyModel()
 
-  >>> # Use the `read` method, optionally specify the file type. FHD default: expand_extended=True. Can also use the 
+  >>> # Use the `read` method, optionally specify the file type. FHD default: expand_extended=True. Can also use the
   >>> # file type specific `read_fhd_catalog` method.
   >>> filename = os.path.join(DATA_PATH, 'fhd_catalog.sav')
   >>> sm.read(filename)
@@ -26,8 +26,8 @@ a) FHD
   >>> sm.read_fhd_catalog(filename)
   WARNING: Source IDs are not unique. Defining unique IDs.
 
-  >>> # Use the `from_file` method to create SkyModel object without initalizing empty object, optionally specify 
-  >>> # the file type. 
+  >>> # Use the `from_file` method to create SkyModel object without initalizing empty object, optionally specify
+  >>> # the file type.
   >>> # FHD default: expand_extended=True. Can also use the file type specific `from_fhd_catalog` method.
   >>> sm = SkyModel.from_file(filename)
   WARNING: Source IDs are not unique. Defining unique IDs.
@@ -52,15 +52,15 @@ b) GLEAM
   >>> sm.read(filename, filetype='gleam')
   >>> sm.read_gleam_catalog(filename)
 
-  >>> # Use the `from_file` method to create SkyModel object without initalizing empty object, optionally specify 
-  >>> # the file type. 
-  >>> # GLEAM defaults: spectral_type='subband', with_error=False. Can also use the 
+  >>> # Use the `from_file` method to create SkyModel object without initalizing empty object, optionally specify
+  >>> # the file type.
+  >>> # GLEAM defaults: spectral_type='subband', with_error=False. Can also use the
   >>> # file type specific `from_gleam_catalog` method.
   >>> sm = SkyModel.from_file(filename)
   >>> sm = SkyModel.from_file(filename, filetype='gleam')
   >>> sm = SkyModel.from_gleam_catalog(filename)
 
-c) VOTable 
+c) VOTable
 **********
 .. code-block:: python
 
@@ -69,25 +69,25 @@ c) VOTable
   >>> from pyradiosky.data import DATA_PATH
   >>> sm = SkyModel()
 
-  >>> # Use the `read` method, optionally specify the file type. VOTable required parameters: table_name, id_column, 
+  >>> # Use the `read` method, optionally specify the file type. VOTable required parameters: table_name, id_column,
   >>> # ra_column, dec_column, and flux_columns. Can also use the file type specific `read_votable_catalog` method.
   >>> filename = os.path.join(DATA_PATH, 'simple_test.vot')
-  >>> sm.read(filename, table_name="VIII_1000_single", id_column="source_id", ra_column="RAJ2000", 
-  ...         dec_column="DEJ2000", flux_columns="Si") 
-  >>> sm.read(filename, filetype='vot', table_name="VIII_1000_single", id_column="source_id", ra_column="RAJ2000", 
+  >>> sm.read(filename, table_name="VIII_1000_single", id_column="source_id", ra_column="RAJ2000",
   ...         dec_column="DEJ2000", flux_columns="Si")
-  >>> sm.read_votable_catalog(filename, table_name="VIII_1000_single", id_column="source_id", ra_column="RAJ2000", 
-  ...                         dec_column="DEJ2000", flux_columns="Si") 
- 
-  >>> # Use the `from_file` method to create SkyModel object without initalizing empty object, optionally specify 
-  >>> # the file type. 
-  >>> # VOTable required parameters: table_name, id_column, ra_column, dec_column, and flux_columns. 
-  >>> # Can also use the file type specific `read_votable_catalog` method.
-  >>> sm = SkyModel.from_file(filename, table_name="VIII_1000_single", id_column="source_id", ra_column="RAJ2000", 
+  >>> sm.read(filename, filetype='vot', table_name="VIII_1000_single", id_column="source_id", ra_column="RAJ2000",
+  ...         dec_column="DEJ2000", flux_columns="Si")
+  >>> sm.read_votable_catalog(filename, table_name="VIII_1000_single", id_column="source_id", ra_column="RAJ2000",
   ...                         dec_column="DEJ2000", flux_columns="Si")
-  >>> sm = SkyModel.from_file(filename, filetype='vot', table_name="VIII_1000_single", id_column="source_id", 
+
+  >>> # Use the `from_file` method to create SkyModel object without initalizing empty object, optionally specify
+  >>> # the file type.
+  >>> # VOTable required parameters: table_name, id_column, ra_column, dec_column, and flux_columns.
+  >>> # Can also use the file type specific `read_votable_catalog` method.
+  >>> sm = SkyModel.from_file(filename, table_name="VIII_1000_single", id_column="source_id", ra_column="RAJ2000",
+  ...                         dec_column="DEJ2000", flux_columns="Si")
+  >>> sm = SkyModel.from_file(filename, filetype='vot', table_name="VIII_1000_single", id_column="source_id",
   ...                         ra_column="RAJ2000", dec_column="DEJ2000", flux_columns="Si")
-  >>> sm = SkyModel.from_votable_catalog(filename, table_name="VIII_1000_single", id_column="source_id", 
+  >>> sm = SkyModel.from_votable_catalog(filename, table_name="VIII_1000_single", id_column="source_id",
   ...                                    ra_column="RAJ2000", dec_column="DEJ2000", flux_columns="Si")
 
 d) text
@@ -99,19 +99,19 @@ d) text
   >>> from pyradiosky.data import DATA_PATH
   >>> sm = SkyModel()
 
-  >>> # Use the `read` method, optionally specify the file type. See Attributes section for required columns of text file. 
+  >>> # Use the `read` method, optionally specify the file type. See Attributes section for required columns of text file.
   >>> # Can also use the file type specific `read_text_catalog` method.
   >>> filename = os.path.join(DATA_PATH, 'pointsource_catalog.txt')
   >>> sm.read(filename)
   >>> sm.read(filename, filetype='text')
   >>> sm.read_text_catalog(filename)
- 
-  >>> # Use the `from_file` method to create SkyModel object without initalizing empty object, optionally specify 
-  >>> # the file type. 
+
+  >>> # Use the `from_file` method to create SkyModel object without initalizing empty object, optionally specify
+  >>> # the file type.
   >>> sm = SkyModel.from_file(filename)
   >>> sm = SkyModel.from_file(filename, filetype='text')
   >>> sm = SkyModel.from_text_catalog(filename)
- 
+
 e) skyh5
 ********
 .. code-block:: python
@@ -121,18 +121,18 @@ e) skyh5
   >>> from pyradiosky.data import DATA_PATH
   >>> sm = SkyModel()
 
-  >>> # Use the `read` method, optionally specify the file type. See Attributes section for required columns of text file. 
+  >>> # Use the `read` method, optionally specify the file type. See Attributes section for required columns of text file.
   >>> # Can also use the file type specific `read_text_catalog` method.
   >>> filename = os.path.join(DATA_PATH, 'gsm_icrs.skyh5')
   >>> sm.read(filename)
   >>> sm.read(filename, filetype='skyh5')
   >>> sm.read_skyh5(filename)
 
-  >>> # Use the `from_file` method to create SkyModel object without initalizing empty object, optionally specify 
-  >>> # the file type. 
+  >>> # Use the `from_file` method to create SkyModel object without initalizing empty object, optionally specify
+  >>> # the file type.
   >>> sm = SkyModel.from_file(filename)
   >>> sm = SkyModel.from_file(filename, filetype='skyh5')
-  >>> sm = SkyModel.from_skyh5(filename) 
+  >>> sm = SkyModel.from_skyh5(filename)
 
 SkyModel: Plotting
 ------------------
@@ -147,7 +147,7 @@ a) FHD (using extended_model_group attribute)
   >>> from pyradiosky import SkyModel
   >>> from pyradiosky.data import DATA_PATH
   >>> sm = SkyModel()
- 
+
   >>> filename = os.path.join(DATA_PATH, 'fhd_catalog_with_beam_values.sav')
   >>> sm.read_fhd_catalog(filename)
 
@@ -169,9 +169,9 @@ a) FHD (using extended_model_group attribute)
   >>> print(sm.spectral_type)
   spectral_index
   >>> # correction done since catalog reference frequencies had wrong power
-  >>> sm.reference_frequency = sm.reference_frequency*10**6 
+  >>> sm.reference_frequency = sm.reference_frequency*10**6
   >>> print(np.unique(sm.reference_frequency))
-  [1.82435013e+08 2.15675003e+08] Hz 
+  [1.82435013e+08 2.15675003e+08] Hz
   >>> print(np.unique(sm.spectral_index))
   [-0.8]
   >>> print(np.unique(sm.extended_model_group))
@@ -179,20 +179,20 @@ a) FHD (using extended_model_group attribute)
   >>> # beam amplitude for stokes parameter index = 0 (stokes I or unpolarized), Nfreqs index = 0 (first and only frequency
   >>> # since Nfreqs = 1 for spectral index type), Ncomponents index = : (all components)
   >>> print(np.unique(sm.beam_amp[0,0,:]))
-  [0.12874769 0.56623143 0.59106636] 
-  >>> # coherency (2 x 2 matrix of electric field correlation) for polarization1 index = 0 (North), 
-  >>> # polarization2 index = 0 (North), Nfreqs index = 0 (first and only frequency since Nfreqs = 1 for 
+  [0.12874769 0.56623143 0.59106636]
+  >>> # coherency (2 x 2 matrix of electric field correlation) for polarization1 index = 0 (North),
+  >>> # polarization2 index = 0 (North), Nfreqs index = 0 (first and only frequency since Nfreqs = 1 for
   >>> # spectral index type), Ncomponents index = 0 (first component)
-  >>> print(sm.coherency_radec[0,0,0,0]) 
+  >>> print(sm.coherency_radec[0,0,0,0])
   (8.400908470153809+0j) Jy
 
   >>> # dividing by 10^6 since frequency typically plotted in units of MHz
-  >>> plt.scatter(sm.reference_frequency/10**6, sm.spectral_index) # doctest: +SKIP 
+  >>> plt.scatter(sm.reference_frequency/10**6, sm.spectral_index) # doctest: +SKIP
   >>> plt.xlabel("Reference Frequency (MHz)") # doctest: +SKIP
   >>> plt.ylabel("Spectral Index") # doctest: +SKIP
   >>> plt.show() # doctest: +SKIP
 
-  >>> index_32768 = [] 
+  >>> index_32768 = []
   >>> for j in range(len(sm.extended_model_group)):
   ...     if sm.extended_model_group[j] == '32768':
   ...         # indices for extended model group 32768
@@ -202,11 +202,11 @@ a) FHD (using extended_model_group attribute)
   >>> print(np.unique(sm.reference_frequency[index_32768]))
   [2.15675003e+08] Hz
 
-  >>> # plots of fluxes are sensible at one frequency since fluxes can change with frequency, plots below provide fluxes 
+  >>> # plots of fluxes are sensible at one frequency since fluxes can change with frequency, plots below provide fluxes
   >>> # when frequency = reference frequency (more on this in at_frequencies section)
 
   >>> # log taken since these fluxes have different orders of magnitude
-  >>> plt.hist(np.log(sm.stokes.value[0,0,index_32768]), bins=20) # doctest: +SKIP 
+  >>> plt.hist(np.log(sm.stokes.value[0,0,index_32768]), bins=20) # doctest: +SKIP
   >>> plt.xlabel("log(Flux (Jy))") # doctest: +SKIP
   >>> plt.ylabel("Counts") # doctest: +SKIP
   >>> plt.show() # doctest: +SKIP
@@ -234,7 +234,7 @@ b) GLEAM (working with error, changing component type)
 
   >>> # these are centers of frequency bands
   >>> x = sm.freq_array.value/(10**6)
-  >>> # flux for stokes parameter = 0 (stokes I or unpolarized), Nfreqs index = : (all frequencies), 
+  >>> # flux for stokes parameter = 0 (stokes I or unpolarized), Nfreqs index = : (all frequencies),
   >>> # Ncomponents index = 0 (first component)
   >>> y_error = sm.stokes_error[0,:,0].value
   >>> plt.errorbar(x, y, yerr = y_error, fmt='o', ecolor = 'red', color='yellow') # doctest: +SKIP
@@ -243,7 +243,7 @@ b) GLEAM (working with error, changing component type)
   >>> plt.show() # doctest: +SKIP
 
   >>> # in_place=True so it’s applied to current object
-  >>> sm.assign_to_healpix(16, order='nested', inplace=True) 
+  >>> sm.assign_to_healpix(16, order='nested', inplace=True)
   >>> print(sm.nside)
   16
   >>> print(sm.hpx_order)
@@ -288,11 +288,11 @@ c) skyh5 (incorporating astropy healpix package (like plotting pixels), changing
    9.44444444e+07 1.05555556e+08 1.16666667e+08 1.27777778e+08
    1.38888889e+08 1.50000000e+08] Hz
   >>> print(sm.hpx_inds[:10])
-  [0 1 2 3 4 5 6 7 8 9] 
+  [0 1 2 3 4 5 6 7 8 9]
   >>> print(sm.hpx_order)
   ring
   >>> print(sm.nside)
-  8 
+  8
   >>> print(sm.frame)
   icrs
   >>> print(sm.coherency_radec[:,:,0,0])
@@ -338,7 +338,7 @@ c) skyh5 (incorporating astropy healpix package (like plotting pixels), changing
   439.74226071262797 arcmin
 
   >>> coord = SkyCoord('00h42m44.3503s +41d16m08.634s', frame='galactic')
-  >>> print(hp.interpolate_bilinear_skycoord(coord, sm.stokes.value[0,0,:])) 
+  >>> print(hp.interpolate_bilinear_skycoord(coord, sm.stokes.value[0,0,:]))
   6540.375582405899
 
   >>> a = (sm.gl.radian/math.pi)[:3]
@@ -351,14 +351,14 @@ c) skyh5 (incorporating astropy healpix package (like plotting pixels), changing
   ...     #adds pixel index at center of each pixel
   ...     ax.annotate(txt, (a[i], z[i]), fontsize=8) # doctest: +SKIP
   >>> for j in range(len(sm.hpx_inds[:3])): # doctest: +SKIP
-  ...     lon = hp.boundaries_lonlat(sm.hpx_inds[j], 100)[0]/math.pi # doctest: +SKIP 
+  ...     lon = hp.boundaries_lonlat(sm.hpx_inds[j], 100)[0]/math.pi # doctest: +SKIP
   ...     lat = np.cos(hp.boundaries_lonlat(sm.hpx_inds[j], 100)[1]) # doctest: +SKIP
   ...     lon = lon.value # doctest: +SKIP
   ...     lat = lat.value # doctest: +SKIP
   ...     vertices = np.vstack([lon.ravel(), lat.ravel()]).transpose() # doctest: +SKIP
   ...     p = Polygon(vertices, closed=True, edgecolor='black', facecolor='none') # doctest: +SKIP
   ...     # adds boundaries around each pixel
-  ...     ax.add_patch(p) # doctest: +SKIP 
+  ...     ax.add_patch(p) # doctest: +SKIP
 
   >>> a = (sm.gl.radian/math.pi)[:3]
   >>> z = np.cos(sm.gb.radian)[:3]
@@ -390,14 +390,14 @@ a) skyh5
   >>> import matplotlib.pyplot as plt # doctest: +SKIP
   >>> from pyradiosky import SkyModel
 
-  >>> sm = SkyModel(component_type='healpix', nside=1, hpx_inds=[0,1,2,3], stokes=np.zeros((4,1,4)), spectral_type='flat', 
+  >>> sm = SkyModel(component_type='healpix', nside=1, hpx_inds=[0,1,2,3], stokes=np.zeros((4,1,4)), spectral_type='flat',
   ...               hpx_order='ring')
   >>> print(sm.get_lon_lat())
   (<Longitude [ 45., 135., 225., 315.] deg>, <Latitude [41.8103149, 41.8103149, 41.8103149, 41.8103149] deg>)
 
-  >>> sm.filename == 'zero.skyh5' 
+  >>> sm.filename == 'zero.skyh5'
   >>> sm.write_skyh5('zero.skyh5')
- 
+
 b) working with time and location
 *********************************
 .. code-block:: python
@@ -425,10 +425,10 @@ b) working with time and location
   ...     obstime=time,
   ...     frame="altaz",
   ...     location=array_location)
-  >>> icrs_coord = source_coord.transform_to("icrs") 
+  >>> icrs_coord = source_coord.transform_to("icrs")
   >>> # unpolarized only
-  >>> sm = SkyModel(name="zen_source", ra=icrs_coord.ra, dec=icrs_coord.dec, stokes=[1.0, 0, 0, 0] * units.Jy, 
-  ...               spectral_type="flat", history = 'drawn from zenith_skymodel in test_skymodel.py') 
+  >>> sm = SkyModel(name="zen_source", ra=icrs_coord.ra, dec=icrs_coord.dec, stokes=[1.0, 0, 0, 0] * units.Jy,
+  ...               spectral_type="flat", history = 'drawn from zenith_skymodel in test_skymodel.py')
   >>> sm._set_spectral_type_params(sm.spectral_type)
   >>> print(sm.check(check_extra=True, run_check_acceptability=True))
   True
@@ -484,7 +484,7 @@ b) working with time and location
   1
 
   >>> # works for any point component type
-  >>> sm.filename == 'zen_source.txt' 
+  >>> sm.filename == 'zen_source.txt'
   >>> sm.write_text_catalog('zen_source.txt')
 
 SkyModel: Selecting data
@@ -531,7 +531,7 @@ a) using cut_nonrising method
 
   >>> names = ["src{}".format(i) for i in range(Nsrcs)]
   >>> stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
-  >>> # stokes I (unpolarized) sources given 1 Jy flux, otherwise no flux 
+  >>> # stokes I (unpolarized) sources given 1 Jy flux, otherwise no flux
   >>> stokes[0, ...] = 1.0 * units.Jy
 
   >>> sm = SkyModel(name=names, ra=ra, dec=dec, stokes=stokes, spectral_type="flat")
@@ -608,7 +608,7 @@ b) GLEAM (using plotly package and select and source_cuts methods)
   >>> plt.show() # doctest: +SKIP
 
   >>> sm3 = sm.copy()
-  >>> sm3.select(min_brightness=.1*units.Jy, max_brightness=1*units.Jy, brightness_freq_range=[100*10**6, 
+  >>> sm3.select(min_brightness=.1*units.Jy, max_brightness=1*units.Jy, brightness_freq_range=[100*10**6,
   ...            200*10**6]*units.Hz)
   >>> plt.scatter(x=sm3.ra, y=sm3.dec, c=sm3.stokes[0,13,:], cmap="plasma") # doctest: +SKIP
   >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.75) # doctest: +SKIP
@@ -627,13 +627,13 @@ b) GLEAM (using plotly package and select and source_cuts methods)
   >>> sm4.select(lon_range = Longitude([340, 360], units.deg))
 
   >>> sm5 = sm.copy()
-  >>> sm5.select(min_brightness=.1*units.Jy, max_brightness=1*units.Jy, brightness_freq_range=[100*10**6, 
+  >>> sm5.select(min_brightness=.1*units.Jy, max_brightness=1*units.Jy, brightness_freq_range=[100*10**6,
   ...            200*10**6]*units.Hz)
 
-  >>> fig = px.scatter(x=sm4.ra.value, y=sm4.dec.value, color=sm4.stokes[0,13,:].value, # doctest: +SKIP 
+  >>> fig = px.scatter(x=sm4.ra.value, y=sm4.dec.value, color=sm4.stokes[0,13,:].value, # doctest: +SKIP
   ...                  labels={'x': 'RA (deg)', 'y': 'DEC (deg)', 'color': 'Flux (Jy)'}) # doctest: +SKIP
   >>> fig.add_trace(px.scatter(x=sm5.ra.value, y=sm5.dec.value, symbol_sequence=['x'], # doctest: +SKIP
-  ...                          color=sm5.stokes[0,13,:].value, labels={'x': 'RA (deg)', 'y': 'DEC (deg)', # doctest: +SKIP 
+  ...                          color=sm5.stokes[0,13,:].value, labels={'x': 'RA (deg)', 'y': 'DEC (deg)', # doctest: +SKIP
   ...                          'color': 'Flux (Jy)'}).data[0]) # doctest: +SKIP
   >>> # for RA to be in conventional order
   >>> fig.update_layout(xaxis_range=[max(sm5.ra.value),min(sm5.ra.value)]) # doctest: +SKIP
@@ -662,7 +662,7 @@ c) skyh5 (using select method, incorporating astropy healpix package)
   >>> from astropy_healpix import HEALPix
   >>> sm = SkyModel()
 
-  >>> filename = os.path.join(DATA_PATH, 'gsm_icrs.skyh5') 
+  >>> filename = os.path.join(DATA_PATH, 'gsm_icrs.skyh5')
   >>> sm.read_skyh5(filename)
 
   >>> plt.scatter(sm.ra, sm.dec) # doctest: +SKIP
@@ -672,8 +672,8 @@ c) skyh5 (using select method, incorporating astropy healpix package)
   >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
   >>> plt.show() # doctest: +SKIP
 
-  >>> sm_new = sm.copy() 
-  >>> inds = list(range(0, 24)) 
+  >>> sm_new = sm.copy()
+  >>> inds = list(range(0, 24))
   >>> sm_new.select(component_inds=inds)
 
   >>> plt.scatter(sm_new.ra, sm_new.dec) # doctest: +SKIP
@@ -683,7 +683,7 @@ c) skyh5 (using select method, incorporating astropy healpix package)
   >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
   >>> plt.show() # doctest: +SKIP
 
-  >>> sm_new.filename == 'gsm_icrs_new.skyh5' 
+  >>> sm_new.filename == 'gsm_icrs_new.skyh5'
   >>> sm_new.write_skyh5('gsm_icrs_new.skyh5')
 
   >>> # used instead of transform_to since this interpolates to new pixel centers, as pixels defined by coordinate system
@@ -691,7 +691,7 @@ c) skyh5 (using select method, incorporating astropy healpix package)
   >>> hp = HEALPix(sm.nside, sm.hpx_order, sm.frame)
 
   >>> cone_index = hp.cone_search_lonlat(10 * u.deg, 10 * u.deg, radius=5 * u.deg)
-  >>> print(cone_index) 
+  >>> print(cone_index)
   [304 273 337 305]
   >>> plt.scatter(sm.lon.value[cone_index], sm.lat.value[cone_index]) # doctest: +SKIP
   >>> plt.xlim(max(sm.lon.value[cone_index]), min(sm.lon.value[cone_index])) # doctest: +SKIP
@@ -702,7 +702,7 @@ c) skyh5 (using select method, incorporating astropy healpix package)
 
   >>> neighbours_10 = hp.neighbours(10)
   >>> print(neighbours_10)
-  [21 20  9  2  3 11 22 37] 
+  [21 20  9  2  3 11 22 37]
   >>> plt.scatter(sm.lon.value[neighbours_10], sm.lat.value[neighbours_10]) # doctest: +SKIP
   >>> plt.xlim(max(sm.lon.value[neighbours_10]), min(sm.lon.value[neighbours_10])) # doctest: +SKIP
   >>> plt.autoscale() # doctest: +SKIP
@@ -744,15 +744,15 @@ a) text
   >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
   >>> plt.show() # doctest: +SKIP
 
-  >>> sm2 = sm.copy() 
-  >>> sm2.select(lon_range = Longitude([1.26, 1.31], units.deg)) 
+  >>> sm2 = sm.copy()
+  >>> sm2.select(lon_range = Longitude([1.26, 1.31], units.deg))
 
   >>> sm3 = sm.copy()
   >>> sm3.select(lon_range = Longitude([1.31, 1.36], units.deg))
 
   >>> sm_new = sm2.concat(sm3, inplace=False)
-  >>> sm_new.filename == '2srcs.txt' 
-  >>> sm_new.write_text_catalog('2srcs.txt') 
+  >>> sm_new.filename == '2srcs.txt'
+  >>> sm_new.write_text_catalog('2srcs.txt')
 
   >>> plt.scatter(x=sm_new.ra, y=sm_new.dec, c=sm_new.stokes[0,0,:], cmap="plasma") # doctest: +SKIP
   >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.75) # doctest: +SKIP
@@ -782,7 +782,7 @@ a) GLEAM (subband spectral type)
   >>> print(sm.freq_array)
   [7.60e+07 8.40e+07 9.20e+07 9.90e+07 1.07e+08 1.15e+08 1.22e+08 1.30e+08
    1.43e+08 1.51e+08 1.58e+08 1.66e+08 1.74e+08 1.81e+08 1.89e+08 1.97e+08
-   2.04e+08 2.12e+08 2.20e+08 2.27e+08] Hz 
+   2.04e+08 2.12e+08 2.20e+08 2.27e+08] Hz
 
   >>> plt.scatter(x=sm.ra, y=sm.dec, c=sm.stokes[0,4,:], cmap="plasma") # doctest: +SKIP
   >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.75) # doctest: +SKIP
@@ -792,7 +792,7 @@ a) GLEAM (subband spectral type)
   >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
   >>> plt.show() # doctest: +SKIP
 
-  >>> sm.at_frequencies(freqs=[200*10**6]*units.Hz, inplace=True, freq_interp_kind='cubic', nan_handling='clip', 
+  >>> sm.at_frequencies(freqs=[200*10**6]*units.Hz, inplace=True, freq_interp_kind='cubic', nan_handling='clip',
   ...                   run_check=True, atol=None)
 
   >>> print(sm.freq_array)
@@ -825,7 +825,7 @@ b) FHD (spectral index spectral type)
   >>> print(np.unique(sm.reference_frequency))
   [7.40000000e+07 1.80000000e+08 1.81000000e+08 2.15675003e+08] Hz
 
-  >>> print(sm.stokes.value[0,0,8235]) 
+  >>> print(sm.stokes.value[0,0,8235])
   0.5017849802970886
   >>> print(sm.reference_frequency[8235]
   215675003.0517578 Hz
@@ -834,7 +834,7 @@ b) FHD (spectral index spectral type)
   -0.8
 
   >>> x = np.linspace(75*10**6, 225*10**6, 16)
-  >>> # y = sm.stokes.value[0,0,8235] (flux is accurate for a frequency x) when x = sm.reference_frequency[8235] 
+  >>> # y = sm.stokes.value[0,0,8235] (flux is accurate for a frequency x) when x = sm.reference_frequency[8235]
   >>> y = sm.stokes.value[0,0,8235]*(x/sm.reference_frequency[8235])**sm.spectral_index[8235]
   >>> plt.plot(x/10**6,y) # doctest: +SKIP
   >>> plt.scatter(sm.reference_frequency[8235]/10**6, sm.stokes.value[0,0,8235]) # doctest: +SKIP
@@ -856,11 +856,11 @@ b) FHD (spectral index spectral type)
   >>> plt.scatter(sm.reference_frequency[0]/10**6, sm.stokes.value[0,0,0]) # doctest: +SKIP
   >>> plt.xlabel("Reference Frequency (MHz)") # doctest: +SKIP
   >>> plt.ylabel("Flux (Jy)") # doctest: +SKIP
-  >>> # if spectral index is 0, the spectrum is flat meaning same flux for all frequencies, that's why the 
+  >>> # if spectral index is 0, the spectrum is flat meaning same flux for all frequencies, that's why the
   >>> # at_frequencies method for the flat spectral type just copies
   >>> plt.show() # doctest: +SKIP
 
-  >>> sm.at_frequencies(freqs=[200*10**6]*units.Hz, inplace=True, run_check=True, atol=None) 
+  >>> sm.at_frequencies(freqs=[200*10**6]*units.Hz, inplace=True, run_check=True, atol=None)
   >>> print(sm.stokes[0,0,8235])
   0.5330077352813429 Jy
 
