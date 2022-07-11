@@ -2198,7 +2198,6 @@ class SkyModel(UVBase):
         if not inplace:
             return sky
 
-    # TODO: work on skycoord starting here next time
     def update_positions(self, time, telescope_location):
         """
         Calculate the altitude/azimuth positions for source components.
@@ -2240,24 +2239,20 @@ class SkyModel(UVBase):
         self.time = time
         self.telescope_location = telescope_location
 
-        lon, lat = self.get_lon_lat()
-
-        skycoord_use = SkyCoord(lon, lat, frame=self._frame_inst)
         # This filter can be removed when lunarsky is updated to not trigger this
         # astropy deprecation warning.
         with warnings.catch_warnings():
             warnings.filterwarnings(
                 "ignore",
                 message="The get_frame_attr_names",
-            )
             if isinstance(self.telescope_location, MoonLocation):
-                source_altaz = skycoord_use.transform_to(
+                source_altaz = self.skycoord.transform_to(
                     LunarTopo(obstime=self.time, location=self.telescope_location)
                 )
             else:
-                source_altaz = skycoord_use.transform_to(
+                source_altaz = self.skycoord.transform_to(
                     AltAz(obstime=self.time, location=self.telescope_location)
-                )
+            )
 
         alt_az = np.array([source_altaz.alt.rad, source_altaz.az.rad])
 
@@ -2276,6 +2271,11 @@ class SkyModel(UVBase):
         # Horizon mask:
         self.above_horizon = self.alt_az[0, :] > 0.0
 
+    # TODO: work on skycoord starting here next time
+    # Note: the rotation code below all assumes ICRS as the starting frame. That needs
+    # to be relaxed carefully!
+    # Consider making coherency_radec optional (maybe rename to reflect all coord sys)
+    # or dropping it (this might lead to repeated calculations for pyuvsim)
     def _calc_average_rotation_matrix(self):
         """
         Calculate the "average" rotation matrix from RA/Dec to AltAz.
