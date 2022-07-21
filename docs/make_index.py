@@ -44,6 +44,7 @@ def write_index_rst(readme_file=None, write_file=None):
         "\n\nFurther Documentation\n====================================\n"
         ".. toctree::\n"
         "   :maxdepth: 1\n\n"
+        "   tutorial\n"
         "   skymodel\n"
         "   utility_functions\n"
         "   developer_docs\n"

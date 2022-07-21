@@ -1,8 +1,21 @@
+Tutorial
+========
+
+By default, following the tutorial will write any files to the current working directory.
+Alternatively you can change the location the output files are saved to
+by changing the arguments to the ``os.path.join`` calls.
+When running the tutorial during test suite execution,
+output files are written to a temporary directory created by pytest.
+
 --------
 SkyModel
 --------
 
-Add description
+SkyModel is the primary user class, it can represent catalogs of point sources or
+diffuse models as HEALPix maps. A number of methods are available for reading in and
+writing out files as well as various transformations, including calculating fully
+polarized coherencies in the local Alt/Az basis (useful for visibility simulators).
+This tutorial should give a basic introduction to all the methods.
 
 SkyModel: Reading in files and creating SkyModel objects
 --------------------------------------------------------
@@ -18,10 +31,10 @@ a) FHD
 
   >>> # Use the `read` method, optionally specify the file type. FHD default: expand_extended=True. Can also use the
   >>> # file type specific `read_fhd_catalog` method.
-  >>> filename = os.path.join(DATA_PATH, 'fhd_catalog.sav')
+  >>> filename = os.path.join(DATA_PATH, "fhd_catalog.sav")
   >>> sm.read(filename)
   WARNING: Source IDs are not unique. Defining unique IDs.
-  >>> sm.read(filename, filetype='fhd')
+  >>> sm.read(filename, filetype="fhd")
   WARNING: Source IDs are not unique. Defining unique IDs.
   >>> sm.read_fhd_catalog(filename)
   WARNING: Source IDs are not unique. Defining unique IDs.
@@ -31,7 +44,7 @@ a) FHD
   >>> # FHD default: expand_extended=True. Can also use the file type specific `from_fhd_catalog` method.
   >>> sm = SkyModel.from_file(filename)
   WARNING: Source IDs are not unique. Defining unique IDs.
-  >>> sm = SkyModel.from_file(filename, filetype='fhd')
+  >>> sm = SkyModel.from_file(filename, filetype="fhd")
   WARNING: Source IDs are not unique. Defining unique IDs.
   >>> sm = SkyModel.from_fhd_catalog(filename)
   WARNING: Source IDs are not unique. Defining unique IDs.
@@ -45,19 +58,19 @@ b) GLEAM
   >>> from pyradiosky.data import DATA_PATH
   >>> sm = SkyModel()
 
-  >>> # Use the `read` method, optionally specify the file type. GLEAM defaults: spectral_type='subband', with_error=False.
+  >>> # Use the `read` method, optionally specify the file type. GLEAM defaults: spectral_type="subband", with_error=False.
   >>> # Can also use the file type specific `read_gleam_catalog` method.
-  >>> filename = os.path.join(DATA_PATH, 'gleam_50srcs.vot')
+  >>> filename = os.path.join(DATA_PATH, "gleam_50srcs.vot")
   >>> sm.read(filename)
-  >>> sm.read(filename, filetype='gleam')
+  >>> sm.read(filename, filetype="gleam")
   >>> sm.read_gleam_catalog(filename)
 
   >>> # Use the `from_file` method to create SkyModel object without initalizing empty object, optionally specify
   >>> # the file type.
-  >>> # GLEAM defaults: spectral_type='subband', with_error=False. Can also use the
+  >>> # GLEAM defaults: spectral_type="subband", with_error=False. Can also use the
   >>> # file type specific `from_gleam_catalog` method.
   >>> sm = SkyModel.from_file(filename)
-  >>> sm = SkyModel.from_file(filename, filetype='gleam')
+  >>> sm = SkyModel.from_file(filename, filetype="gleam")
   >>> sm = SkyModel.from_gleam_catalog(filename)
 
 c) VOTable
@@ -71,10 +84,10 @@ c) VOTable
 
   >>> # Use the `read` method, optionally specify the file type. VOTable required parameters: table_name, id_column,
   >>> # ra_column, dec_column, and flux_columns. Can also use the file type specific `read_votable_catalog` method.
-  >>> filename = os.path.join(DATA_PATH, 'simple_test.vot')
+  >>> filename = os.path.join(DATA_PATH, "simple_test.vot")
   >>> sm.read(filename, table_name="VIII_1000_single", id_column="source_id", ra_column="RAJ2000",
   ...         dec_column="DEJ2000", flux_columns="Si")
-  >>> sm.read(filename, filetype='vot', table_name="VIII_1000_single", id_column="source_id", ra_column="RAJ2000",
+  >>> sm.read(filename, filetype="vot", table_name="VIII_1000_single", id_column="source_id", ra_column="RAJ2000",
   ...         dec_column="DEJ2000", flux_columns="Si")
   >>> sm.read_votable_catalog(filename, table_name="VIII_1000_single", id_column="source_id", ra_column="RAJ2000",
   ...                         dec_column="DEJ2000", flux_columns="Si")
@@ -85,7 +98,7 @@ c) VOTable
   >>> # Can also use the file type specific `read_votable_catalog` method.
   >>> sm = SkyModel.from_file(filename, table_name="VIII_1000_single", id_column="source_id", ra_column="RAJ2000",
   ...                         dec_column="DEJ2000", flux_columns="Si")
-  >>> sm = SkyModel.from_file(filename, filetype='vot', table_name="VIII_1000_single", id_column="source_id",
+  >>> sm = SkyModel.from_file(filename, filetype="vot", table_name="VIII_1000_single", id_column="source_id",
   ...                         ra_column="RAJ2000", dec_column="DEJ2000", flux_columns="Si")
   >>> sm = SkyModel.from_votable_catalog(filename, table_name="VIII_1000_single", id_column="source_id",
   ...                                    ra_column="RAJ2000", dec_column="DEJ2000", flux_columns="Si")
@@ -101,15 +114,15 @@ d) text
 
   >>> # Use the `read` method, optionally specify the file type. See Attributes section for required columns of text file.
   >>> # Can also use the file type specific `read_text_catalog` method.
-  >>> filename = os.path.join(DATA_PATH, 'pointsource_catalog.txt')
+  >>> filename = os.path.join(DATA_PATH, "pointsource_catalog.txt")
   >>> sm.read(filename)
-  >>> sm.read(filename, filetype='text')
+  >>> sm.read(filename, filetype="text")
   >>> sm.read_text_catalog(filename)
 
   >>> # Use the `from_file` method to create SkyModel object without initalizing empty object, optionally specify
   >>> # the file type.
   >>> sm = SkyModel.from_file(filename)
-  >>> sm = SkyModel.from_file(filename, filetype='text')
+  >>> sm = SkyModel.from_file(filename, filetype="text")
   >>> sm = SkyModel.from_text_catalog(filename)
 
 e) skyh5
@@ -123,15 +136,15 @@ e) skyh5
 
   >>> # Use the `read` method, optionally specify the file type. See Attributes section for required columns of text file.
   >>> # Can also use the file type specific `read_text_catalog` method.
-  >>> filename = os.path.join(DATA_PATH, 'gsm_icrs.skyh5')
+  >>> filename = os.path.join(DATA_PATH, "gsm_icrs.skyh5")
   >>> sm.read(filename)
-  >>> sm.read(filename, filetype='skyh5')
+  >>> sm.read(filename, filetype="skyh5")
   >>> sm.read_skyh5(filename)
 
   >>> # Use the `from_file` method to create SkyModel object without initalizing empty object, optionally specify
   >>> # the file type.
   >>> sm = SkyModel.from_file(filename)
-  >>> sm = SkyModel.from_file(filename, filetype='skyh5')
+  >>> sm = SkyModel.from_file(filename, filetype="skyh5")
   >>> sm = SkyModel.from_skyh5(filename)
 
 SkyModel: Plotting
@@ -148,7 +161,7 @@ a) FHD (using extended_model_group attribute)
   >>> from pyradiosky.data import DATA_PATH
   >>> sm = SkyModel()
 
-  >>> filename = os.path.join(DATA_PATH, 'fhd_catalog_with_beam_values.sav')
+  >>> filename = os.path.join(DATA_PATH, "fhd_catalog_with_beam_values.sav")
   >>> sm.read_fhd_catalog(filename)
 
   >>> plt.scatter(sm.ra, sm.dec) # doctest: +SKIP
@@ -194,7 +207,7 @@ a) FHD (using extended_model_group attribute)
 
   >>> index_32768 = []
   >>> for j in range(len(sm.extended_model_group)):
-  ...     if sm.extended_model_group[j] == '32768':
+  ...     if sm.extended_model_group[j] == "32768":
   ...         # indices for extended model group 32768
   ...         index_32768.append(j)
 
@@ -229,7 +242,7 @@ b) GLEAM (working with error, changing component type)
   >>> import matplotlib.pyplot as plt # doctest: +SKIP
   >>> sm = SkyModel()
 
-  >>> filename = os.path.join(DATA_PATH, 'gleam_50srcs.vot')
+  >>> filename = os.path.join(DATA_PATH, "gleam_50srcs.vot")
   >>> sm.read_gleam_catalog(filename, with_error = True)
 
   >>> # these are centers of frequency bands
@@ -237,13 +250,13 @@ b) GLEAM (working with error, changing component type)
   >>> # flux for stokes parameter = 0 (stokes I or unpolarized), Nfreqs index = : (all frequencies),
   >>> # Ncomponents index = 0 (first component)
   >>> y_error = sm.stokes_error[0,:,0].value
-  >>> plt.errorbar(x, y, yerr = y_error, fmt='o', ecolor = 'red', color='yellow') # doctest: +SKIP
+  >>> plt.errorbar(x, y, yerr = y_error, fmt="o", ecolor = "red", color="yellow") # doctest: +SKIP
   >>> plt.xlabel("Frequency (MHz)") # doctest: +SKIP
   >>> plt.ylabel("Flux (Jy)") # doctest: +SKIP
   >>> plt.show() # doctest: +SKIP
 
   >>> # in_place=True so it’s applied to current object
-  >>> sm.assign_to_healpix(16, order='nested', inplace=True)
+  >>> sm.assign_to_healpix(16, order="nested", inplace=True)
   >>> print(sm.nside)
   16
   >>> print(sm.hpx_order)
@@ -264,7 +277,7 @@ c) skyh5 (incorporating astropy healpix package (like plotting pixels), changing
   >>> from astropy.coordinates import SkyCoord
   >>> sm = SkyModel()
 
-  >>> filename = os.path.join(DATA_PATH, 'gsm_icrs.skyh5')
+  >>> filename = os.path.join(DATA_PATH, "gsm_icrs.skyh5")
   >>> sm.read_skyh5(filename)
 
   >>> plt.scatter(sm.ra, sm.dec) # doctest: +SKIP
@@ -337,7 +350,7 @@ c) skyh5 (incorporating astropy healpix package (like plotting pixels), changing
   >>> print(hp.pixel_resolution)
   439.74226071262797 arcmin
 
-  >>> coord = SkyCoord('00h42m44.3503s +41d16m08.634s', frame='galactic')
+  >>> coord = SkyCoord("00h42m44.3503s +41d16m08.634s", frame="galactic")
   >>> print(hp.interpolate_bilinear_skycoord(coord, sm.stokes.value[0,0,:]))
   6540.375582405899
 
@@ -356,7 +369,7 @@ c) skyh5 (incorporating astropy healpix package (like plotting pixels), changing
   ...     lon = lon.value # doctest: +SKIP
   ...     lat = lat.value # doctest: +SKIP
   ...     vertices = np.vstack([lon.ravel(), lat.ravel()]).transpose() # doctest: +SKIP
-  ...     p = Polygon(vertices, closed=True, edgecolor='black', facecolor='none') # doctest: +SKIP
+  ...     p = Polygon(vertices, closed=True, edgecolor="black", facecolor="none") # doctest: +SKIP
   ...     # adds boundaries around each pixel
   ...     ax.add_patch(p) # doctest: +SKIP
 
@@ -375,7 +388,7 @@ c) skyh5 (incorporating astropy healpix package (like plotting pixels), changing
   ...     lon = lon.value # doctest: +SKIP
   ...     lat = lat.value # doctest: +SKIP
   ...     vertices = np.vstack([lon.ravel(), lat.ravel()]).transpose() # doctest: +SKIP
-  ...     p = Polygon(vertices, closed=True, edgecolor='black', facecolor='none') # doctest: +SKIP
+  ...     p = Polygon(vertices, closed=True, edgecolor="black", facecolor="none") # doctest: +SKIP
   ...     ax.add_patch(p) # doctest: +SKIP
 
 SkyModel: Creating and writing out catalogs
@@ -390,13 +403,14 @@ a) skyh5
   >>> import matplotlib.pyplot as plt # doctest: +SKIP
   >>> from pyradiosky import SkyModel
 
-  >>> sm = SkyModel(component_type='healpix', nside=1, hpx_inds=[0,1,2,3], stokes=np.zeros((4,1,4)), spectral_type='flat',
-  ...               hpx_order='ring')
+  >>> sm = SkyModel(component_type="healpix", nside=1, hpx_inds=[0,1,2,3], stokes=np.zeros((4,1,4)), spectral_type="flat",
+  ...               hpx_order="ring")
   >>> print(sm.get_lon_lat())
   (<Longitude [ 45., 135., 225., 315.] deg>, <Latitude [41.8103149, 41.8103149, 41.8103149, 41.8103149] deg>)
 
-  >>> sm.filename == 'zero.skyh5'
-  >>> sm.write_skyh5('zero.skyh5')
+  >>> sm.filename == "zero.skyh5"
+  >>> write_file = os.path.join(".", )
+  >>> sm.write_skyh5("zero.skyh5")
 
 b) working with time and location
 *********************************
@@ -428,7 +442,7 @@ b) working with time and location
   >>> icrs_coord = source_coord.transform_to("icrs")
   >>> # unpolarized only
   >>> sm = SkyModel(name="zen_source", ra=icrs_coord.ra, dec=icrs_coord.dec, stokes=[1.0, 0, 0, 0] * units.Jy,
-  ...               spectral_type="flat", history = 'drawn from zenith_skymodel in test_skymodel.py')
+  ...               spectral_type="flat", history = "drawn from zenith_skymodel in test_skymodel.py")
   >>> sm._set_spectral_type_params(sm.spectral_type)
   >>> print(sm.check(check_extra=True, run_check_acceptability=True))
   True
@@ -484,8 +498,8 @@ b) working with time and location
   1
 
   >>> # works for any point component type
-  >>> sm.filename == 'zen_source.txt'
-  >>> sm.write_text_catalog('zen_source.txt')
+  >>> sm.filename == "zen_source.txt"
+  >>> sm.write_text_catalog("zen_source.txt")
 
 SkyModel: Selecting data
 ------------------------
@@ -564,7 +578,7 @@ b) GLEAM (using plotly package and select and source_cuts methods)
   >>> import plotly.express as px # doctest: +SKIP
   >>> sm = SkyModel()
 
-  >>> filename = os.path.join(DATA_PATH, 'gleam_50srcs.vot')
+  >>> filename = os.path.join(DATA_PATH, "gleam_50srcs.vot")
   >>> sm.read_gleam_catalog(filename)
 
   >>> sm.jansky_to_kelvin()
@@ -631,14 +645,14 @@ b) GLEAM (using plotly package and select and source_cuts methods)
   ...            200*10**6]*units.Hz)
 
   >>> fig = px.scatter(x=sm4.ra.value, y=sm4.dec.value, color=sm4.stokes[0,13,:].value, # doctest: +SKIP
-  ...                  labels={'x': 'RA (deg)', 'y': 'DEC (deg)', 'color': 'Flux (Jy)'}) # doctest: +SKIP
-  >>> fig.add_trace(px.scatter(x=sm5.ra.value, y=sm5.dec.value, symbol_sequence=['x'], # doctest: +SKIP
-  ...                          color=sm5.stokes[0,13,:].value, labels={'x': 'RA (deg)', 'y': 'DEC (deg)', # doctest: +SKIP
-  ...                          'color': 'Flux (Jy)'}).data[0]) # doctest: +SKIP
+  ...                  labels={"x": "RA (deg)", "y": "DEC (deg)", "color": "Flux (Jy)"}) # doctest: +SKIP
+  >>> fig.add_trace(px.scatter(x=sm5.ra.value, y=sm5.dec.value, symbol_sequence=["x"], # doctest: +SKIP
+  ...                          color=sm5.stokes[0,13,:].value, labels={"x": "RA (deg)", "y": "DEC (deg)", # doctest: +SKIP
+  ...                          "color": "Flux (Jy)"}).data[0]) # doctest: +SKIP
   >>> # for RA to be in conventional order
   >>> fig.update_layout(xaxis_range=[max(sm5.ra.value),min(sm5.ra.value)]) # doctest: +SKIP
   >>> # like autoscale
-  >>> fig['layout']['xaxis'].update(autorange = True) # doctest: +SKIP
+  >>> fig["layout"]["xaxis"].update(autorange = True) # doctest: +SKIP
   >>> fig.show() # doctest: +SKIP
 
   >>> sm6 = sm.source_cuts(min_flux=0.2 * units.Jy, max_flux=1.5 * units.Jy, inplace=False)
@@ -662,7 +676,7 @@ c) skyh5 (using select method, incorporating astropy healpix package)
   >>> from astropy_healpix import HEALPix
   >>> sm = SkyModel()
 
-  >>> filename = os.path.join(DATA_PATH, 'gsm_icrs.skyh5')
+  >>> filename = os.path.join(DATA_PATH, "gsm_icrs.skyh5")
   >>> sm.read_skyh5(filename)
 
   >>> plt.scatter(sm.ra, sm.dec) # doctest: +SKIP
@@ -683,8 +697,8 @@ c) skyh5 (using select method, incorporating astropy healpix package)
   >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
   >>> plt.show() # doctest: +SKIP
 
-  >>> sm_new.filename == 'gsm_icrs_new.skyh5'
-  >>> sm_new.write_skyh5('gsm_icrs_new.skyh5')
+  >>> sm_new.filename == "gsm_icrs_new.skyh5"
+  >>> sm_new.write_skyh5("gsm_icrs_new.skyh5")
 
   >>> # used instead of transform_to since this interpolates to new pixel centers, as pixels defined by coordinate system
   >>> sm.healpix_interp_transform("galactic")
@@ -733,7 +747,7 @@ a) text
   ...     Galactic)
   >>> sm = SkyModel()
 
-  >>> filename = os.path.join(DATA_PATH, 'pointsource_catalog.txt')
+  >>> filename = os.path.join(DATA_PATH, "pointsource_catalog.txt")
   >>> sm.read_text_catalog(filename)
 
   >>> plt.scatter(x=sm.ra, y=sm.dec, c=sm.stokes[0,0,:], cmap="plasma") # doctest: +SKIP
@@ -751,8 +765,8 @@ a) text
   >>> sm3.select(lon_range = Longitude([1.31, 1.36], units.deg))
 
   >>> sm_new = sm2.concat(sm3, inplace=False)
-  >>> sm_new.filename == '2srcs.txt'
-  >>> sm_new.write_text_catalog('2srcs.txt')
+  >>> sm_new.filename == "2srcs.txt"
+  >>> sm_new.write_text_catalog("2srcs.txt")
 
   >>> plt.scatter(x=sm_new.ra, y=sm_new.dec, c=sm_new.stokes[0,0,:], cmap="plasma") # doctest: +SKIP
   >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.75) # doctest: +SKIP
@@ -776,7 +790,7 @@ a) GLEAM (subband spectral type)
   >>> import matplotlib.pyplot as plt
   >>> sm = SkyModel()
 
-  >>> filename = os.path.join(DATA_PATH, 'gleam_50srcs.vot')
+  >>> filename = os.path.join(DATA_PATH, "gleam_50srcs.vot")
   >>> sm.read_gleam_catalog(filename)
 
   >>> print(sm.freq_array)
@@ -792,7 +806,7 @@ a) GLEAM (subband spectral type)
   >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
   >>> plt.show() # doctest: +SKIP
 
-  >>> sm.at_frequencies(freqs=[200*10**6]*units.Hz, inplace=True, freq_interp_kind='cubic', nan_handling='clip',
+  >>> sm.at_frequencies(freqs=[200*10**6]*units.Hz, inplace=True, freq_interp_kind="cubic", nan_handling="clip",
   ...                   run_check=True, atol=None)
 
   >>> print(sm.freq_array)
@@ -817,7 +831,7 @@ b) FHD (spectral index spectral type)
   >>> from pyradiosky.data import DATA_PATH
   >>> sm = SkyModel()
 
-  >>> filename = os.path.join(DATA_PATH, 'fhd_catalog.sav')
+  >>> filename = os.path.join(DATA_PATH, "fhd_catalog.sav")
   >>> sm.read_fhd_catalog(filename)
   WARNING: Source IDs are not unique. Defining unique IDs.
 
@@ -875,7 +889,7 @@ c) skyh5 (full spectral type)
   >>> from pyradiosky.data import DATA_PATH
   >>> sm = SkyModel()
 
-  >>> filename = os.path.join(DATA_PATH, 'gsm_icrs.skyh5')
+  >>> filename = os.path.join(DATA_PATH, "gsm_icrs.skyh5")
   >>> sm.read_skyh5(filename)
 
   >>> print(sm.freq_array)

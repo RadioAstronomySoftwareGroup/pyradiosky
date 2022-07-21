@@ -9,8 +9,8 @@ pyradiosky is currently in a very early development stage, interfaces are changi
 
 The primary user class is `SkyModel`, which supports:
 
-  - catalogs of point sources (read/write to text files, read VOTables)
-  - diffuse models as HEALPix maps (read/write to hd5 format)
+  - catalogs of point sources (read/write to hd5 and text files, read VOTables)
+  - diffuse models as HEALPix maps (read/write to hd5 files)
   - conversion between RA/Dec and Azimuth/Elevation including calculating full
   polarization coherencies in Az/El.
 
