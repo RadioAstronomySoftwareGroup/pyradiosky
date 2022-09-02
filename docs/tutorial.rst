@@ -150,7 +150,7 @@ e) skyh5
 SkyModel: Plotting
 ------------------
 
-a) FHD (using extended_model_group attribute)
+a) using extended_model_group attribute
 *********************************************
 .. code-block:: python
 
@@ -231,8 +231,20 @@ a) FHD (using extended_model_group attribute)
   >>> plt.xlabel("RA (deg)") # doctest: +SKIP
   >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
   >>> plt.show() # doctest: +SKIP
+  
+.. image:: Images/fhd_catalog_with_beam_values_radec.png
+    :width: 600
+    
+.. image:: Images/fhd_catalog_with_beam_values_refspec.png
+    :width: 600
+    
+.. image:: Images/fhd_catalog_with_beam_values_fluxcounts.png
+    :width: 600
+  
+.. image:: Images/fhd_catalog_with_beam_values_radec_32768.png
+    :width: 600
 
-b) GLEAM (working with error, changing component type)
+b) using stokes_error attribute, changing component type
 ******************************************************
 .. code-block:: python
 
@@ -261,8 +273,11 @@ b) GLEAM (working with error, changing component type)
   16
   >>> print(sm.hpx_order)
   nested
+  
+.. image:: Images/gleam_50srcs_freqflux.png
+    :width: 600
 
-c) skyh5 (incorporating astropy healpix package (like plotting pixels), changing component types cont., changing frames)
+c) incorporating astropy healpix package (like plotting pixels), changing component type cont., changing frames
 ************************************************************************************************************************
 .. code-block:: python
 
@@ -390,11 +405,23 @@ c) skyh5 (incorporating astropy healpix package (like plotting pixels), changing
   ...     vertices = np.vstack([lon.ravel(), lat.ravel()]).transpose() # doctest: +SKIP
   ...     p = Polygon(vertices, closed=True, edgecolor="black", facecolor="none") # doctest: +SKIP
   ...     ax.add_patch(p) # doctest: +SKIP
+  
+.. image:: Images/gsm_icrs_radec.png
+    :width: 600  
+    
+.. image:: Images/gsm_icrs_fluxcounts.png
+    :width: 600
+    
+.. image:: Images/gsm_icrs_phiz_ring.png
+    :width: 600
+
+.. image:: Images/gsm_icrs_phiz_nested.png
+    :width: 600
 
 SkyModel: Creating and writing out catalogs
 -------------------------------------------
 
-a) skyh5
+a) creating and writing out healpix catalog, using get_lon_lat method
 ********
 .. code-block:: python
 
@@ -408,11 +435,10 @@ a) skyh5
   >>> print(sm.get_lon_lat())
   (<Longitude [ 45., 135., 225., 315.] deg>, <Latitude [41.8103149, 41.8103149, 41.8103149, 41.8103149] deg>)
 
-  >>> sm.filename == "zero.skyh5"
-  >>> write_file = os.path.join(".", )
-  >>> sm.write_skyh5("zero.skyh5")
+  >>> write_file = os.path.join(".", "zero.skyh5")
+  >>> sm.write_skyh5(write_file)
 
-b) working with time and location
+b) creating and writing out point catalog, using calculate_rise_set_lsts and clear_time_position_specific_params methods
 *********************************
 .. code-block:: python
 
@@ -458,6 +484,14 @@ b) working with time and location
   [1.16240067]
   >>> print(sm._set_lst)
   [5.11057854]
+  
+  >>> # coherency in local alt/az basis can be different from coherency in ra/dec basis
+  >>> print(sm.coherency_calc()[:,:,0,0]) 
+  [[-0.13066397+0.j  -0.3197858 -0.5j]
+   [-0.3197858 +0.5j  1.13066397+0.j ]] Jy
+  >>> print(sm.coherency_radec[:,:,0,0]) 
+  [[1. +0.j  0.5-0.5j]
+   [0.5+0.5j 0. +0.j ]] Jy
 
   >>> print(sm.time)
   2015-03-01 00:00:00.000
@@ -498,8 +532,8 @@ b) working with time and location
   1
 
   >>> # works for any point component type
-  >>> sm.filename == "zen_source.txt"
-  >>> sm.write_text_catalog("zen_source.txt")
+  >>> write_file = os.path.join(".", "zen_source.txt" )
+  >>> sm.write_text_catalog(write_file)
 
 SkyModel: Selecting data
 ------------------------
@@ -557,7 +591,7 @@ a) using cut_nonrising method
   >>> print(sm2.Ncomponents)
   320
 
-b) GLEAM (using plotly package and select and source_cuts methods)
+b) using plotly package and select and source_cuts methods
 ******************************************************************
 .. code-block:: python
 
@@ -637,32 +671,46 @@ b) GLEAM (using plotly package and select and source_cuts methods)
   >>> plt.ylabel("Counts") # doctest: +SKIP
   >>> plt.show() # doctest: +SKIP
 
-  >>> sm4 = sm.copy()
-  >>> sm4.select(lon_range = Longitude([340, 360], units.deg))
-
-  >>> sm5 = sm.copy()
-  >>> sm5.select(min_brightness=.1*units.Jy, max_brightness=1*units.Jy, brightness_freq_range=[100*10**6,
-  ...            200*10**6]*units.Hz)
-
-  >>> fig = px.scatter(x=sm4.ra.value, y=sm4.dec.value, color=sm4.stokes[0,13,:].value, # doctest: +SKIP
+  >>> fig = px.scatter(x=sm2.ra.value, y=sm2.dec.value, color=sm2.stokes[0,13,:].value, # doctest: +SKIP
   ...                  labels={"x": "RA (deg)", "y": "DEC (deg)", "color": "Flux (Jy)"}) # doctest: +SKIP
-  >>> fig.add_trace(px.scatter(x=sm5.ra.value, y=sm5.dec.value, symbol_sequence=["x"], # doctest: +SKIP
-  ...                          color=sm5.stokes[0,13,:].value, labels={"x": "RA (deg)", "y": "DEC (deg)", # doctest: +SKIP
+  >>> fig.add_trace(px.scatter(x=sm3.ra.value, y=sm3.dec.value, symbol_sequence=["x"], # doctest: +SKIP
+  ...                          color=sm3.stokes[0,13,:].value, labels={"x": "RA (deg)", "y": "DEC (deg)", # doctest: +SKIP
   ...                          "color": "Flux (Jy)"}).data[0]) # doctest: +SKIP
   >>> # for RA to be in conventional order
-  >>> fig.update_layout(xaxis_range=[max(sm5.ra.value),min(sm5.ra.value)]) # doctest: +SKIP
+  >>> fig.update_layout(xaxis_range=[max(sm3.ra.value),min(sm3.ra.value)]) # doctest: +SKIP
   >>> # like autoscale
   >>> fig["layout"]["xaxis"].update(autorange = True) # doctest: +SKIP
   >>> fig.show() # doctest: +SKIP
 
-  >>> sm6 = sm.source_cuts(min_flux=0.2 * units.Jy, max_flux=1.5 * units.Jy, inplace=False)
+  >>> sm4 = sm.source_cuts(min_flux=0.2 * units.Jy, max_flux=1.5 * units.Jy, inplace=False)
 
   >>> print(sm.Ncomponents)
   50
-  >>> print(sm6.Ncomponents)
+  >>> print(sm4.Ncomponents)
   9
+  
+.. image:: Images/gleam_50srcs_radec_K.png
+    :width: 600
+    
+.. image:: Images/gleam_50srcs_radec_Jy.png
+    :width: 600
+    
+.. image:: Images/gleam_50srcs_fluxcounts.png
+    :width: 600
+    
+.. image:: Images/gleam_50srcs_radec_lonselect.png
+    :width: 600
+    
+.. image:: Images/gleam_50srcs_radec_fluxselect.png
+    :width: 600
+    
+.. image:: Images/gleam_50srcs_fluxcounts_fluxselect.png
+    :width: 600
+    
+.. image:: Images/gleam_50srcs_radec_compare.png
+    :width: 600
 
-c) skyh5 (using select method, incorporating astropy healpix package)
+c) using select method, incorporating astropy healpix package
 *********************************************************************
 .. code-block:: python
 
@@ -697,8 +745,8 @@ c) skyh5 (using select method, incorporating astropy healpix package)
   >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
   >>> plt.show() # doctest: +SKIP
 
-  >>> sm_new.filename == "gsm_icrs_new.skyh5"
-  >>> sm_new.write_skyh5("gsm_icrs_new.skyh5")
+  >>> write_file = os.path.join(".", "gsm_icrs_new.skyh5" )
+  >>> sm_new.write_skyh5(write_file)
 
   >>> # used instead of transform_to since this interpolates to new pixel centers, as pixels defined by coordinate system
   >>> sm.healpix_interp_transform("galactic")
@@ -723,11 +771,23 @@ c) skyh5 (using select method, incorporating astropy healpix package)
   >>> plt.xlabel("Galactic Longitude (deg)") # doctest: +SKIP
   >>> plt.ylabel("Galactic Latitude (deg)") # doctest: +SKIP
   >>> plt.show() # doctest: +SKIP
+  
+.. image:: Images/gsm_icrs_radec.png
+    :width: 600  
+    
+.. image:: Images/gsm_icrs_radec_indselect.png
+    :width: 600
+    
+.. image:: Images/gsm_icrs_glgb_coneselect.png
+    :width: 600
+  
+.. image:: Images/gsm_icrs_glgb_neighborselect.png
+    :width: 600
 
-SkyModel: Combining and concatenating data
+SkyModel: Concatenating data
 ------------------------------------------
 
-a) text
+a) using select and concat methods
 *******
 .. code-block:: python
 
@@ -765,8 +825,8 @@ a) text
   >>> sm3.select(lon_range = Longitude([1.31, 1.36], units.deg))
 
   >>> sm_new = sm2.concat(sm3, inplace=False)
-  >>> sm_new.filename == "2srcs.txt"
-  >>> sm_new.write_text_catalog("2srcs.txt")
+  >>> write_file = os.path.join(".", "2srcs.txt" )
+  >>> sm_new.write_text_catalog(write_file)
 
   >>> plt.scatter(x=sm_new.ra, y=sm_new.dec, c=sm_new.stokes[0,0,:], cmap="plasma") # doctest: +SKIP
   >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.75) # doctest: +SKIP
@@ -775,11 +835,17 @@ a) text
   >>> plt.xlabel("RA (deg)") # doctest: +SKIP
   >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
   >>> plt.show() # doctest: +SKIP
+  
+.. image:: Images/pointsource_catalog_radec.png
+    :width: 600
+  
+.. image:: Images/pointsource_catalog_radec_concat.png
+    :width: 600
 
 SkyModel: using at_frequencies method
 -------------------------------------
 
-a) GLEAM (subband spectral type)
+a) subband spectral type
 ********************************
 .. code-block:: python
 
@@ -819,8 +885,14 @@ a) GLEAM (subband spectral type)
   >>> plt.xlabel("RA (deg)") # doctest: +SKIP
   >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
   >>> plt.show() # doctest: +SKIP
+  
+.. image:: Images/gleam_50srcs_radec_oldfreq.png
+    :width: 600
+  
+.. image:: Images/gleam_50srcs_radec_newfreq.png
+    :width: 600
 
-b) FHD (spectral index spectral type)
+b) spectral index spectral type
 *************************************
 .. code-block:: python
 
@@ -877,8 +949,14 @@ b) FHD (spectral index spectral type)
   >>> sm.at_frequencies(freqs=[200*10**6]*units.Hz, inplace=True, run_check=True, atol=None)
   >>> print(sm.stokes[0,0,8235])
   0.5330077352813429 Jy
+  
+.. image:: Images/fhd_catalog_refflux_nonzerospec.png
+    :width: 600
+    
+.. image:: Images/fhd_catalog_refflux_zerospec.png
+    :width: 600
 
-c) skyh5 (full spectral type)
+c) full spectral type
 *****************************
 .. code-block:: python
 
@@ -910,3 +988,9 @@ c) skyh5 (full spectral type)
   >>> plt.xlabel("log(Flux (Jy))") # doctest: +SKIP
   >>> plt.ylabel("Counts") # doctest: +SKIP
   >>> plt.show() # doctest: +SKIP
+  
+.. image:: Images/gsm_icrs_fluxcounts_150MHzfreqind.png
+    :width: 600
+  
+.. image:: Images/gsm_icrs_fluxcounts_150MHzatfreq.png
+    :width: 600
