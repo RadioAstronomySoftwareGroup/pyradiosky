@@ -231,16 +231,16 @@ a) using extended_model_group attribute
   >>> plt.xlabel("RA (deg)") # doctest: +SKIP
   >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
   >>> plt.show() # doctest: +SKIP
-  
+
 .. image:: Images/fhd_catalog_with_beam_values_radec.png
     :width: 600
-    
+
 .. image:: Images/fhd_catalog_with_beam_values_refspec.png
     :width: 600
-    
+
 .. image:: Images/fhd_catalog_with_beam_values_fluxcounts.png
     :width: 600
-  
+
 .. image:: Images/fhd_catalog_with_beam_values_radec_32768.png
     :width: 600
 
@@ -273,7 +273,7 @@ b) using stokes_error attribute, changing component type
   16
   >>> print(sm.hpx_order)
   nested
-  
+
 .. image:: Images/gleam_50srcs_freqflux.png
     :width: 600
 
@@ -405,13 +405,13 @@ c) incorporating astropy healpix package (like plotting pixels), changing compon
   ...     vertices = np.vstack([lon.ravel(), lat.ravel()]).transpose() # doctest: +SKIP
   ...     p = Polygon(vertices, closed=True, edgecolor="black", facecolor="none") # doctest: +SKIP
   ...     ax.add_patch(p) # doctest: +SKIP
-  
+
 .. image:: Images/gsm_icrs_radec.png
-    :width: 600  
-    
+    :width: 600
+
 .. image:: Images/gsm_icrs_fluxcounts.png
     :width: 600
-    
+
 .. image:: Images/gsm_icrs_phiz_ring.png
     :width: 600
 
@@ -484,12 +484,12 @@ b) creating and writing out point catalog, using calculate_rise_set_lsts and cle
   [1.16240067]
   >>> print(sm._set_lst)
   [5.11057854]
-  
+
   >>> # coherency in local alt/az basis can be different from coherency in ra/dec basis
-  >>> print(sm.coherency_calc()[:,:,0,0]) 
+  >>> print(sm.coherency_calc()[:,:,0,0])
   [[-0.13066397+0.j  -0.3197858 -0.5j]
    [-0.3197858 +0.5j  1.13066397+0.j ]] Jy
-  >>> print(sm.coherency_radec[:,:,0,0]) 
+  >>> print(sm.coherency_radec[:,:,0,0])
   [[1. +0.j  0.5-0.5j]
    [0.5+0.5j 0. +0.j ]] Jy
 
@@ -688,25 +688,25 @@ b) using plotly package and select and source_cuts methods
   50
   >>> print(sm4.Ncomponents)
   9
-  
+
 .. image:: Images/gleam_50srcs_radec_K.png
     :width: 600
-    
+
 .. image:: Images/gleam_50srcs_radec_Jy.png
     :width: 600
-    
+
 .. image:: Images/gleam_50srcs_fluxcounts.png
     :width: 600
-    
+
 .. image:: Images/gleam_50srcs_radec_lonselect.png
     :width: 600
-    
+
 .. image:: Images/gleam_50srcs_radec_fluxselect.png
     :width: 600
-    
+
 .. image:: Images/gleam_50srcs_fluxcounts_fluxselect.png
     :width: 600
-    
+
 .. image:: Images/gleam_50srcs_radec_compare.png
     :width: 600
 
@@ -771,16 +771,16 @@ c) using select method, incorporating astropy healpix package
   >>> plt.xlabel("Galactic Longitude (deg)") # doctest: +SKIP
   >>> plt.ylabel("Galactic Latitude (deg)") # doctest: +SKIP
   >>> plt.show() # doctest: +SKIP
-  
+
 .. image:: Images/gsm_icrs_radec.png
-    :width: 600  
-    
+    :width: 600
+
 .. image:: Images/gsm_icrs_radec_indselect.png
     :width: 600
-    
+
 .. image:: Images/gsm_icrs_glgb_coneselect.png
     :width: 600
-  
+
 .. image:: Images/gsm_icrs_glgb_neighborselect.png
     :width: 600
 
@@ -835,10 +835,10 @@ a) using select and concat methods
   >>> plt.xlabel("RA (deg)") # doctest: +SKIP
   >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
   >>> plt.show() # doctest: +SKIP
-  
+
 .. image:: Images/pointsource_catalog_radec.png
     :width: 600
-  
+
 .. image:: Images/pointsource_catalog_radec_concat.png
     :width: 600
 
@@ -885,10 +885,10 @@ a) subband spectral type
   >>> plt.xlabel("RA (deg)") # doctest: +SKIP
   >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
   >>> plt.show() # doctest: +SKIP
-  
+
 .. image:: Images/gleam_50srcs_radec_oldfreq.png
     :width: 600
-  
+
 .. image:: Images/gleam_50srcs_radec_newfreq.png
     :width: 600
 
@@ -949,10 +949,10 @@ b) spectral index spectral type
   >>> sm.at_frequencies(freqs=[200*10**6]*units.Hz, inplace=True, run_check=True, atol=None)
   >>> print(sm.stokes[0,0,8235])
   0.5330077352813429 Jy
-  
+
 .. image:: Images/fhd_catalog_refflux_nonzerospec.png
     :width: 600
-    
+
 .. image:: Images/fhd_catalog_refflux_zerospec.png
     :width: 600
 
@@ -988,9 +988,9 @@ c) full spectral type
   >>> plt.xlabel("log(Flux (Jy))") # doctest: +SKIP
   >>> plt.ylabel("Counts") # doctest: +SKIP
   >>> plt.show() # doctest: +SKIP
-  
+
 .. image:: Images/gsm_icrs_fluxcounts_150MHzfreqind.png
     :width: 600
-  
+
 .. image:: Images/gsm_icrs_fluxcounts_150MHzatfreq.png
     :width: 600
