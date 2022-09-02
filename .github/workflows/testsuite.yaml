@@ -158,3 +158,51 @@ jobs:
         with:
           token: ${{secrets.CODECOV_TOKEN}} #required
           file: ./coverage.xml #optional
+
+  docs_test:
+      env:
+        ENV_NAME: tests
+        PYTHON: ${{ matrix.python-version }}
+        OS: ${{ matrix.os }}
+      name: Tutorial Testing
+      runs-on: ${{ matrix.os }}
+      defaults:
+        run:
+          # Adding -l {0} helps ensure conda can be found properly.
+          shell: bash -l {0}
+      strategy:
+        fail-fast: false
+        matrix:
+          os: [ubuntu-latest, macos-latest, windows-latest]
+          python-version: [3.7, 3.8, 3.9]
+      steps:
+        - uses: actions/checkout@master
+          with:
+            fetch-depth: 1
+
+        - name: Setup Miniconda
+          uses: conda-incubator/setup-miniconda@v2.0.0
+          with:
+            auto-update-conda: true
+            miniconda-version: "latest"
+            python-version: ${{ env.PYTHON }}
+            environment-file: ci/${{ env.ENV_NAME }}.yaml
+            activate-environment: ${{ env.ENV_NAME }}
+
+        - name: Conda Info
+          run: |
+            conda info -a
+            conda list
+            PYVER=`python -c "import sys; print('{:d}.{:d}'.format(sys.version_info.major, sys.version_info.minor))"`
+            if [[ $PYVER != ${{ env.PYTHON }} ]]; then
+              exit 1;
+            fi
+
+        - name: Install
+          run: |
+            pip install --no-deps .
+
+        - name: Run Tests
+          run: |
+            cd docs
+            python -m pytest -n 2 --doctest-glob="*.rst"
