@@ -26,7 +26,7 @@ from astropy.units import Quantity
 from astropy.io import votable
 
 from pyuvdata.uvbase import UVBase
-from pyuvdata.parameter import UVParameter
+from pyuvdata.parameter import UVParameter, SkyCoordParameter
 import pyuvdata.utils as uvutils
 from pyuvdata.uvbeam.cst_beam import CSTBeam
 
@@ -258,9 +258,11 @@ class SkyModel(UVBase):
             ":class:`astropy.coordinates.SkyCoord` object that contains the component"
             "positions, shape (Ncomponents,)."
         )
-        # TODO: think about tolerances
-        self._skycoord = UVParameter(
-            "skycoord", description=desc, expected_type=SkyCoord, form=("Ncomponents",)
+        self._skycoord = SkyCoordParameter(
+            "skycoord",
+            description=desc,
+            form=("Ncomponents",),
+            radian_tol=self.angle_tol.rad,
         )
 
         desc = (
@@ -371,9 +373,10 @@ class SkyModel(UVBase):
         )
 
         # The coherency is a 2x2 matrix giving electric field correlation in Jy
-        self._coherency_radec = UVParameter(
-            "coherency_radec",
+        self._frame_coherency = UVParameter(
+            "frame_coherency",
             description="Ra/Dec coherency per component. shape (2, 2, Nfreqs, Ncomponents,) ",
+            required=False,
             form=(2, 2, "Nfreqs", "Ncomponents"),
             expected_type=Quantity,
         )
@@ -546,8 +549,8 @@ class SkyModel(UVBase):
                 lat = dec
                 if frame is None:
                     warnings.warn(
-                        "No frame was specified for RA and Dec. Defaulting to ICRS, but"
-                        "this will become an error in version 0.3 and later.",
+                        "No frame was specified for RA and Dec. Defaulting to ICRS, "
+                        "but this will become an error in version 0.3 and later.",
                         DeprecationWarning,
                     )
                     frame = "icrs"
@@ -568,7 +571,38 @@ class SkyModel(UVBase):
                     raise ValueError(f"Invalid frame name {frame}.")
                 frame = frame_class()
 
-            skycoord = SkyCoord(lon, lat, frame)
+            if lon is not None:
+                if not isinstance(lon, Longitude):
+                    if not isinstance(lon, (list, np.ndarray, tuple)):
+                        lon = [lon]
+                    # Cannot just try converting to Longitude because if the values are
+                    # Latitudes they are silently converted to Longitude rather than
+                    # throwing an error.
+                    for val in lon:
+                        if not isinstance(val, (Longitude)):
+                            lon_name = [
+                                k for k in ["ra", "gl", "lon"] if coords_given[k]
+                            ][0]
+                            raise ValueError(
+                                f"{lon_name} must be one or more Longitude objects"
+                            )
+                    lon = Longitude(lon)
+                if not isinstance(lat, Latitude):
+                    if not isinstance(lat, (list, np.ndarray, tuple)):
+                        lat = [lat]
+                    # Cannot just try converting to Latitude because if the values are
+                    # Longitude they are silently converted to Longitude rather than
+                    # throwing an error.
+                    for val in lat:
+                        if not isinstance(val, (Latitude)):
+                            lat_name = [
+                                k for k in ["dec", "gb", "lat"] if coords_given[k]
+                            ][0]
+                            raise ValueError(
+                                f"{lat_name} must be one or more Latitude objects"
+                            )
+                    lat = Latitude(lat)
+                skycoord = SkyCoord(np.atleast_1d(lon), np.atleast_1d(lat), frame=frame)
 
         if component_type is not None:
             if component_type not in self._component_type.acceptable_vals:
@@ -583,7 +617,7 @@ class SkyModel(UVBase):
             self._set_component_type_params("point")
 
         if self.component_type == "healpix":
-            req_args = ["nside", "hpx_inds", "stokes", "spectral_type", "hpx_order"]
+            req_args = ["nside", "hpx_inds", "stokes", "spectral_type"]
             args_set_req = [
                 nside is not None,
                 hpx_inds is not None,
@@ -591,7 +625,7 @@ class SkyModel(UVBase):
                 spectral_type is not None,
             ]
         else:
-            req_args = ["name", "lon", "lat", "stokes", "spectral_type"]
+            req_args = ["name", "skycoord", "stokes", "spectral_type"]
             args_set_req = [
                 name is not None,
                 skycoord is not None,
@@ -624,6 +658,8 @@ class SkyModel(UVBase):
 
             if name is not None:
                 self.name = np.atleast_1d(name)
+            if skycoord is not None:
+                self.skycoord = skycoord
             if nside is not None:
                 self.nside = nside
             if hpx_inds is not None:
@@ -656,34 +692,6 @@ class SkyModel(UVBase):
 
             else:
                 self.Ncomponents = self.name.size
-                if isinstance(lon, (list)):
-                    # Cannot just try converting to Longitude because if the values are
-                    # Latitudes they are silently converted to Longitude rather than
-                    # throwing an error.
-                    for val in lon:
-                        if not isinstance(val, (Longitude)):
-                            lon_name = [
-                                k for k in ["ra", "gl", "lon"] if coords_given[k]
-                            ][0]
-                            raise ValueError(
-                                f"All values in {lon_name} must be Longitude objects"
-                            )
-                    lon = Longitude(lon)
-                self.lon = np.atleast_1d(lon)
-                if isinstance(lat, (list)):
-                    # Cannot just try converting to Latitude because if the values are
-                    # Longitude they are silently converted to Longitude rather than
-                    # throwing an error.
-                    for val in lat:
-                        if not isinstance(val, (Latitude)):
-                            lat_name = [
-                                k for k in ["dec", "gb", "lat"] if coords_given[k]
-                            ][0]
-                            raise ValueError(
-                                f"All values in {lat_name} must be Latitude objects"
-                            )
-                    lat = Latitude(lat)
-                self.lat = np.atleast_1d(lat)
 
             self._set_spectral_type_params(spectral_type)
 
@@ -781,7 +789,7 @@ class SkyModel(UVBase):
             stokes_eshape = self._stokes.expected_shape(self)
             if self.stokes.shape != stokes_eshape:
                 # Check this here to give a clear error. Otherwise this shape
-                # propagates to coherency_radec and gives a confusing error message.
+                # propagates to frame_coherency and gives a confusing error message.
                 raise ValueError(
                     "stokes is not the correct shape. stokes shape is "
                     f"{self.stokes.shape}, expected shape is {stokes_eshape}."
@@ -803,8 +811,6 @@ class SkyModel(UVBase):
                 np.any(np.sum(self.stokes[1:, :, :], axis=0) != 0.0, axis=0)
             )[0]
             self._n_polarized = np.unique(self._polarized).size
-
-            self.coherency_radec = skyutils.stokes_to_coherency(self.stokes)
 
             # update filename attribute
             if filename is not None:
@@ -861,6 +867,20 @@ class SkyModel(UVBase):
             if name in comp_dict:
                 coord = comp_dict[name]
                 return getattr(self.skycoord, coord)
+
+        if name == "coherency_radec":
+            warnings.warn(
+                "coherency_radec is a deprecated parameter, use frame_coherency "
+                "instead. Frame coherency is an optional parameter and is not set on "
+                "when the object is initialized. Use `calc_frame_coherency` to "
+                "calculate it and optionally save it on the object. Starting in "
+                "version 0.3.0 this call will error.",
+                category=DeprecationWarning,
+            )
+            if self.frame_coherency is None:
+                self.calc_frame_coherency()
+
+            return self.frame_coherency
 
         # TODO: capture Attribute error from asking for wrong coord type and suggest
         # using the transform_to method
@@ -957,7 +977,9 @@ class SkyModel(UVBase):
                 "Only one of freq_array and reference_frequency can be specified, not both."
             )
 
-        for param in [self._stokes, self._coherency_radec]:
+        for param in [self._stokes, self._frame_coherency]:
+            if param.value is None:
+                continue
             param_unit = param.value.unit
             if self.component_type == "point":
                 allowed_units = ("Jy", "K sr")
@@ -1009,8 +1031,6 @@ class SkyModel(UVBase):
         # Run the basic __eq__ from UVBase
         # the filters below should be removed in version 0.3.0
         with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message="lon is no longer")
-            warnings.filterwarnings("ignore", message="lat is no longer")
             try:
                 # The `silent` parameter was added in the version *after* pyuvdata
                 # version 2.2.12
@@ -1025,34 +1045,20 @@ class SkyModel(UVBase):
                     other, check_extra=check_extra, allowed_failures=allowed_failures
                 )
 
-            # TODO: figure out how to handle skycoords with tolerances
-            # Issue deprecation warning if ra/decs aren't close to future_angle_tol levels
-            if self._lon.value is not None and not units.quantity.allclose(
-                self.lon, other.lon, rtol=0, atol=self.future_angle_tol
-            ):
+        if equal:
+            # Issue deprecation warning if skycoords aren't close to future_angle_tol levels
+            sky_separation = self.skycoord.separation(other.skycoord).rad
+            if np.any(sky_separation > self.future_angle_tol.rad):
                 warnings.warn(
-                    "The _lon parameters are not within the future tolerance. "
-                    f"Left is {self.lon}, right is {other.lon}. "
-                    "This will become an error in version 0.2.0",
-                    category=DeprecationWarning,
-                )
-
-            if self._lat.value is not None and not units.quantity.allclose(
-                self.lat, other.lat, rtol=0, atol=self.future_angle_tol
-            ):
-                warnings.warn(
-                    "The _lat parameters are not within the future tolerance. "
-                    f"Left is {self.lat}, right is {other.lat}. "
+                    "The skycoord parameters are not within the future tolerance. "
+                    f"The sky separation between them is {sky_separation}, "
                     "This will become an error in version 0.2.0",
                     category=DeprecationWarning,
                 )
 
         if not equal:
             # the filters below should be removed in version 0.3.0
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", message="lon is no longer")
-                warnings.filterwarnings("ignore", message="lat is no longer")
-                equal = super(SkyModel, self).__eq__(other, check_extra=False)
+            equal = super(SkyModel, self).__eq__(other, check_extra=False)
 
             if equal:
                 # required params are equal, extras are not but check_extra is turned on.
@@ -1269,7 +1275,8 @@ class SkyModel(UVBase):
         this._frame_inst = frame
         this._frame.value = frame.name
         # recalculate the coherency now that we are in the new frame
-        this.coherency_radec = skyutils.stokes_to_coherency(this.stokes)
+        if this.frame_coherency is not None:
+            this.frame_coherency = this.calc_frame_coherency()
 
         if run_check:
             this.check(
@@ -1329,7 +1336,8 @@ class SkyModel(UVBase):
             if self.stokes_error is not None:
                 self.stokes_error = self.stokes_error.to(units.Jy)
 
-        self.coherency_radec = skyutils.stokes_to_coherency(self.stokes)
+        if self.frame_coherency is not None:
+            self.frame_coherency = self.calc_frame_coherency()
 
     def jansky_to_kelvin(self):
         """
@@ -1372,7 +1380,8 @@ class SkyModel(UVBase):
         if self.stokes_error is not None:
             self.stokes_error = self.stokes_error * conv_factor
 
-        self.coherency_radec = skyutils.stokes_to_coherency(self.stokes)
+        if self.frame_coherency is not None:
+            self.frame_coherency = self.calc_frame_coherency()
 
     def _get_lon_lat_component_names(self):
         if self.component_type == "healpix":
@@ -1467,9 +1476,10 @@ class SkyModel(UVBase):
         self.lon, self.lat = self.get_lon_lat()
         self._set_component_type_params("point")
         self.stokes = self.stokes * astropy_healpix.nside_to_pixel_area(self.nside)
-        self.coherency_radec = (
-            self.coherency_radec * astropy_healpix.nside_to_pixel_area(self.nside)
-        )
+        if self.frame_coherency is not None:
+            self.frame_coherency = (
+                self.frame_coherency * astropy_healpix.nside_to_pixel_area(self.nside)
+            )
         name_use = [
             "nside" + str(self.nside) + "_" + self.hpx_order + "_" + str(ind)
             for ind in self.hpx_inds
@@ -1541,9 +1551,10 @@ class SkyModel(UVBase):
 
         self._set_component_type_params("healpix")
         self.stokes = self.stokes / astropy_healpix.nside_to_pixel_area(self.nside)
-        self.coherency_radec = (
-            self.coherency_radec / astropy_healpix.nside_to_pixel_area(self.nside)
-        )
+        if self.frame_coherency is not None:
+            self.frame_coherency = (
+                self.frame_coherency / astropy_healpix.nside_to_pixel_area(self.nside)
+            )
         self.name = None
         self.lon = None
         self.lat = None
@@ -1714,7 +1725,7 @@ class SkyModel(UVBase):
             if sky.skycoord.frame != coords.frame:
                 warnings.warn(
                     f"Input parameter frame (value: {frame.name.lower()}) differs "
-                    f"from the frame attribute on this object (value: {self.frame.lower()}). "
+                    f"from the frame attribute on this object (value: {sky.frame.lower()}). "
                     "Using input frame for coordinate calculations."
                 )
                 sky.hpx_frame = frame
@@ -1730,7 +1741,7 @@ class SkyModel(UVBase):
                 "ignore",
                 message="The get_frame_attr_names",
             )
-            hpx_inds = hpx_obj.skycoord_to_healpix(self.skycoord)
+            hpx_inds = hpx_obj.skycoord_to_healpix(sky.skycoord)
 
         sky._set_component_type_params("healpix")
         sky.nside = nside
@@ -1781,13 +1792,6 @@ class SkyModel(UVBase):
                 np.zeros((4, sky.Nfreqs, new_hpx_inds.size), dtype=sky.stokes.dtype),
                 unit=sky.stokes.unit,
             )
-            new_coherency = Quantity(
-                np.zeros(
-                    (2, 2, sky.Nfreqs, new_hpx_inds.size),
-                    dtype=sky.coherency_radec.dtype,
-                ),
-                unit=sky.coherency_radec.unit,
-            )
             if sky.stokes_error is not None:
                 new_stokes_error = Quantity(
                     np.zeros(
@@ -1800,10 +1804,9 @@ class SkyModel(UVBase):
                 new_stokes[:, :, ind_num] = np.sum(
                     sky.stokes[:, :, ind_dict[hpx_ind]], axis=2
                 )
-                new_coherency[:, :, :, ind_num] = np.sum(
-                    sky.coherency_radec[:, :, :, ind_dict[hpx_ind]], axis=3
-                )
-                if sky.stokes_error is not None:
+
+            if sky.stokes_error is not None:
+                for ind_num, hpx_ind in enumerate(new_hpx_inds):
                     # add errors in quadrature
                     new_stokes_error[:, :, ind_num] = np.sqrt(
                         np.sum(sky.stokes_error[:, :, ind_dict[hpx_ind]] ** 2, axis=2)
@@ -1811,9 +1814,6 @@ class SkyModel(UVBase):
             sky.Ncomponents = new_hpx_inds.size
             sky.hpx_inds = new_hpx_inds
             sky.stokes = new_stokes / astropy_healpix.nside_to_pixel_area(sky.nside)
-            sky.coherency_radec = new_coherency / astropy_healpix.nside_to_pixel_area(
-                sky.nside
-            )
             if sky.stokes_error is not None:
                 sky.stokes_error = (
                     new_stokes_error / astropy_healpix.nside_to_pixel_area(sky.nside)
@@ -1835,15 +1835,16 @@ class SkyModel(UVBase):
         else:
             sky.hpx_inds = hpx_inds
             sky.stokes = sky.stokes / astropy_healpix.nside_to_pixel_area(sky.nside)
-            sky.coherency_radec = (
-                sky.coherency_radec / astropy_healpix.nside_to_pixel_area(sky.nside)
-            )
             if sky.stokes_error is not None:
                 sky.stokes_error = (
                     sky.stokes_error / astropy_healpix.nside_to_pixel_area(sky.nside)
                 )
         sky.name = None
         sky.skycoord = None
+
+        if sky.frame_coherency is not None:
+            # recalculate from stokes
+            sky.calc_frame_coherency()
 
         if full_sky and sky.Ncomponents < hpx_obj.npix:
             # add in zero flux pixels
@@ -1906,7 +1907,8 @@ class SkyModel(UVBase):
             sort_order = np.argsort(sky.hpx_inds)
             sky.hpx_inds = sky.hpx_inds[sort_order]
             sky.stokes = sky.stokes[:, :, sort_order]
-            sky.coherency_radec = sky.coherency_radec[:, :, :, sort_order]
+            if sky.frame_coherency is not None:
+                sky.frame_coherency = sky.frame_coherency[:, :, :, sort_order]
             if sky.stokes_error is not None:
                 sky.stokes_error = sky.stokes_error[:, :, sort_order]
             for param in sky.ncomponent_length_params:
@@ -2190,7 +2192,7 @@ class SkyModel(UVBase):
         sky.Nfreqs = freqs.size
         sky.spectral_type = "full"
         sky.freq_array = freqs
-        sky.coherency_radec = skyutils.stokes_to_coherency(sky.stokes)
+        sky.coherency_radec = sky.calc_frame_coherency()
 
         if run_check:
             sky.check()
@@ -2271,11 +2273,24 @@ class SkyModel(UVBase):
         # Horizon mask:
         self.above_horizon = self.alt_az[0, :] > 0.0
 
-    # TODO: work on skycoord starting here next time
-    # Note: the rotation code below all assumes ICRS as the starting frame. That needs
-    # to be relaxed carefully!
-    # Consider making coherency_radec optional (maybe rename to reflect all coord sys)
-    # or dropping it (this might lead to repeated calculations for pyuvsim)
+    def calc_frame_coherency(self, store=True):
+        """
+        Calculate the coherency in the object skymodel frame or hpx_frame.
+
+        Parameters
+        ----------
+        store : bool
+            Option to store the frame_coherency to the object. This saves time for
+            repeated calls but adds memory.
+
+        """
+        frame_coherency = skyutils.stokes_to_coherency(self.stokes)
+
+        if store:
+            self.frame_coherency = frame_coherency
+        else:
+            return frame_coherency
+
     def _calc_average_rotation_matrix(self):
         """
         Calculate the "average" rotation matrix from RA/Dec to AltAz.
@@ -2294,13 +2309,18 @@ class SkyModel(UVBase):
         y_c = np.array([0, 1.0, 0])
         z_c = np.array([0, 0, 1.0])
 
-        axes_icrs = SkyCoord(
+        if self.component_type == "healpix":
+            frame_use = self.hpx_frame
+        else:
+            frame_use = self.skycoord.frame
+
+        axes_frame = SkyCoord(
             x=x_c,
             y=y_c,
             z=z_c,
             obstime=self.time,
             location=self.telescope_location,
-            frame="icrs",
+            frame=frame_use,
             representation_type="cartesian",
         )
 
@@ -2311,7 +2331,7 @@ class SkyModel(UVBase):
                 "ignore",
                 message="The get_frame_attr_names",
             )
-            axes_altaz = axes_icrs.transform_to("altaz")
+            axes_altaz = axes_frame.transform_to("altaz")
         axes_altaz.representation_type = "cartesian"
 
         """ This transformation matrix is generally not orthogonal
@@ -2327,7 +2347,7 @@ class SkyModel(UVBase):
 
     def _calc_rotation_matrix(self, inds=None):
         """
-        Calculate the true rotation matrix from RA/Dec to AltAz for each component.
+        Calculate the true rotation matrix from object frame to AltAz per component.
 
         Parameters
         ----------
@@ -2346,10 +2366,10 @@ class SkyModel(UVBase):
         n_inds = len(inds)
 
         # Find mathematical points and vectors for RA/Dec
-        theta_radec = np.pi / 2.0 - self.lat.rad[inds]
-        phi_radec = self.lon.rad[inds]
-        radec_vec = sct.r_hat(theta_radec, phi_radec)
-        assert radec_vec.shape == (3, n_inds)
+        theta_frame = np.pi / 2.0 - self.lat.rad[inds]
+        phi_frame = self.lon.rad[inds]
+        frame_vec = sct.r_hat(theta_frame, phi_frame)
+        assert frame_vec.shape == (3, n_inds)
 
         # Find mathematical points and vectors for Alt/Az
         theta_altaz = np.pi / 2.0 - self.alt_az[0, inds]
@@ -2362,7 +2382,7 @@ class SkyModel(UVBase):
         R_exact = np.zeros((3, 3, n_inds), dtype=np.float64)
 
         for src_i in range(n_inds):
-            intermediate_vec = np.matmul(R_avg, radec_vec[:, src_i])
+            intermediate_vec = np.matmul(R_avg, frame_vec[:, src_i])
 
             R_perturb = sct.vecs2rot(r1=intermediate_vec, r2=altaz_vec[:, src_i])
 
@@ -2372,7 +2392,7 @@ class SkyModel(UVBase):
 
     def _calc_coherency_rotation(self, inds=None):
         """
-        Calculate the rotation matrix to apply to the RA/Dec coherency to get it into alt/az.
+        Calculate the rotation matrix to apply to the frame coherency to get it into alt/az.
 
         Parameters
         ----------
@@ -2383,7 +2403,7 @@ class SkyModel(UVBase):
         Returns
         -------
         array of floats
-            Rotation matrix that takes the coherency from (RA,Dec) --> (Alt,Az),
+            Rotation matrix that takes the coherency from frame --> (Alt,Az),
             shape (2, 2, Ncomponents).
         """
         if inds is None:
@@ -2392,9 +2412,9 @@ class SkyModel(UVBase):
 
         basis_rotation_matrix = self._calc_rotation_matrix(inds)
 
-        # Find mathematical points and vectors for RA/Dec
-        theta_radec = np.pi / 2.0 - self.lat.rad[inds]
-        phi_radec = self.lon.rad[inds]
+        # Find mathematical points and vectors for frame
+        theta_frame = np.pi / 2.0 - self.lat.rad[inds]
+        phi_frame = self.lon.rad[inds]
 
         # Find mathematical points and vectors for Alt/Az
         theta_altaz = np.pi / 2.0 - self.alt_az[0, inds]
@@ -2405,8 +2425,8 @@ class SkyModel(UVBase):
             coherency_rot_matrix[
                 :, :, src_i
             ] = sct.spherical_basis_vector_rotation_matrix(
-                theta_radec[src_i],
-                phi_radec[src_i],
+                theta_frame[src_i],
+                phi_frame[src_i],
                 basis_rotation_matrix[:, :, src_i],
                 theta_altaz[src_i],
                 phi_altaz[src_i],
@@ -2414,14 +2434,14 @@ class SkyModel(UVBase):
 
         return coherency_rot_matrix
 
-    def coherency_calc(self, deprecated_location=None):
+    def coherency_calc(self, deprecated_location=None, store_frame_coherency=True):
         """
         Calculate the local coherency in alt/az basis.
 
         :meth:`SkyModel.update_positions` must be run prior to this method.
 
         The coherency is a 2x2 matrix giving electric field correlation in Jy.
-        It's specified on the object as a coherency in the ra/dec basis,
+        It is specified on the object as a coherency in the frame basis,
         but must be rotated into local alt/az.
 
         Parameters
@@ -2429,6 +2449,9 @@ class SkyModel(UVBase):
         deprecated_location : :class:`astropy.coordinates.EarthLocation`
             This keyword is deprecated. It is preserved to maintain backwards
             compatibility and sets the EarthLocation on this SkyModel object.
+        store_frame_coherency : bool
+            Option to store the frame_coherency to the object. This saves time for
+            repeated calls but adds memory.
 
         Returns
         -------
@@ -2463,8 +2486,11 @@ class SkyModel(UVBase):
                 errm + "value was: {al}".format(al=str(self.telescope_location))
             )
 
+        if self.frame_coherency is None:
+            self.calc_frame_coherency(store=store_frame_coherency)
+
         # Select sources within the horizon only.
-        coherency_local = self.coherency_radec[..., above_horizon]
+        coherency_local = self.frame_coherency[..., above_horizon]
 
         # For unpolarized sources, there's no need to rotate the coherency matrix.
         if self._n_polarized > 0:
@@ -2488,7 +2514,7 @@ class SkyModel(UVBase):
                 coherency_local[:, :, :, pol_over_hor] = np.einsum(
                     "aby,bcxy,cdy->adxy",
                     rotation_matrix_T,
-                    self.coherency_radec[:, :, :, full_pol_over_hor],
+                    self.frame_coherency[:, :, :, full_pol_over_hor],
                     rotation_matrix,
                 )
 
@@ -2623,7 +2649,7 @@ class SkyModel(UVBase):
             this.name = np.concatenate((this.name, other.name))
 
         if this.component_type == "healpix":
-            for param in ["_lon", "_lat", "_name"]:
+            for param in ["_skycoord", "_name"]:
                 this_param = getattr(this, param)
                 other_param = getattr(other, param)
                 param_name = this_param.name
@@ -2646,12 +2672,21 @@ class SkyModel(UVBase):
                     )
                     setattr(this, param_name, None)
         else:
-            this.lon = np.concatenate((this.lon, other.lon))
-            this.lat = np.concatenate((this.lat, other.lat))
+            this.skycoord = np.concatenate((this.skycoord, other.skycoord))
+
         this.stokes = np.concatenate((this.stokes, other.stokes), axis=2)
-        this.coherency_radec = np.concatenate(
-            (this.coherency_radec, other.coherency_radec), axis=3
-        )
+
+        if this.frame_coherency is not None and other.frame_coherency is not None:
+            this.frame_coherency = (
+                np.concatenate((this.frame_coherency, other.frame_coherency), axis=3),
+            )
+        elif this.frame_coherency is not None or other.frame_coherency is not None:
+            warnings.warn(
+                "Only one object has frame coherencies, setting frame_coherency"
+                "to None on final object. Use `calc_frame_coherency` to "
+                "recalculate them."
+            )
+            this.frame_coherency = None
 
         if this.spectral_type == "spectral_index":
             this.reference_frequency = np.concatenate(
@@ -2793,8 +2828,8 @@ class SkyModel(UVBase):
             )
         component_inds = component_inds[
             np.nonzero(
-                (self.lat[component_inds] >= lat_range[0])
-                & (self.lat[component_inds] <= lat_range[1])
+                (self.skycoord.lat[component_inds] >= lat_range[0])
+                & (self.skycoord.lat[component_inds] <= lat_range[1])
             )[0]
         ]
         return component_inds
@@ -2808,17 +2843,17 @@ class SkyModel(UVBase):
         if lon_range[1] < lon_range[0]:
             # we're wrapping around longitude = 2*pi = 0
             component_inds1 = component_inds[
-                np.nonzero(self.lon[component_inds] >= lon_range[0])[0]
+                np.nonzero(self.skycoord.lon[component_inds] >= lon_range[0])[0]
             ]
             component_inds2 = component_inds[
-                np.nonzero(self.lon[component_inds] <= lon_range[1])[0]
+                np.nonzero(self.skycoord.lon[component_inds] <= lon_range[1])[0]
             ]
             component_inds = np.union1d(component_inds1, component_inds2)
         else:
             component_inds = component_inds[
                 np.nonzero(
-                    (self.lon[component_inds] >= lon_range[0])
-                    & (self.lon[component_inds] <= lon_range[1])
+                    (self.skycoord.lon[component_inds] >= lon_range[0])
+                    & (self.skycoord.lon[component_inds] <= lon_range[1])
                 )[0]
             ]
         return component_inds
@@ -2932,10 +2967,10 @@ class SkyModel(UVBase):
         component_inds : array_like of int
             Component indices to keep on the object.
         lat_range : :class:`astropy.coordinates.Latitude`
-            Range of Dec or galactic latitude, depending on the object `frame`
+            Range of Dec or galactic latitude, depending on the object `skycoord.frame`
             attribute, to keep on the object, shape (2,).
         lon_range : :class:`astropy.coordinates.Longitude`
-            Range of RA or galactic longitude, depending on the object `frame`
+            Range of RA or galactic longitude, depending on the object  `skycoord.frame`
             attribute, to keep on the object, shape (2,). If the second value is
             smaller than the first, the lons are treated as being wrapped around
             lon = 0, and the lons kept on the object will run from the larger value,
@@ -3013,7 +3048,8 @@ class SkyModel(UVBase):
                 setattr(skyobj, param_name, attr.value[component_inds])
 
         skyobj.stokes = skyobj.stokes[:, :, component_inds]
-        skyobj.coherency_radec = skyobj.coherency_radec[:, :, :, component_inds]
+        if skyobj.frame_coherency is not None:
+            skyobj.frame_coherency = skyobj.frame_coherency[:, :, :, component_inds]
         if skyobj.stokes_error is not None:
             skyobj.stokes_error = skyobj.stokes_error[:, :, component_inds]
         if skyobj.beam_amp is not None:
@@ -3340,8 +3376,12 @@ class SkyModel(UVBase):
 
         arr = np.empty(self.Ncomponents, dtype=dt)
         arr["source_id"] = self.name
-        arr["ra_j2000"] = self.lon.deg
-        arr["dec_j2000"] = self.lat.deg
+        if self.skycoord.frame == "ICRS":
+            arr["ra_j2000"] = self.skycoord.ra.deg
+            arr["dec_j2000"] = self.skycoord.dec.deg
+        else:
+            arr["lat_" + self.skycoord.frame.to_lower()] = self.skycoord.lat.deg
+            arr["lon" + self.skycoord.frame.to_lower()] = self.skycoord.lon.deg
 
         for ii in range(4):
             if stokes_keep[ii]:
@@ -3398,6 +3438,7 @@ class SkyModel(UVBase):
 
         return self._text_write_preprocess()
 
+    # TODO: work on skycoord starting here next time
     @classmethod
     def from_recarray(
         cls,
