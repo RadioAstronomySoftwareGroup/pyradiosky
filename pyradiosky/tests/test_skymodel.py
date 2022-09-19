@@ -446,6 +446,7 @@ def test_init_lists(spec_type, param, zenith_skycoord):
         name=names,
         ra=ras,
         dec=decs,
+        frame="icrs",
         stokes=stokes,
         reference_frequency=ref_freqs,
         spectral_index=spec_index,
@@ -475,6 +476,7 @@ def test_init_lists(spec_type, param, zenith_skycoord):
                 name=names,
                 ra=ras,
                 dec=decs,
+                frame="icrs",
                 stokes=stokes,
                 reference_frequency=ref_freqs,
                 spectral_index=spec_index,
@@ -486,6 +488,7 @@ def test_init_lists(spec_type, param, zenith_skycoord):
             name=names,
             ra=ras,
             dec=decs,
+            frame="icrs",
             stokes=stokes,
             reference_frequency=ref_freqs,
             spectral_index=spec_index,
@@ -499,10 +502,10 @@ def test_init_lists(spec_type, param, zenith_skycoord):
 @pytest.mark.parametrize(
     "spec_type, param, msg",
     [
-        ("flat", "ra", "All values in ra must be Longitude objects"),
-        ("flat", "ra_lat", "All values in ra must be Longitude objects"),
-        ("flat", "dec", "All values in dec must be Latitude objects"),
-        ("flat", "dec_lon", "All values in dec must be Latitude objects"),
+        ("flat", "ra", "ra must be one or more Longitude objects"),
+        ("flat", "ra_lat", "ra must be one or more Longitude objects"),
+        ("flat", "dec", "dec must be one or more Latitude objects"),
+        ("flat", "dec_lon", "dec must be one or more Latitude objects"),
         (
             "flat",
             "stokes",
@@ -658,7 +661,7 @@ def test_skymodel_init_errors(zenith_skycoord):
     # Check error cases
     with pytest.raises(
         ValueError,
-        match=("UVParameter _lon is not the appropriate type."),
+        match=("ra must be one or more Longitude objects"),
     ):
         SkyModel(
             name="icrs_zen",
@@ -670,7 +673,7 @@ def test_skymodel_init_errors(zenith_skycoord):
 
     with pytest.raises(
         ValueError,
-        match=("UVParameter _lat is not the appropriate type."),
+        match=("dec must be one or more Latitude objects"),
     ):
         SkyModel(
             name="icrs_zen",
@@ -729,7 +732,7 @@ def test_skymodel_init_errors(zenith_skycoord):
         )
 
     with pytest.raises(
-        ValueError, match=("For point component types, the coherency_radec")
+        ValueError, match=("For point component types, the frame_coherency")
     ):
         sky = SkyModel(
             name="icrs_zen",
@@ -739,7 +742,8 @@ def test_skymodel_init_errors(zenith_skycoord):
             spectral_type="flat",
             freq_array=[1e8] * units.Hz,
         )
-        sky.coherency_radec = sky.coherency_radec.value * units.m
+        sky.calc_frame_coherency()
+        sky.frame_coherency = sky.frame_coherency.value * units.m
         sky.check()
 
     with pytest.raises(
@@ -769,7 +773,10 @@ def test_skymodel_deprecated(time_location):
 
     with uvtest.check_warnings(
         DeprecationWarning,
-        match="The input parameters to SkyModel.__init__ have changed",
+        match=[
+            "The input parameters to SkyModel.__init__ have changed",
+            "No frame was specified for RA and Dec.",
+        ],
     ):
         source_old = SkyModel(
             "Test",
@@ -790,6 +797,7 @@ def test_skymodel_deprecated(time_location):
             name="Test",
             ra=Longitude(12.0 * units.hr),
             dec=Latitude(-30.0 * units.deg),
+            frame="icrs",
             stokes=[1.0, 0.0, 0.0, 0.0] * units.Jy,
             spectral_type="flat",
             reference_frequency=np.array([1e8]),
@@ -808,6 +816,7 @@ def test_skymodel_deprecated(time_location):
             name="Test",
             ra=Longitude(12.0 * units.hr),
             dec=Latitude(-30.0 * units.deg),
+            frame="icrs",
             stokes=[1.0, 0.0, 0.0, 0.0] * units.Jy,
             spectral_type="flat",
             reference_frequency=[1e8],
@@ -823,6 +832,7 @@ def test_skymodel_deprecated(time_location):
             name="Test",
             ra=Longitude(12.0 * units.hr),
             dec=Latitude(-30.0 * units.deg),
+            frame="icrs",
             stokes=np.asarray([1.0, 0.0, 0.0, 0.0]),
             spectral_type="flat",
             reference_frequency=np.array([1e8]) * units.Hz,
@@ -833,6 +843,7 @@ def test_skymodel_deprecated(time_location):
         name="Test",
         ra=Longitude(12.0 * units.hr),
         dec=Latitude(-30.0 * units.deg),
+        frame="icrs",
         stokes=[1.0, 0.0, 0.0, 0.0] * units.Jy,
         spectral_type="flat",
         reference_frequency=np.array([1.5e8]) * units.Hz,
@@ -851,13 +862,14 @@ def test_skymodel_deprecated(time_location):
         name="Test",
         ra=Longitude(12.0 * units.hr),
         dec=Latitude(-30.0 * units.deg + 2e-3 * units.arcsec),
+        frame="icrs",
         stokes=[1.0, 0.0, 0.0, 0.0] * units.Jy,
         spectral_type="flat",
         reference_frequency=np.array([1e8]) * units.Hz,
     )
     with uvtest.check_warnings(
         DeprecationWarning,
-        match=("The _lat parameters are not within the future tolerance"),
+        match=("The skycoord parameters are not within the future tolerance"),
     ):
         assert source_new == source_old
 
@@ -865,13 +877,14 @@ def test_skymodel_deprecated(time_location):
         name="Test",
         ra=Longitude(Longitude(12.0 * units.hr) + Longitude(2e-3 * units.arcsec)),
         dec=Latitude(-30.0 * units.deg),
+        frame="icrs",
         stokes=[1.0, 0.0, 0.0, 0.0] * units.Jy,
         spectral_type="flat",
         reference_frequency=np.array([1e8]) * units.Hz,
     )
     with uvtest.check_warnings(
         DeprecationWarning,
-        match=("The _lon parameters are not within the future tolerance"),
+        match=("The skycoord parameters are not within the future tolerance"),
     ):
         assert source_new == source_old
 
@@ -881,13 +894,17 @@ def test_skymodel_deprecated(time_location):
         name="Test",
         ra=Longitude(12.0 * units.hr),
         dec=Latitude(-30.0 * units.deg),
+        frame="icrs",
         stokes=stokes,
         spectral_type="subband",
         freq_array=np.array([1e8, 1.5e8]) * units.Hz,
     )
     with uvtest.check_warnings(
         DeprecationWarning,
-        match="The input parameters to SkyModel.__init__ have changed",
+        match=[
+            "The input parameters to SkyModel.__init__ have changed",
+            "No frame was specified for RA and Dec.",
+        ],
     ):
         source_old = SkyModel(
             "Test",
@@ -908,6 +925,7 @@ def test_skymodel_deprecated(time_location):
             name="Test",
             ra=Longitude(12.0 * units.hr),
             dec=Latitude(-30.0 * units.deg),
+            frame="icrs",
             stokes=stokes,
             spectral_type="subband",
             freq_array=np.array([1e8, 1.5e8]),
@@ -926,6 +944,7 @@ def test_skymodel_deprecated(time_location):
             name="Test",
             ra=Longitude(12.0 * units.hr),
             dec=Latitude(-30.0 * units.deg),
+            frame="icrs",
             stokes=stokes,
             spectral_type="subband",
             freq_array=[1e8, 1.5e8],
