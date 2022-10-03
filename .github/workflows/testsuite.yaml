@@ -173,8 +173,8 @@ jobs:
       strategy:
         fail-fast: false
         matrix:
-          os: [ubuntu-latest, macos-latest, windows-latest]
-          python-version: [3.7, 3.8, 3.9]
+          os: ubuntu-latest
+          python-version: 3.8
       steps:
         - uses: actions/checkout@master
           with:
@@ -205,4 +205,4 @@ jobs:
         - name: Run Tests
           run: |
             cd docs
-            python -m pytest -n 2 --doctest-glob="*.rst"
+            python -m pytest --doctest-glob="*.rst"
