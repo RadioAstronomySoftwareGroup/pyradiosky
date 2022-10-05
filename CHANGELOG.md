@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ## Changed
+- Added support for `allowed_failures` keyword in `SkyModel.__eq__` to match
+`pyuvdata.UVBase`, update pyuvdata minimum version to 2.2.1 when that keyword was
+introduced.
 - Updated the astropy requirement to >= 5.0.4
 - Dropped support for python 3.7
 
