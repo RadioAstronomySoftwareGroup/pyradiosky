@@ -13,7 +13,7 @@ dependencies:
   - pre-commit
   - pypandoc
   - pytest-cov
-  - pyuvdata>=2.1.3
+  - pyuvdata>=2.2.1
   - pyyaml
   - scipy
   - setuptools_scm

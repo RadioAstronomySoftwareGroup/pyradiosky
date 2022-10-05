@@ -998,14 +998,16 @@ class SkyModel(UVBase):
         # Error if attribute not found
         return self.__getattribute__(name)
 
-    def __eq__(self, other, check_extra=True):
+    def __eq__(self, other, check_extra=True, allowed_failures=None):
         """Check for equality, check for future equality."""
         # Run the basic __eq__ from UVBase
         # the filters below should be removed in version 0.3.0
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message="lon is no longer")
             warnings.filterwarnings("ignore", message="lat is no longer")
-            equal = super(SkyModel, self).__eq__(other, check_extra=check_extra)
+            equal = super(SkyModel, self).__eq__(
+                other, check_extra=check_extra, allowed_failures=allowed_failures
+            )
 
             # Issue deprecation warning if ra/decs aren't close to future_angle_tol levels
             if self._lon.value is not None and not units.quantity.allclose(
@@ -2735,7 +2737,6 @@ class SkyModel(UVBase):
                 this.history += " Next object history follows. " + other.history
             else:
                 if "_combine_history_addition" in dir(uvutils):
-                    # this uses new (in v2.2.0) functionality in pyuvdata
                     extra_history = uvutils._combine_history_addition(
                         this.history, other.history
                     )
@@ -2744,13 +2745,6 @@ class SkyModel(UVBase):
                             " Unique part of next object history follows. "
                             + extra_history
                         )
-                else:  # pragma: no cover
-                    # backwards compatibility for older versions of pyuvdata
-                    # remove when we require pyuvdata>=2.2.0
-                    this.history = uvutils._combine_histories(
-                        this.history + " Unique part of next object history follows. ",
-                        other.history,
-                    )
 
         # Check final object is self-consistent
         if run_check:
