@@ -162,19 +162,15 @@ jobs:
   docs_test:
       env:
         ENV_NAME: tests
-        PYTHON: ${{ matrix.python-version }}
-        OS: ${{ matrix.os }}
+        PYTHON: 3.9
       name: Tutorial Testing
-      runs-on: ${{ matrix.os }}
+      runs-on: ubuntu-latest
       defaults:
         run:
           # Adding -l {0} helps ensure conda can be found properly.
           shell: bash -l {0}
       strategy:
         fail-fast: false
-        matrix:
-          os: ubuntu-latest
-          python-version: 3.8
       steps:
         - uses: actions/checkout@master
           with:
