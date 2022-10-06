@@ -998,7 +998,7 @@ class SkyModel(UVBase):
         # Error if attribute not found
         return self.__getattribute__(name)
 
-    def __eq__(self, other, check_extra=True, allowed_failures=None):
+    def __eq__(self, other, check_extra=True, allowed_failures="filename"):
         """Check for equality, check for future equality."""
         # Run the basic __eq__ from UVBase
         # the filters below should be removed in version 0.3.0
