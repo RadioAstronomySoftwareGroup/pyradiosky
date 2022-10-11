@@ -143,7 +143,8 @@ class SkyModel(UVBase):
     frame : str
         Name of coordinates frame of source positions.
         If ra/dec or gl/gb are provided, this will be set to `icrs` or `galactic` by
-        default. Must be interpretable by `astropy.coordinates.frame_transform_graph.lookup_name()`.
+        default. Must be interpretable by
+        `astropy.coordinates.frame_transform_graph.lookup_name()`.
         Required if keywords `lon` and `lat` are used. Not needed if  the `skycoord` is
         passed.
     skycoord : :class:`astropy.coordinates.SkyCoord`
@@ -515,95 +516,6 @@ class SkyModel(UVBase):
                 freq_array = freqs_use
                 reference_frequency = None
 
-        if skycoord is not None:
-            location_params = [lon, lat, ra, dec, gl, gb, frame]
-            for param in location_params:
-                if param is not None:
-                    raise ValueError(f"Cannot set {param} if the skycoord is set.")
-
-            self.skycoord = skycoord
-        else:
-            # Raise error if missing the right combination.
-            coords_given = {
-                "lon": lon is not None,
-                "lat": lat is not None,
-                "ra": ra is not None,
-                "dec": dec is not None,
-                "gl": gl is not None,
-                "gb": gb is not None,
-            }
-
-            valid_combos = [{"ra", "dec"}, {"lat", "lon"}, {"gl", "gb"}, set()]
-            input_combo = {k for k, v in coords_given.items() if v}
-
-            if input_combo not in valid_combos:
-                raise ValueError(f"Invalid input coordinate combination: {input_combo}")
-
-            if input_combo == {"lat", "lon"} and frame is None:
-                raise ValueError(
-                    "The 'frame' keyword must be set to initialize from lat/lon."
-                )
-
-            if (ra is not None) and (dec is not None):
-                lon = ra
-                lat = dec
-                if frame is None:
-                    warnings.warn(
-                        "No frame was specified for RA and Dec. Defaulting to ICRS, "
-                        "but this will become an error in version 0.3 and later.",
-                        DeprecationWarning,
-                    )
-                    frame = "icrs"
-            elif (gl is not None) and (gb is not None):
-                lon = gl
-                lat = gb
-                if frame is None:
-                    warnings.warn(
-                        "No frame was specified for gl and gb. Defaulting to galactic, "
-                        "but this will become an error in version 0.3 and later.",
-                        DeprecationWarning,
-                    )
-                    frame = "galactic"
-
-            if isinstance(frame, str):
-                frame_class = frame_transform_graph.lookup_name(frame)
-                if frame_class is None:
-                    raise ValueError(f"Invalid frame name {frame}.")
-                frame = frame_class()
-
-            if lon is not None:
-                if not isinstance(lon, Longitude):
-                    if not isinstance(lon, (list, np.ndarray, tuple)):
-                        lon = [lon]
-                    # Cannot just try converting to Longitude because if the values are
-                    # Latitudes they are silently converted to Longitude rather than
-                    # throwing an error.
-                    for val in lon:
-                        if not isinstance(val, (Longitude)):
-                            lon_name = [
-                                k for k in ["ra", "gl", "lon"] if coords_given[k]
-                            ][0]
-                            raise ValueError(
-                                f"{lon_name} must be one or more Longitude objects"
-                            )
-                    lon = Longitude(lon)
-                if not isinstance(lat, Latitude):
-                    if not isinstance(lat, (list, np.ndarray, tuple)):
-                        lat = [lat]
-                    # Cannot just try converting to Latitude because if the values are
-                    # Longitude they are silently converted to Longitude rather than
-                    # throwing an error.
-                    for val in lat:
-                        if not isinstance(val, (Latitude)):
-                            lat_name = [
-                                k for k in ["dec", "gb", "lat"] if coords_given[k]
-                            ][0]
-                            raise ValueError(
-                                f"{lat_name} must be one or more Latitude objects"
-                            )
-                    lat = Latitude(lat)
-                skycoord = SkyCoord(np.atleast_1d(lon), np.atleast_1d(lat), frame=frame)
-
         if component_type is not None:
             if component_type not in self._component_type.acceptable_vals:
                 raise ValueError(
@@ -625,6 +537,98 @@ class SkyModel(UVBase):
                 spectral_type is not None,
             ]
         else:
+            if skycoord is not None:
+                location_params = [lon, lat, ra, dec, gl, gb, frame]
+                for param in location_params:
+                    if param is not None:
+                        raise ValueError(f"Cannot set {param} if the skycoord is set.")
+
+                self.skycoord = skycoord
+            else:
+                # Raise error if missing the right combination.
+                coords_given = {
+                    "lon": lon is not None,
+                    "lat": lat is not None,
+                    "ra": ra is not None,
+                    "dec": dec is not None,
+                    "gl": gl is not None,
+                    "gb": gb is not None,
+                }
+
+                valid_combos = [{"ra", "dec"}, {"lat", "lon"}, {"gl", "gb"}, set()]
+                input_combo = {k for k, v in coords_given.items() if v}
+
+                if input_combo not in valid_combos:
+                    raise ValueError(
+                        f"Invalid input coordinate combination: {input_combo}"
+                    )
+
+                if input_combo == {"lat", "lon"} and frame is None:
+                    raise ValueError(
+                        "The 'frame' keyword must be set to initialize from lat/lon."
+                    )
+
+                if (ra is not None) and (dec is not None):
+                    lon = ra
+                    lat = dec
+                    if frame is None:
+                        warnings.warn(
+                            "No frame was specified for RA and Dec. Defaulting to ICRS, "
+                            "but this will become an error in version 0.3 and later.",
+                            DeprecationWarning,
+                        )
+                        frame = "icrs"
+                elif (gl is not None) and (gb is not None):
+                    lon = gl
+                    lat = gb
+                    if frame is None:
+                        warnings.warn(
+                            "No frame was specified for gl and gb. Defaulting to galactic, "
+                            "but this will become an error in version 0.3 and later.",
+                            DeprecationWarning,
+                        )
+                        frame = "galactic"
+
+                if isinstance(frame, str):
+                    frame_class = frame_transform_graph.lookup_name(frame)
+                    if frame_class is None:
+                        raise ValueError(f"Invalid frame name {frame}.")
+                    frame = frame_class()
+
+                if lon is not None:
+                    if not isinstance(lon, Longitude):
+                        if not isinstance(lon, (list, np.ndarray, tuple)):
+                            lon = [lon]
+                        # Cannot just try converting to Longitude because if the values are
+                        # Latitudes they are silently converted to Longitude rather than
+                        # throwing an error.
+                        for val in lon:
+                            if not isinstance(val, (Longitude)):
+                                lon_name = [
+                                    k for k in ["ra", "gl", "lon"] if coords_given[k]
+                                ][0]
+                                raise ValueError(
+                                    f"{lon_name} must be one or more Longitude objects"
+                                )
+                        lon = Longitude(lon)
+                    if not isinstance(lat, Latitude):
+                        if not isinstance(lat, (list, np.ndarray, tuple)):
+                            lat = [lat]
+                        # Cannot just try converting to Latitude because if the values are
+                        # Longitude they are silently converted to Longitude rather than
+                        # throwing an error.
+                        for val in lat:
+                            if not isinstance(val, (Latitude)):
+                                lat_name = [
+                                    k for k in ["dec", "gb", "lat"] if coords_given[k]
+                                ][0]
+                                raise ValueError(
+                                    f"{lat_name} must be one or more Latitude objects"
+                                )
+                        lat = Latitude(lat)
+                    skycoord = SkyCoord(
+                        np.atleast_1d(lon), np.atleast_1d(lat), frame=frame
+                    )
             req_args = ["name", "skycoord", "stokes", "spectral_type"]
             args_set_req = [
                 name is not None,
@@ -632,6 +636,7 @@ class SkyModel(UVBase):
                 stokes is not None,
                 spectral_type is not None,
             ]
+
         if spectral_type == "spectral_index":
             req_args.extend(["spectral_index", "reference_frequency"])
             args_set_req.extend(
@@ -684,7 +689,7 @@ class SkyModel(UVBase):
                         category=DeprecationWarning,
                     )
                     self.hpx_frame = "icrs"
-                    frame = frame_transform_graph.lookup_name(self.frame)()
+                    frame = frame_transform_graph.lookup_name(frame)()
                 else:
                     self.hpx_frame = frame
 
@@ -1045,7 +1050,7 @@ class SkyModel(UVBase):
                     other, check_extra=check_extra, allowed_failures=allowed_failures
                 )
 
-        if equal:
+        if equal and not self.component_type == "healpix":
             # Issue deprecation warning if skycoords aren't close to future_angle_tol levels
             sky_separation = self.skycoord.separation(other.skycoord).rad
             if np.any(sky_separation > self.future_angle_tol.rad):
@@ -1385,8 +1390,8 @@ class SkyModel(UVBase):
 
     def _get_lon_lat_component_names(self):
         if self.component_type == "healpix":
-            coord = SkyCoord(0, 0, frame=self.hpx_frame, units="deg")
-            frame_obj = coord.frame_obj
+            coord = SkyCoord(0, 0, frame=self.hpx_frame, unit="deg")
+            frame_obj = coord.frame
         else:
             frame_obj = self.skycoord.frame
 
@@ -1473,7 +1478,7 @@ class SkyModel(UVBase):
                 "The astropy-healpix module must be installed to use HEALPix methods"
             ) from e
 
-        self.lon, self.lat = self.get_lon_lat()
+        self.skycoord = SkyCoord(*self.get_lon_lat(), frame=self.hpx_frame)
         self._set_component_type_params("point")
         self.stokes = self.stokes * astropy_healpix.nside_to_pixel_area(self.nside)
         if self.frame_coherency is not None:
@@ -1716,19 +1721,19 @@ class SkyModel(UVBase):
 
             frame_obj = coords.frame
 
-            if not isinstance(frame, (Galactic, ICRS)):
+            if not isinstance(frame_obj, (Galactic, ICRS)):
                 raise ValueError(
-                    f"Supplied frame {frame.__class__.__name__} is not supported at "
+                    f"Supplied frame {frame_obj.__class__.__name__} is not supported at "
                     "this time. Only 'galactic' and 'icrs' frames are currently supported.",
                 )
 
-            if sky.skycoord.frame != coords.frame:
+            if sky.skycoord.frame.name != coords.frame.name:
                 warnings.warn(
-                    f"Input parameter frame (value: {frame.name.lower()}) differs "
-                    f"from the frame attribute on this object (value: {sky.frame.lower()}). "
+                    f"Input parameter frame (value: {frame_obj.name}) differs "
+                    f"from the frame attribute on this object (value: {sky.skycoord.frame.name}). "
                     "Using input frame for coordinate calculations."
                 )
-                sky.hpx_frame = frame
+            sky.hpx_frame = frame_obj.name
 
         # clear time & position specific parameters
         sky.clear_time_position_specific_params()
@@ -3436,9 +3441,10 @@ class SkyModel(UVBase):
             DeprecationWarning,
         )
 
+        if not self.skycoord.frame == "ICRS":
+            raise ValueError("to_recarray only supports the ICRS coordinate frame")
         return self._text_write_preprocess()
 
-    # TODO: work on skycoord starting here next time
     @classmethod
     def from_recarray(
         cls,
@@ -3629,15 +3635,15 @@ class SkyModel(UVBase):
             header_params = [
                 "_Ncomponents",
                 "_Nfreqs",
+                "_skycoord",
                 "_component_type",
                 "_spectral_type",
-                "_lon",
-                "_lat",
                 "_history",
                 "_name",
                 "_nside",
                 "_hpx_order",
                 "_hpx_inds",
+                "_hpx_frame",
                 "_freq_array",
                 "_reference_frequency",
                 "_spectral_index",
@@ -3647,12 +3653,12 @@ class SkyModel(UVBase):
             ]
 
             optional_params = [
+                "_skycoord",
                 "_name",
-                "_ra",
-                "_dec",
                 "_nside",
                 "_hpx_inds",
                 "_hpx_order",
+                "_hpx_frame",
                 "_freq_array",
                 "_reference_frequency",
                 "_spectral_index",
@@ -3661,9 +3667,40 @@ class SkyModel(UVBase):
                 "_extended_model_group",
             ]
 
+            self.component_type = header["component_type"][()].tobytes().decode("utf-8")
+
+            if self.component_type != "healpix":
+                if "skycoord" in header:
+                    skycoord_dict = {}
+                    for key, dset in header["skycoord"].items():
+                        if issubclass(dset.dtype.type, np.bytes_):
+                            skycoord_dict[key] = bytes(dset[()]).decode("utf8")
+                        else:
+                            skycoord_dict[key] = dset[()]
+                    self.skycoord = SkyCoord(**skycoord_dict)
+                else:
+                    if "lat" in header and "lon" in header and "frame" in header:
+                        header_params += ["lat", "lon", "frame"]
+                        optional_params += ["lat", "lon", "frame"]
+                    elif "ra" in header and "dec" in header:
+                        header_params += ["ra", "dec"]
+                        optional_params += ["ra", "dec"]
+                    else:
+                        raise ValueError(
+                            "No component location information found in file."
+                        )
+                    warnings.warn(
+                        "Parameter skycoord not found in skyh5 file. "
+                        "This skyh5 file was written by an older version of pyradiosky. "
+                        "Consider re-writing this file to ensure future compatibility"
+                    )
+
             for par in header_params:
-                param = getattr(self, par)
-                parname = param.name
+                if par in ["lat", "lon", "frame", "ra", "dec"]:
+                    parname = par
+                else:
+                    param = getattr(self, par)
+                    parname = param.name
 
                 # skip optional params if not present
                 if par in optional_params:
@@ -3676,21 +3713,7 @@ class SkyModel(UVBase):
                     if parname in ["lon", "lat", "ra", "dec"]:
                         continue
 
-                if parname in ["lon", "lat"]:
-                    if parname not in header:
-                        warnings.warn(
-                            f"Parameter {parname} not found in skyh5 file. "
-                            "This skyh5 file was written by an older version of pyradiosky. "
-                            "Consdier re-writing this file to ensure future compatibility"
-                        )
-                        if parname == "lat":
-                            dset = header["dec"]
-                        elif parname == "lon":
-                            dset = header["ra"]
-                    else:
-                        dset = header[parname]
-                else:
-                    dset = header[parname]
+                dset = header[parname]
 
                 value = dset[()]
 
@@ -3945,6 +3968,7 @@ class SkyModel(UVBase):
         )
         return self
 
+    # TODO: work on skycoord starting here next time
     def read_votable_catalog(
         self,
         votable_file,
@@ -5194,14 +5218,12 @@ class SkyModel(UVBase):
                 "_Nfreqs",
                 "_component_type",
                 "_spectral_type",
-                "_lon",
-                "_lat",
-                "_frame",
                 "_history",
                 "_name",
                 "_nside",
                 "_hpx_order",
                 "_hpx_inds",
+                "_hpx_frame",
                 "_freq_array",
                 "_reference_frequency",
                 "_spectral_index",
@@ -5248,6 +5270,17 @@ class SkyModel(UVBase):
                     header[parname].attrs["unit"] = unit
                 if angtype is not None:
                     header[parname].attrs["angtype"] = angtype
+
+            # special handling for the skycoord
+            # make a nested group based on the skycoord.info._represent_as_dict()
+            skycoord_info = self.skycoord.info
+            skycoord_dict = skycoord_info._represent_as_dict()
+            sc_group = header.create_group("skycoord")
+            for key, value in skycoord_dict.items():
+                if isinstance(value, str):
+                    sc_group[key] = np.bytes_(value)
+                else:
+                    sc_group[key] = value
 
             # write out the stokes array
             dgrp = fileobj.create_group("Data")
