@@ -279,7 +279,7 @@ c) incorporating astropy healpix package (like plotting pixels), changing compon
   >>> import numpy as np
   >>> import math
   >>> import matplotlib.pyplot as plt # doctest: +SKIP
-  >>> from matplotlib.patches import Polygon
+  >>> from matplotlib.patches import Polygon # doctest: +SKIP
   >>> from pyradiosky import SkyModel
   >>> from pyradiosky.data import DATA_PATH
   >>> from astropy_healpix import HEALPix
@@ -843,7 +843,7 @@ a) subband spectral type
   >>> from pyradiosky import SkyModel
   >>> from pyradiosky.data import DATA_PATH
   >>> from astropy import units
-  >>> import matplotlib.pyplot as plt
+  >>> import matplotlib.pyplot as plt # doctest: +SKIP
   >>> sm = SkyModel()
 
   >>> filename = os.path.join(DATA_PATH, "gleam_50srcs.vot")
