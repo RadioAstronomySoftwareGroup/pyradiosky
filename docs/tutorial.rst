@@ -33,21 +33,15 @@ a) FHD
   >>> # file type specific `read_fhd_catalog` method.
   >>> filename = os.path.join(DATA_PATH, "fhd_catalog.sav")
   >>> sm.read(filename)
-  WARNING: Source IDs are not unique. Defining unique IDs.
   >>> sm.read(filename, filetype="fhd")
-  WARNING: Source IDs are not unique. Defining unique IDs.
   >>> sm.read_fhd_catalog(filename)
-  WARNING: Source IDs are not unique. Defining unique IDs.
 
   >>> # Use the `from_file` method to create SkyModel object without initalizing empty object, optionally specify
   >>> # the file type.
   >>> # FHD default: expand_extended=True. Can also use the file type specific `from_fhd_catalog` method.
   >>> sm = SkyModel.from_file(filename)
-  WARNING: Source IDs are not unique. Defining unique IDs.
   >>> sm = SkyModel.from_file(filename, filetype="fhd")
-  WARNING: Source IDs are not unique. Defining unique IDs.
   >>> sm = SkyModel.from_fhd_catalog(filename)
-  WARNING: Source IDs are not unique. Defining unique IDs.
 
 b) GLEAM
 ********
@@ -475,8 +469,7 @@ b) creating and writing out point catalog, using calculate_rise_set_lsts and cle
 
   >>> print(sm.name)
   ['zen_source']
-  >>> print(sm.history)
-  drawn from zenith_skymodel in test_skymodel.py  Read/written with pyradiosky version: 0.1.4.dev20+g741a955.
+  >>> # print(sm.history) to learn where the sky model is drawn from and how it is read/written
   >>> sm.update_positions(time, array_location)
 
   >>> sm.calculate_rise_set_lsts(array_location.lat)
@@ -487,11 +480,8 @@ b) creating and writing out point catalog, using calculate_rise_set_lsts and cle
 
   >>> # coherency in local alt/az basis can be different from coherency in ra/dec basis
   >>> print(sm.coherency_calc()[:,:,0,0])
-  [[-0.13066397+0.j  -0.3197858 -0.5j]
-   [-0.3197858 +0.5j  1.13066397+0.j ]] Jy
-  >>> print(sm.coherency_radec[:,:,0,0])
-  [[1. +0.j  0.5-0.5j]
-   [0.5+0.5j 0. +0.j ]] Jy
+  [[0.5+0.j 0. +0.j]
+   [0. +0.j 0.5+0.j]] Jy
 
   >>> print(sm.time)
   2015-03-01 00:00:00.000
@@ -905,15 +895,15 @@ b) spectral index spectral type
 
   >>> filename = os.path.join(DATA_PATH, "fhd_catalog.sav")
   >>> sm.read_fhd_catalog(filename)
-  WARNING: Source IDs are not unique. Defining unique IDs.
 
   >>> # correction done since catalog reference frequencies had wrong power
+  >>> sm.reference_frequency = sm.reference_frequency*10**6
   >>> print(np.unique(sm.reference_frequency))
   [7.40000000e+07 1.80000000e+08 1.81000000e+08 2.15675003e+08] Hz
 
   >>> print(sm.stokes.value[0,0,8235])
   0.5017849802970886
-  >>> print(sm.reference_frequency[8235]
+  >>> print(sm.reference_frequency[8235])
   215675003.0517578 Hz
   >>> # last component (at index 8325) was chosen due to nonzero spectral index
   >>> print(sm.spectral_index[8235])
