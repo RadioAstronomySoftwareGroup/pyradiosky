@@ -360,8 +360,8 @@ c) incorporating astropy healpix package (like plotting pixels), changing compon
   439.74226071262797 arcmin
 
   >>> coord = SkyCoord("00h42m44.3503s +41d16m08.634s", frame="galactic")
-  >>> print(hp.interpolate_bilinear_skycoord(coord, sm.stokes.value[0,0,:]))
-  6540.375582405898
+  >>> print(round(hp.interpolate_bilinear_skycoord(coord, sm.stokes.value[0,0,:])))
+  6540
 
   >>> a = (sm.gl.radian/math.pi)[:3]
   >>> z = np.cos(sm.gb.radian)[:3]
