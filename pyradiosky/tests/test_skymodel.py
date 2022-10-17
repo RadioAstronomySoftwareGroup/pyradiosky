@@ -519,7 +519,8 @@ def test_init_lists(spec_type, param, zenith_skycoord):
         (
             "spectral_index",
             "reference_frequency",
-            "If reference_frequency is supplied as a list, all the elements must be Quantity objects with compatible units.",
+            "If reference_frequency is supplied as a list, all the elements must be "
+            "Quantity objects with compatible units.",
         ),
         (
             "spectral_index",
@@ -531,7 +532,8 @@ def test_init_lists(spec_type, param, zenith_skycoord):
         (
             "spectral_index",
             "reference_frequency_obj",
-            "If reference_frequency is supplied as a list, all the elements must be Quantity objects with compatible units.",
+            "If reference_frequency is supplied as a list, all the elements must be "
+            "Quantity objects with compatible units.",
         ),
         (
             "subband",
@@ -791,7 +793,8 @@ def test_skymodel_deprecated(time_location):
     # test numpy array for reference_frequency
     with uvtest.check_warnings(
         DeprecationWarning,
-        match="In version 0.2.0, the reference_frequency will be required to be an astropy Quantity",
+        match="In version 0.2.0, the reference_frequency will be required to be an "
+        "astropy Quantity",
     ):
         source_old = SkyModel(
             name="Test",
@@ -809,7 +812,8 @@ def test_skymodel_deprecated(time_location):
         [UserWarning, DeprecationWarning],
         match=[
             "reference_frequency is a list. Attempting to convert to a Quantity.",
-            "In version 0.2.0, the reference_frequency will be required to be an astropy Quantity",
+            "In version 0.2.0, the reference_frequency will be required to be an "
+            "astropy Quantity",
         ],
     ):
         source_old = SkyModel(
@@ -1181,14 +1185,7 @@ def test_assign_to_healpix_fullsky(assign_hpx_data, spectral_type):
 
 @pytest.mark.parametrize(
     "frame,err_type,err_msg",
-    [
-        (
-            None,
-            ValueError,
-            "This method requires a coordinate frame but None was supplied",
-        ),
-        ("gcrs", ValueError, "Supplied frame GCRS is not supported at this time."),
-    ],
+    [("gcrs", ValueError, "Supplied frame GCRS is not supported at this time.")],
 )
 def test_assign_to_healpix_frame_errors(assign_hpx_data, frame, err_type, err_msg):
     nside, _, sky = assign_hpx_data
@@ -1205,23 +1202,27 @@ def test_assign_to_healpix_frame_errors(assign_hpx_data, frame, err_type, err_ms
 
 def test_assign_to_healpix_frame_inst_none(assign_hpx_data):
     nside, _, sky = assign_hpx_data
-    sky._frame_inst = None
-    assert sky.frame == "icrs"
+    assert sky.skycoord.frame.name == "icrs"
     sky.assign_to_healpix(nside, inplace=True)
-    assert sky._frame_inst.name == sky.frame
+    assert sky.hpx_frame == "icrs"
 
 
 def test_assign_healpix_frame_override_attribute(assign_hpx_data):
     nside, _, sky = assign_hpx_data
-    sky.frame = "foobar"
-    assert sky.frame == "foobar"
-    warn_msg = (
-        "Input parameter frame (value: icrs) differs from the frame attribute "
-        "on this object (value: foobar"
-    )
-    with uvtest.check_warnings(UserWarning, warn_msg):
+    sky.skycoord = sky.skycoord.transform_to("fk5")
+    assert sky.skycoord.frame.name == "fk5"
+    with uvtest.check_warnings(
+        [DeprecationWarning, UserWarning],
+        match=[
+            "The frame keyword is deprecated, in the future",
+            re.escape(
+                "Input parameter frame (value: icrs) differs from the skycoord "
+                "frame on this object (value: fk5)"
+            ),
+        ],
+    ):
         sky.assign_to_healpix(nside, frame="icrs", inplace=True)
-    assert sky.frame == "icrs"
+    assert sky.hpx_frame == "icrs"
 
 
 def test_assign_to_healpix_errors(assign_hpx_data):
@@ -1423,7 +1424,7 @@ def test_calc_vector_rotation(time_location):
 
 @pytest.mark.parametrize("spectral_type", ["flat", "full"])
 def test_pol_rotator(time_location, spectral_type):
-    """Test that when above_horizon is unset, the coherency rotation is done for all polarized sources."""
+    """Test coherency rotation is done for all polarized sources no horizon info."""
     time, telescope_location = time_location
 
     Nsrcs = 50
@@ -1763,17 +1764,16 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
         "extended_model_group",
         "beam_amp",
         "stokes_error",
-        "lon",
-        "lat",
+        "skycoord",
         "name",
         "spectral_index",
     ],
 )
 def test_concat_optional_params(param, healpix_disk_new):
-    if param in ["lon", "lat", "name"]:
+    if param in ["skycoord", "name"]:
         skyobj_full = healpix_disk_new
-        if param in ["lon", "lat"]:
-            skyobj_full.lon, skyobj_full.lat = skyobj_full.get_lon_lat()
+        if param == "skycoord":
+            skyobj_full.skycoord = SkyCoord(*skyobj_full.get_lon_lat())
         else:
             skyobj_full.name = np.array(
                 ["hpx" + str(ind) for ind in skyobj_full.hpx_inds]
@@ -1812,15 +1812,10 @@ def test_concat_optional_params(param, healpix_disk_new):
 
     assert skyobj_new.filename == [input_filename + "_1", input_filename + "_2"]
 
-    if param not in ["lon", "lat", "name"]:
+    if param not in ["skycoord", "name"]:
         assert getattr(skyobj_new, param) is not None
     else:
         assert (getattr(skyobj_new, "_" + param)).value is None
-        if param in ["lon", "lat"]:
-            with uvtest.check_warnings(
-                DeprecationWarning, f"{param} is no longer a required parameter"
-            ):
-                assert getattr(skyobj_new, param) is not None
 
     skyobj_new.history = skyobj_full.history
 
@@ -1843,7 +1838,7 @@ def test_concat_optional_params(param, healpix_disk_new):
                 skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
             ].tolist()
         )
-    elif param not in ["lon", "lat", "name"]:
+    elif param not in ["skycoord", "name"]:
         assert np.allclose(
             getattr(skyobj_new, param)[
                 :, :, skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
@@ -1862,7 +1857,7 @@ def test_concat_optional_params(param, healpix_disk_new):
         ).all()
     elif param == "extended_model_group":
         assert np.all(getattr(skyobj_new, param)[: skyobj_full.Ncomponents // 2] == "")
-    elif param not in ["lon", "lat", "name"]:
+    elif param not in ["skycoord", "name"]:
         assert np.isnan(
             getattr(skyobj_new, param)[:, :, : skyobj_full.Ncomponents // 2]
         ).all()
@@ -1877,7 +1872,7 @@ def test_concat_optional_params(param, healpix_disk_new):
     with uvtest.check_warnings(UserWarning, f"This object has {param}"):
         skyobj_new = skyobj1.concat(skyobj2, inplace=False)
 
-    if param not in ["lon", "lat", "name"]:
+    if param not in ["skycoord", "name"]:
         assert getattr(skyobj_new, param) is not None
     else:
         assert (getattr(skyobj_new, "_" + param)).value is None
@@ -1895,7 +1890,7 @@ def test_concat_optional_params(param, healpix_disk_new):
             == getattr(skyobj_full, param)[: skyobj_full.Ncomponents // 2].tolist()
         )
 
-    elif param not in ["lon", "lat", "name"]:
+    elif param not in ["skycoord", "name"]:
         assert np.allclose(
             getattr(skyobj_new, param)[:, :, : skyobj_full.Ncomponents // 2],
             getattr(skyobj_full, param)[:, :, : skyobj_full.Ncomponents // 2],
@@ -1920,7 +1915,7 @@ def test_concat_optional_params(param, healpix_disk_new):
             ]
             == ""
         )
-    elif param not in ["lon", "lat", "name"]:
+    elif param not in ["skycoord", "name"]:
         assert np.isnan(
             getattr(skyobj_new, param)[
                 :, :, skyobj_full.Ncomponents // 2 : skyobj_full.Ncomponents
@@ -2025,7 +2020,8 @@ def test_read_healpix_hdf5_old(healpix_data):
 
     with uvtest.check_warnings(
         DeprecationWarning,
-        match="This function is deprecated, use `SkyModel.read_skyh5` or `SkyModel.read_healpix_hdf5` instead.",
+        match="This function is deprecated, use `SkyModel.read_skyh5` or "
+        "`SkyModel.read_healpix_hdf5` instead.",
     ):
         hpmap, inds, freqs = skymodel.read_healpix_hdf5(
             os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
@@ -2100,7 +2096,8 @@ def test_order_healpix_to_sky(healpix_data, hpx_order):
     hmap_orig = np.repeat(hmap_orig[None, :], 10, axis=0)
 
     warn_msg = [
-        "This function is deprecated, use `SkyModel.read_skyh5` or `SkyModel.read_healpix_hdf5` instead.",
+        "This function is deprecated, use `SkyModel.read_skyh5` or "
+        "`SkyModel.read_healpix_hdf5` instead.",
         "In version 0.3.0, the frame keyword will be required for HEALPix maps.",
     ]
     # the none option doesn't issue the frame warning so drop it
@@ -2188,7 +2185,8 @@ def test_read_write_healpix_oldfunction(tmp_path, healpix_data):
 
     with uvtest.check_warnings(
         DeprecationWarning,
-        match="This function is deprecated, use `SkyModel.read_skyh5` or `SkyModel.read_healpix_hdf5` instead.",
+        match="This function is deprecated, use `SkyModel.read_skyh5` or "
+        "`SkyModel.read_healpix_hdf5` instead.",
     ):
         hpmap_new, inds_new, freqs_new = skymodel.read_healpix_hdf5(filename)
 
@@ -2357,7 +2355,7 @@ def test_healpix_positions(tmp_path, time_location):
 
     with pytest.raises(
         ValueError,
-        match="For healpix component types, the coherency_radec parameter must have a "
+        match="For healpix component types, the frame_coherency parameter must have a "
         "unit that can be converted to",
     ):
         skyobj = SkyModel(
@@ -2368,7 +2366,8 @@ def test_healpix_positions(tmp_path, time_location):
             spectral_type="full",
             frame="icrs",
         )
-        skyobj.coherency_radec = skyobj.coherency_radec.value * units.m
+        skyobj.calc_frame_coherency()
+        skyobj.frame_coherency = skyobj.frame_coherency.value * units.m
         skyobj.check()
 
     with uvtest.check_warnings(
@@ -2812,6 +2811,7 @@ def test_select_field(spec_type, init_kwargs):
         name=ids,
         ra=ras,
         dec=decs,
+        frame="icrs",
         stokes=stokes,
         spectral_type=spec_type,
         **init_kwargs,
@@ -2820,28 +2820,30 @@ def test_select_field(spec_type, init_kwargs):
     lon_range = Longitude([90, 240], units.deg)
     skyobj2 = skyobj.copy()
     skyobj2.select(lon_range=lon_range)
-    assert np.all(skyobj2.lon >= lon_range[0])
-    assert np.all(skyobj2.lon <= lon_range[1])
+    assert np.all(skyobj2.skycoord.ra >= lon_range[0])
+    assert np.all(skyobj2.skycoord.ra <= lon_range[1])
 
     lat_range = Latitude([-45, 45], units.deg)
     skyobj2 = skyobj.copy()
     skyobj2.select(lat_range=lat_range)
-    assert np.all(skyobj2.lat >= lat_range[0])
-    assert np.all(skyobj2.lat <= lat_range[1])
+    assert np.all(skyobj2.skycoord.dec >= lat_range[0])
+    assert np.all(skyobj2.skycoord.dec <= lat_range[1])
 
     skyobj2 = skyobj.copy()
     skyobj2.select(lon_range=lon_range, lat_range=lat_range)
-    assert np.all(skyobj2.lon >= lon_range[0])
-    assert np.all(skyobj2.lon <= lon_range[1])
-    assert np.all(skyobj2.lat >= lat_range[0])
-    assert np.all(skyobj2.lat <= lat_range[1])
+    assert np.all(skyobj2.skycoord.ra >= lon_range[0])
+    assert np.all(skyobj2.skycoord.ra <= lon_range[1])
+    assert np.all(skyobj2.skycoord.dec >= lat_range[0])
+    assert np.all(skyobj2.skycoord.dec <= lat_range[1])
 
     # test wrapping longitude
     lon_range = Longitude([270, 90], units.deg)
     skyobj2 = skyobj.copy()
     skyobj2.select(lon_range=lon_range)
     assert (
-        np.nonzero((skyobj.lon > lon_range[0]) & (skyobj.lon < lon_range[1]))[0].size
+        np.nonzero(
+            (skyobj.skycoord.ra > lon_range[0]) & (skyobj.skycoord.ra < lon_range[1])
+        )[0].size
         == 0
     )
 
@@ -3557,8 +3559,8 @@ def test_point_catalog_reader():
     )
 
     assert sorted(skyobj.name) == sorted(catalog_table["source_id"])
-    assert np.allclose(skyobj.ra.deg, catalog_table["ra_j2000"])
-    assert np.allclose(skyobj.dec.deg, catalog_table["dec_j2000"])
+    assert np.allclose(skyobj.skycoord.ra.deg, catalog_table["ra_j2000"])
+    assert np.allclose(skyobj.skycoord.dec.deg, catalog_table["dec_j2000"])
     assert np.allclose(
         skyobj.stokes[0, :].to("Jy").value, catalog_table["flux_density"]
     )
@@ -3612,7 +3614,7 @@ def test_catalog_file_writer(tmp_path):
     names = "zen_source"
     stokes = [1.0, 0, 0, 0] * units.Jy
     zenith_source = SkyModel(
-        name=names, ra=ra, dec=dec, stokes=stokes, spectral_type="flat"
+        name=names, ra=ra, dec=dec, frame="icrs", stokes=stokes, spectral_type="flat"
     )
 
     fname = os.path.join(tmp_path, "temp_cat.txt")
@@ -3770,7 +3772,7 @@ def test_read_text_errors(tmp_path):
     skyobj.write_text_catalog(fname)
     with fileinput.input(files=fname, inplace=True) as infile:
         for line in infile:
-            line = line.replace("SOURCE_ID", "NAME")
+            line = line.replace("source_id", "name")
             print(line, end="")
 
     with pytest.raises(ValueError, match="Header does not match expectations."):
@@ -4198,7 +4200,7 @@ def test_skyh5_units(tmpdir):
 @pytest.mark.parametrize(
     "param,value,errormsg",
     [
-        ("name", None, "Component type is point but 'name' is missing in file."),
+        ("name", None, "Expected parameter name is missing in file"),
         ("Ncomponents", 5, "Ncomponents is not equal to the size of 'name'."),
         ("Nfreqs", 10, "Nfreqs is not equal to the size of 'freq_array'."),
     ],
@@ -4224,12 +4226,9 @@ def test_skyh5_read_errors(mock_point_skies, param, value, errormsg, tmpdir):
 @pytest.mark.parametrize(
     "param,value,errormsg",
     [
-        ("nside", None, "Component type is healpix but 'nside' is missing in file."),
-        (
-            "hpx_inds",
-            None,
-            "Component type is healpix but 'hpx_inds' is missing in file.",
-        ),
+        ("nside", None, "Expected parameter nside is missing in file."),
+        ("hpx_inds", None, "Expected parameter hpx_inds is missing in file."),
+        ("hpx_frame", None, "Expected parameter hpx_frame is missing in file."),
         ("Ncomponents", 10, "Ncomponents is not equal to the size of 'hpx_inds'."),
     ],
 )
@@ -4374,18 +4373,19 @@ def test_skymodel_init_with_frame(coord_kwds, err_msg, exp_frame):
             SkyModel(**coord_kwds)
     else:
         sky = SkyModel(**coord_kwds)
-        assert sky.frame == exp_frame
+        assert sky.skycoord.frame.name == exp_frame
+        lon, lat = sky.get_lon_lat()
         if exp_frame == "galactic":
-            assert sky.lon == sky.gl
-            assert sky.lat == sky.gb
+            assert lon == sky.skycoord.l
+            assert lat == sky.skycoord.b
         if exp_frame == "icrs":
-            assert sky.lon == sky.ra
-            assert sky.lat == sky.dec
+            assert lon == sky.skycoord.ra
+            assert lat == sky.skycoord.dec
 
 
 def test_skymodel_init_galactic_warning():
-    with uvtest.check_warnings(
-        UserWarning, match="Warning: Galactic coordinates gl and gb were given, but"
+    with pytest.raises(
+        ValueError, match="gl or gb supplied but specified frame icrs does not support"
     ):
         SkyModel(
             name=["src"],
@@ -4400,21 +4400,11 @@ def test_skymodel_init_galactic_warning():
 # This filter can be removed when lunarsky is updated to not trigger this
 # astropy deprecation warning.
 @pytest.mark.filterwarnings("ignore:The get_frame_attr_names")
-def test_skymodel_transform_unsupported_frame(zenith_skymodel):
-    with pytest.raises(
-        ValueError, match="Supplied frame GCRS is not supported at this time."
-    ):
-        zenith_skymodel.transform_to("gcrs")
-
-
-# This filter can be removed when lunarsky is updated to not trigger this
-# astropy deprecation warning.
-@pytest.mark.filterwarnings("ignore:The get_frame_attr_names")
 def test_skymodel_tranform_frame(zenith_skymodel, zenith_skycoord):
     zenith_skymodel.transform_to("galactic")
     zenith_skycoord = zenith_skycoord.transform_to("galactic")
 
-    assert zenith_skymodel.frame == "galactic"
+    assert zenith_skymodel.skycoord.frame.name == "galactic"
     assert units.allclose(zenith_skymodel.gl, zenith_skycoord.l)
     assert units.allclose(zenith_skymodel.gb, zenith_skycoord.b)
 
@@ -4428,7 +4418,7 @@ def test_skymodel_tranform_frame_roundtrip(zenith_skymodel, zenith_skycoord):
     zenith_skymodel.transform_to("galactic")
     zenith_skycoord = zenith_skycoord.transform_to("galactic")
 
-    assert zenith_skymodel.frame == "galactic"
+    assert zenith_skymodel.skycoord.frame.name == "galactic"
     assert units.allclose(zenith_skymodel.gl, zenith_skycoord.l)
     assert units.allclose(zenith_skymodel.gb, zenith_skycoord.b)
     zenith_skymodel.transform_to("icrs")
@@ -4447,12 +4437,12 @@ def test_skymodel_transform_healpix_error(healpix_disk_new):
 def test_skyh5_write_frames(healpix_disk_new, tmpdir, frame):
     sky = healpix_disk_new
 
-    sky.frame = frame
+    sky.hpx_frame = frame
     outfile = tmpdir.join("testfile.skyh5")
     sky.write_skyh5(outfile)
 
     new_sky = SkyModel.from_file(outfile)
-    assert new_sky.frame == frame
+    assert new_sky.hpx_frame == frame
 
 
 def test_skyh5_write_read_no_frame(healpix_disk_new, tmpdir):
@@ -4463,25 +4453,30 @@ def test_skyh5_write_read_no_frame(healpix_disk_new, tmpdir):
 
     with h5py.File(outfile, "a") as h5file:
         header = h5file["/Header"]
-        assert header["frame"][()].tobytes().decode("utf-8") == "icrs"
-        del header["frame"]
+        assert header["hpx_frame"][()].tobytes().decode("utf-8") == "icrs"
+        del header["hpx_frame"]
 
     with uvtest.check_warnings(
         UserWarning,
-        match=[
-            "No frame available in this file, assuming 'icrs'.",
-        ],
+        match="No frame available in this file, assuming 'icrs'. Consider re-writing "
+        "this file to ensure future compatility.",
     ):
         new_sky = SkyModel.from_file(outfile)
 
-    assert new_sky.frame == "icrs"
+    assert new_sky.hpx_frame == "icrs"
 
 
 def test_skymodel_transform_healpix(healpix_gsm_galactic, healpix_gsm_icrs):
     pytest.importorskip("astropy_healpix")
     sky_obj = healpix_gsm_galactic
+    print(sky_obj.hpx_frame)
+    sky_obj2 = sky_obj.copy()
     sky_obj.healpix_interp_transform("icrs")
 
+    print(sky_obj2.hpx_frame)
+    print(sky_obj.hpx_frame)
+
+    assert sky_obj2 != sky_obj
     assert sky_obj == healpix_gsm_icrs
 
 
@@ -4532,10 +4527,11 @@ def test_healpix_transform_polarized_error(healpix_gsm_galactic):
 
 def test_healpix_transform_full_sky(healpix_disk_new):
     astropy_healpix = pytest.importorskip("astropy_healpix")
+
     hp_obj = astropy_healpix.HEALPix(
         nside=healpix_disk_new.nside,
         order=healpix_disk_new.hpx_order,
-        frame=healpix_disk_new._frame_inst,
+        frame=healpix_disk_new.hpx_frame,
     )
 
     # get rid of half the data
@@ -4553,10 +4549,7 @@ def test_old_skyh5_reading_ra_dec():
     testfile = os.path.join(SKY_DATA_PATH, "old_skyh5_point_sources.skyh5")
     with uvtest.check_warnings(
         UserWarning,
-        match=[
-            "Parameter lon not found in skyh5 file.",
-            "Parameter lat not found in skyh5 file.",
-        ],
+        match="Parameter skycoord not found in skyh5 file.",
     ):
         sky = SkyModel.from_file(testfile)
     assert sky.check()
