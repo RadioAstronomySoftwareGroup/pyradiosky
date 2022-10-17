@@ -19,7 +19,10 @@ setup_args = {
     "author": "Radio Astronomy Software Group",
     "url": "https://github.com/RadioAstronomySoftwareGroup/pyradiosky",
     "license": "BSD",
-    "description": "Python objects and interfaces for representing diffuse, extended and compact astrophysical radio sources",
+    "description": (
+        "Python objects and interfaces for representing diffuse, extended and "
+        "compact astrophysical radio sources"
+    ),
     "long_description": readme,
     "long_description_content_type": "text/markdown",
     "package_dir": {"pyradiosky": "pyradiosky"},

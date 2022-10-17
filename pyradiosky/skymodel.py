@@ -3,8 +3,9 @@
 # Licensed under the 3-clause BSD License
 """Define SkyModel class and helper functions."""
 
-import warnings
 import os
+import re
+import warnings
 
 import h5py
 import numpy as np
@@ -19,6 +20,8 @@ from astropy.coordinates import (
     frame_transform_graph,
     Galactic,
     ICRS,
+    concatenate as sc_concatenate,
+    BaseCoordinateFrame,
 )
 from astropy.time import Time
 import astropy.units as units
@@ -106,6 +109,170 @@ def _get_matching_fields(
         else:
             return None
     return match_list[0]
+
+
+def _get_lon_lat_component_names(frame_obj):
+    comp_dict = frame_obj.get_representation_component_names()
+    inv_dict = {val: key for key, val in comp_dict.items()}
+
+    return inv_dict["lon"], inv_dict["lat"]
+
+
+def _get_frame_desc_str(frame_obj):
+    if len(frame_obj.frame_attributes) == 0:
+        # this covers icrs and galactic (maybe others?)
+        frame_desc_str = frame_obj.name
+    elif frame_obj.name == "fk5" and frame_obj.equinox == Time("j2000"):
+        # this is for backwards compatibility and standards in the literature
+        # coordinates reported in J2000 implicitly means FK5 unless otherwise stated
+        frame_desc_str = "j2000"
+    elif frame_obj.name == "fk4" and frame_obj.equinox == Time("b1950"):
+        # this is for backwards compatibility and standards in the literature
+        # coordinates reported in B1950 implicitly means FK4 unless otherwise stated
+        frame_desc_str = "b1950"
+    elif frame_obj.name == "fk5":
+        frame_desc_str = frame_obj.name + "_" + frame_obj.equinox.jyear_str
+    elif frame_obj.name == "fk4":
+        frame_desc_str = frame_obj.name + "_" + frame_obj.equinox.byear_str
+    else:
+        raise ValueError(f"{frame_obj.name} is not supported for writing text files.")
+    return frame_desc_str
+
+
+def _get_frame_comp_cols(colnames):
+    frame_use = None
+    frame_names = frame_transform_graph.get_names()
+    lon_col = None
+    lat_col = None
+    ra_fk5_pattern = re.compile("ra[_]*j2000")
+    dec_fk5_pattern = re.compile("de[c_]*j2000")
+    ra_fk4_pattern = re.compile("ra[_]*b1950")
+    dec_fk4_pattern = re.compile("de[c_]*b1950")
+    for name in colnames:
+        if (
+            ra_fk5_pattern.match(name.lower()) is not None
+            or dec_fk5_pattern.match(name.lower()) is not None
+        ):
+            frame_use = SkyCoord(0, 0, unit="deg", frame="fk5").frame
+            break
+        elif (
+            ra_fk4_pattern.match(name.lower()) is not None
+            or dec_fk4_pattern.match(name.lower()) is not None
+        ):
+            frame_use = SkyCoord(0, 0, unit="deg", frame="fk4").frame
+            break
+
+        for frame in frame_names:
+            if frame in name.lower():
+                frame_use = frame
+                break
+        if frame_use is not None:
+            break
+
+    if isinstance(frame_use, str):
+        default_frame = SkyCoord(0, 0, unit="deg", frame=frame_use)
+        lon_name, lat_name = _get_lon_lat_component_names(default_frame)
+        for name in colnames:
+            if lon_name in name.lower():
+                lon_col = name
+            if lat_name in name.lower():
+                lat_col = name
+            if lon_col is not None and lat_col is not None:
+                break
+        frame_str = lon_col.lower().split(lon_name + "_", 1)[1]
+
+        if frame_str == frame_use:
+            frame_use = default_frame.frame
+        elif frame_use in ["fk4", "fk5"]:
+            equinox = Time(frame_str.split("_equinox", 1)[1])
+            frame_use = SkyCoord(
+                0, 0, unit="deg", frame=frame_use, equinox=equinox
+            ).frame
+    else:
+        if frame_use.name == "fk5":
+            for name in colnames:
+                if ra_fk5_pattern.match(name.lower()):
+                    lon_col = name
+                if dec_fk5_pattern.match(name.lower()):
+                    lat_col = name
+                if lon_col is not None and lat_col is not None:
+                    break
+        else:
+            for name in colnames:
+                if ra_fk4_pattern.match(name.lower()):
+                    lon_col = name
+                if dec_fk4_pattern.match(name.lower()):
+                    lat_col = name
+                if lon_col is not None and lat_col is not None:
+                    break
+
+    if lon_col is None:
+        raise ValueError("Longitudinal component column not identified.")
+    if lat_col is None:
+        raise ValueError("Latitudinal component column not identified.")
+
+    if not isinstance(frame_use, BaseCoordinateFrame):
+        raise ValueError(f"frame {frame_use} not recognized from coordinate column")
+    return frame_use, lon_col, lat_col
+
+
+def _add_value_hdf5_group(group, name, value, expected_type):
+    # Extra attributes for astropy Quantity-derived classes.
+    unit = None
+    angtype = None
+    if isinstance(value, units.Quantity):
+        if isinstance(value, Latitude):
+            angtype = "latitude"
+        elif isinstance(value, Longitude):
+            angtype = "longitude"
+        # Use `str` to ensure this works for Composite units as well.
+        unit = str(value.unit)
+        value = value.value
+
+    if isinstance(value, Time):
+        value = str(value)
+
+    try:
+        dtype = value.dtype
+    except AttributeError:
+        dtype = np.dtype(type(value))
+
+    # Strings and arrays of strings require special handling.
+    if dtype.kind == "U" or expected_type == str:
+        if isinstance(value, (list, np.ndarray)):
+            group[name] = np.asarray(value, dtype="bytes")
+        else:
+            group[name] = np.string_(value)
+    else:
+        group[name] = value
+
+    if unit is not None:
+        group[name].attrs["unit"] = unit
+    if angtype is not None:
+        group[name].attrs["angtype"] = angtype
+
+
+def _get_value_hdf5_group(group, name, expected_type):
+    dset = group[name]
+
+    value = dset[()]
+
+    if "unit" in dset.attrs:
+        value *= units.Unit(dset.attrs["unit"])
+
+    angtype = dset.attrs.get("angtype", None)
+
+    if angtype == "latitude":
+        value = Latitude(value)
+    elif angtype == "longitude":
+        value = Longitude(value)
+
+    if expected_type is str:
+        if isinstance(value, np.ndarray):
+            value = np.array([n.tobytes().decode("utf8") for n in value[:]])
+        else:
+            value = value.tobytes().decode("utf8")
+    return value
 
 
 class SkyModel(UVBase):
@@ -211,6 +378,7 @@ class SkyModel(UVBase):
             self._hpx_inds.required = False
             self._nside.required = False
             self._hpx_order.required = False
+            self._hpx_frame.required = False
 
     def __init__(
         self,
@@ -595,6 +763,23 @@ class SkyModel(UVBase):
                         raise ValueError(f"Invalid frame name {frame}.")
                     frame = frame_class()
 
+                if (ra is not None) and (dec is not None):
+                    frame_obj = SkyCoord(0, 0, unit="deg", frame=frame)
+                    comp_names = _get_lon_lat_component_names(frame_obj)
+                    if comp_names[0] != "ra" or comp_names[1] != "dec":
+                        raise ValueError(
+                            f"ra or dec supplied but specified frame {frame.name} does "
+                            "not support ra and dec coordinate."
+                        )
+                elif (gl is not None) and (gb is not None):
+                    frame_obj = SkyCoord(0, 0, unit="deg", frame=frame)
+                    comp_names = _get_lon_lat_component_names(frame_obj)
+                    if comp_names[0] != "l" or comp_names[1] != "b":
+                        raise ValueError(
+                            f"gl or gb supplied but specified frame {frame.name} does "
+                            "not support l and b coordinates."
+                        )
+
                 if lon is not None:
                     if not isinstance(lon, Longitude):
                         if not isinstance(lon, (list, np.ndarray, tuple)):
@@ -689,7 +874,7 @@ class SkyModel(UVBase):
                         category=DeprecationWarning,
                     )
                     self.hpx_frame = "icrs"
-                    frame = frame_transform_graph.lookup_name(frame)()
+                    frame = frame_transform_graph.lookup_name(self.hpx_frame)()
                 else:
                     self.hpx_frame = frame
 
@@ -710,11 +895,11 @@ class SkyModel(UVBase):
                     )
                     try:
                         freq_array = Quantity(freq_array)
-                    except (TypeError):
+                    except TypeError as err:
                         raise ValueError(
                             "If freq_array is supplied as a list, all the elements must be "
                             "Quantity objects with compatible units."
-                        )
+                        ) from err
                 if not isinstance(freq_array, (Quantity,)) or freq_array.unit == "":
                     # This catches arrays or lists that have all numeric types
                     warnings.warn(
@@ -735,23 +920,24 @@ class SkyModel(UVBase):
                     # the elements are Quantities with compatible units or if all the
                     # elements are just numeric (in which case the units will be "").
                     warnings.warn(
-                        "reference_frequency is a list. Attempting to convert to a Quantity.",
+                        "reference_frequency is a list. Attempting to convert to a "
+                        "Quantity.",
                     )
                     try:
                         reference_frequency = Quantity(reference_frequency)
-                    except (TypeError):
+                    except TypeError as err:
                         raise ValueError(
-                            "If reference_frequency is supplied as a list, all the elements must be "
-                            "Quantity objects with compatible units."
-                        )
+                            "If reference_frequency is supplied as a list, all the "
+                            "elements must be Quantity objects with compatible units."
+                        ) from err
                 if (
                     not isinstance(reference_frequency, (Quantity,))
                     or reference_frequency.unit == ""
                 ):
                     # This catches arrays or lists that have all numeric types
                     warnings.warn(
-                        "In version 0.2.0, the reference_frequency will be required to be an "
-                        "astropy Quantity with units that are convertable to Hz. "
+                        "In version 0.2.0, the reference_frequency will be required to "
+                        "be an astropy Quantity with units that are convertable to Hz. "
                         "Currently, floats are assumed to be in Hz.",
                         category=DeprecationWarning,
                     )
@@ -811,7 +997,8 @@ class SkyModel(UVBase):
             if beam_amp is not None:
                 self.beam_amp = beam_amp
 
-            # Indices along the component axis, such that the source is polarized at any frequency.
+            # Indices along the component axis, such that the source is polarized at
+            # any frequency.
             self._polarized = np.where(
                 np.any(np.sum(self.stokes[1:, :, :], axis=0) != 0.0, axis=0)
             )[0]
@@ -840,38 +1027,24 @@ class SkyModel(UVBase):
 
         Also Provide ra and dec for healpix objects with deprecation warnings.
         """
-        if self.component_type == "healpix":
-            if name == "lon":
-                warnings.warn(
-                    "lon is no longer a required parameter on Healpix objects and the "
-                    "value is currently None. Use `get_lon_lat` to get the lon and lat "
-                    "values for Healpix components. Starting in version 0.3.0 this call "
-                    "will return None.",
-                    category=DeprecationWarning,
-                )
-                lon, _ = self.get_lon_lat()
-                return lon
-            elif name == "lat":
-                warnings.warn(
-                    "lat is no longer a required parameter on Healpix objects and the "
-                    "value is currently None. Use `get_lon_lat` to get the lon and lat "
-                    "values for Healpix components. Starting in version 0.3.0 this call "
-                    "will return None.",
-                    category=DeprecationWarning,
-                )
-                _, lat = self.get_lon_lat()
-                return lat
-
-        if (not name.startswith("__")) and self.skycoord.frame is not None:
-            comp_dict = self.skycoord.frame.get_representation_component_names()
-            # Naming for galactic is different from astropy:
-            if name == "gl":
-                name = "l"
-            if name == "gb":
-                name = "b"
-            if name in comp_dict:
-                coord = comp_dict[name]
-                return getattr(self.skycoord, coord)
+        if name == "lon":
+            warnings.warn(
+                "lon is no longer a parameter on SkyModel objects. Use "
+                "`get_lon_lat` to get the longitudinal and latidudinal values. "
+                "Starting in version 0.3.0 this call will error.",
+                category=DeprecationWarning,
+            )
+            lon, _ = self.get_lon_lat()
+            return lon
+        elif name == "lat":
+            warnings.warn(
+                "lat is no longer a parameter on SkyModel objects. Use "
+                "`get_lon_lat` to get the longitudinal and latidudinal values. "
+                "Starting in version 0.3.0 this call will error.",
+                category=DeprecationWarning,
+            )
+            _, lat = self.get_lon_lat()
+            return lat
 
         if name == "coherency_radec":
             warnings.warn(
@@ -887,8 +1060,39 @@ class SkyModel(UVBase):
 
             return self.frame_coherency
 
-        # TODO: capture Attribute error from asking for wrong coord type and suggest
-        # using the transform_to method
+        if name == "frame":
+            if self.skycoord is not None:
+                return self.skycoord.frame.name
+            else:
+                return self.hpx_frame
+
+        if not name.startswith("__"):
+            # Naming for galactic is different from astropy:
+            galactic_warning = False
+            if name == "gl":
+                galactic_warning = True
+                name = "l"
+            if name == "gb":
+                galactic_warning = True
+                name = "b"
+            comp_names = self._get_lon_lat_component_names()
+            if name in comp_names:
+                if self.skycoord is not None:
+                    if galactic_warning:
+                        warnings.warn(
+                            "gl and gb are no longer a parameters on SkyModel objects "
+                            "in the galactic frame. Use l and b instead. "
+                            "Starting in version 0.3.0 this call will error.",
+                            category=DeprecationWarning,
+                        )
+                    return getattr(self.skycoord, name)
+                warnings.warn(
+                    "It is more efficient to use the `get_lon_lat` method to get "
+                    "longitudinal and latitudinal coordinates for HEALPix maps.",
+                )
+                comp_ind = np.nonzero(np.array(comp_names) == name)[0][0]
+                lon_lat = self.get_lon_lat()
+                return lon_lat[comp_ind]
 
         # Error if attribute not found
         return super().__getattribute__(name)
@@ -931,14 +1135,11 @@ class SkyModel(UVBase):
     def ncomponent_length_params(self):
         """Iterate over ncomponent length paramters."""
         # the filters below should be removed in version 0.3.0
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message="lon is no longer")
-            warnings.filterwarnings("ignore", message="lat is no longer")
-            param_list = (
-                param for param in self if getattr(self, param).form == ("Ncomponents",)
-            )
-            for param in param_list:
-                yield param
+        param_list = (
+            param for param in self if getattr(self, param).form == ("Ncomponents",)
+        )
+        for param in param_list:
+            yield param
 
     @property
     def _time_position_params(self):
@@ -1008,12 +1209,9 @@ class SkyModel(UVBase):
 
         # Run the basic check from UVBase
         # the filters below should be removed in version 0.3.0
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message="lon is no longer")
-            warnings.filterwarnings("ignore", message="lat is no longer")
-            super(SkyModel, self).check(
-                check_extra=check_extra, run_check_acceptability=run_check_acceptability
-            )
+        super(SkyModel, self).check(
+            check_extra=check_extra, run_check_acceptability=run_check_acceptability
+        )
 
         # make sure freq_array or reference_frequency if present is compatible with Hz
         if not (self.freq_array is None or self.freq_array.unit.is_equivalent("Hz")):
@@ -1087,10 +1285,7 @@ class SkyModel(UVBase):
         """Return a copy of this object."""
         # Overload this method to filter ra/dec warnings that shouldn't be issued.
         # this method should be removed in version 0.3.0
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message="lon is no longer")
-            warnings.filterwarnings("ignore", message="lat is no longer")
-            return super(SkyModel, self).copy()
+        return super(SkyModel, self).copy()
 
     def transform_to(self, frame):
         """Transform to a different skycoord coordinate frame.
@@ -1133,7 +1328,8 @@ class SkyModel(UVBase):
 
         This method is only available for a healpix type sky model.
         Computes the pixel centers for a HEALPix map in the new frame,
-        then interpolates the old map using :meth:`astropy_healpix.HEALPix.interpolate_bilinear_skycoord`.
+        then interpolates the old map using
+        :meth:`astropy_healpix.HEALPix.interpolate_bilinear_skycoord`.
 
         Conversion with this method may take some time as it must iterate over every
         frequency and stokes parameter individually.
@@ -1143,7 +1339,8 @@ class SkyModel(UVBase):
         since this would induce a Q <--> U rotation.
 
         Current implementation is equal to using a healpy.Rotator class to 1 part in 10^-5
-        (e.g :func:`numpy.allclose(healpy_rotated_map, interpolate_bilinear_skycoord, rtol=1e-5) is True`).
+        (e.g :func:`numpy.allclose(healpy_rotated_map, interpolate_bilinear_skycoord,
+        rtol=1e-5) is True`).
 
 
         Parameters
@@ -1277,8 +1474,7 @@ class SkyModel(UVBase):
         # the number of components can change when making this transformation!
         this.Ncomponents = this.stokes.shape[2]
 
-        this._frame_inst = frame
-        this._frame.value = frame.name
+        this._hpx_frame.value = frame.name
         # recalculate the coherency now that we are in the new frame
         if this.frame_coherency is not None:
             this.frame_coherency = this.calc_frame_coherency()
@@ -1388,17 +1584,15 @@ class SkyModel(UVBase):
         if self.frame_coherency is not None:
             self.frame_coherency = self.calc_frame_coherency()
 
-    def _get_lon_lat_component_names(self):
+    def _get_frame_obj(self):
         if self.component_type == "healpix":
             coord = SkyCoord(0, 0, frame=self.hpx_frame, unit="deg")
-            frame_obj = coord.frame
+            return coord.frame
         else:
-            frame_obj = self.skycoord.frame
+            return self.skycoord.frame
 
-        comp_dict = frame_obj.get_representation_component_names()
-        inv_dict = {val: key for key, val in comp_dict.items()}
-
-        return inv_dict["lon"], inv_dict["lat"]
+    def _get_lon_lat_component_names(self):
+        return _get_lon_lat_component_names(self._get_frame_obj())
 
     def get_lon_lat(self):
         """
@@ -1560,9 +1754,9 @@ class SkyModel(UVBase):
             self.frame_coherency = (
                 self.frame_coherency / astropy_healpix.nside_to_pixel_area(self.nside)
             )
+        self.hpx_frame = self.skycoord.frame.name
         self.name = None
-        self.lon = None
-        self.lat = None
+        self.skycoord = None
 
         if to_k:
             self.jansky_to_kelvin()
@@ -1730,7 +1924,8 @@ class SkyModel(UVBase):
             if sky.skycoord.frame.name != coords.frame.name:
                 warnings.warn(
                     f"Input parameter frame (value: {frame_obj.name}) differs "
-                    f"from the frame attribute on this object (value: {sky.skycoord.frame.name}). "
+                    f"from the skycoord frame on this object (value: "
+                    "{sky.skycoord.frame.name}). "
                     "Using input frame for coordinate calculations."
                 )
             sky.hpx_frame = frame_obj.name
@@ -1762,6 +1957,8 @@ class SkyModel(UVBase):
                 ind_dict[ind] = np.nonzero(hpx_inds == ind)[0]
                 first_inds.append(ind_dict[ind][0])
                 for param in sky.ncomponent_length_params:
+                    if param == "_skycoord":
+                        continue
                     attr = getattr(sky, param)
                     if attr.value is not None:
                         if np.unique(attr.value[ind_dict[ind]]).size > 1:
@@ -1773,7 +1970,7 @@ class SkyModel(UVBase):
                                     "using the `at_frequencies` method first or a "
                                     "larger nside."
                                 )
-                            elif param not in ["_lon", "_lat", "_name"]:
+                            elif param != "_name":
                                 raise ValueError(
                                     "Multiple components map to a single healpix pixel "
                                     f"and the {param_name} varies among them."
@@ -1892,7 +2089,7 @@ class SkyModel(UVBase):
             )
             new_obj = SkyModel(
                 component_type="healpix",
-                hpx_frame=sky.hpx_frame,
+                frame=sky.hpx_frame,
                 nside=sky.nside,
                 hpx_order=sky.hpx_order,
                 spectral_type=sky.spectral_type,
@@ -2040,10 +2237,16 @@ class SkyModel(UVBase):
 
                 message = "Some stokes values are NaNs."
                 if nan_handling == "propagate":
-                    message += " All output stokes values for sources with any NaN values will be NaN."
+                    message += (
+                        " All output stokes values for sources with any NaN values "
+                        "will be NaN."
+                    )
                 else:
                     message += " Interpolating using the non-NaN values only."
-                message += " You can change the way NaNs are handled using the `nan_handling` keyword."
+                message += (
+                    " You can change the way NaNs are handled using the "
+                    "`nan_handling` keyword."
+                )
                 warnings.warn(message)
                 stokes_arr = self.stokes.value
                 freq_arr = self.freq_array.to("Hz").value
@@ -2149,15 +2352,19 @@ class SkyModel(UVBase):
                         )
                     if len(wh_nan_high) > 0:
                         message = (
-                            f"{len(wh_nan_high)} components had all NaN stokes values above "
-                            "one or more of the requested frequencies. "
+                            f"{len(wh_nan_high)} components had all NaN stokes values "
+                            "above one or more of the requested frequencies. "
                         )
                         if nan_handling == "interp":
-                            message += "The stokes for these components at these frequencies will be NaN."
+                            message += (
+                                "The stokes for these components at these frequencies "
+                                "will be NaN."
+                            )
                         else:
                             message += (
-                                "Using the stokes value at the highest frequency without a "
-                                "NaN for these components at these frequencies."
+                                "Using the stokes value at the highest frequency "
+                                "without a NaN for these components at these "
+                                "frequencies."
                             )
                         warnings.warn(message)
                     if len(wh_nan_low) > 0:
@@ -2166,11 +2373,14 @@ class SkyModel(UVBase):
                             "one or more of the requested frequencies. "
                         )
                         if nan_handling == "interp":
-                            message += "The stokes for these components at these frequencies will be NaN."
+                            message += (
+                                "The stokes for these components at these frequencies "
+                                "will be NaN."
+                            )
                         else:
                             message += (
-                                "Using the stokes value at the lowest frequency without a "
-                                "NaN for these components at these frequencies."
+                                "Using the stokes value at the lowest frequency "
+                                "without a NaN for these components at these frequencies."
                             )
                         warnings.warn(message)
                     if len(wh_nan_many) > 0:
@@ -2246,6 +2456,11 @@ class SkyModel(UVBase):
         self.time = time
         self.telescope_location = telescope_location
 
+        if self.component_type == "healpix":
+            skycoord_use = SkyCoord(*self.get_lon_lat(), frame=self.hpx_frame)
+        else:
+            skycoord_use = self.skycoord
+
         # This filter can be removed when lunarsky is updated to not trigger this
         # astropy deprecation warning.
         with warnings.catch_warnings():
@@ -2253,11 +2468,11 @@ class SkyModel(UVBase):
                 "ignore",
                 message="The get_frame_attr_names",
             if isinstance(self.telescope_location, MoonLocation):
-                source_altaz = self.skycoord.transform_to(
+                source_altaz = skycoord_use.transform_to(
                     LunarTopo(obstime=self.time, location=self.telescope_location)
                 )
             else:
-                source_altaz = self.skycoord.transform_to(
+                source_altaz = skycoord_use.transform_to(
                     AltAz(obstime=self.time, location=self.telescope_location)
             )
 
@@ -2314,18 +2529,13 @@ class SkyModel(UVBase):
         y_c = np.array([0, 1.0, 0])
         z_c = np.array([0, 0, 1.0])
 
-        if self.component_type == "healpix":
-            frame_use = self.hpx_frame
-        else:
-            frame_use = self.skycoord.frame
-
         axes_frame = SkyCoord(
             x=x_c,
             y=y_c,
             z=z_c,
             obstime=self.time,
             location=self.telescope_location,
-            frame=frame_use,
+            frame=self._get_frame_obj(),
             representation_type="cartesian",
         )
 
@@ -2370,9 +2580,10 @@ class SkyModel(UVBase):
 
         n_inds = len(inds)
 
+        lon, lat = self.get_lon_lat()
         # Find mathematical points and vectors for RA/Dec
-        theta_frame = np.pi / 2.0 - self.lat.rad[inds]
-        phi_frame = self.lon.rad[inds]
+        theta_frame = np.pi / 2.0 - lat.rad[inds]
+        phi_frame = lon.rad[inds]
         frame_vec = sct.r_hat(theta_frame, phi_frame)
         assert frame_vec.shape == (3, n_inds)
 
@@ -2417,9 +2628,10 @@ class SkyModel(UVBase):
 
         basis_rotation_matrix = self._calc_rotation_matrix(inds)
 
+        lon, lat = self.get_lon_lat()
         # Find mathematical points and vectors for frame
-        theta_frame = np.pi / 2.0 - self.lat.rad[inds]
-        phi_frame = self.lon.rad[inds]
+        theta_frame = np.pi / 2.0 - lat.rad[inds]
+        phi_frame = lon.rad[inds]
 
         # Find mathematical points and vectors for Alt/Az
         theta_altaz = np.pi / 2.0 - self.alt_az[0, inds]
@@ -2677,7 +2889,7 @@ class SkyModel(UVBase):
                     )
                     setattr(this, param_name, None)
         else:
-            this.skycoord = np.concatenate((this.skycoord, other.skycoord))
+            this.skycoord = sc_concatenate((this.skycoord, other.skycoord))
 
         this.stokes = np.concatenate((this.stokes, other.stokes), axis=2)
 
@@ -2831,11 +3043,10 @@ class SkyModel(UVBase):
                 "lat_range must be 2 element range with the second component "
                 "larger than the first."
             )
+        _, lat_vals = self.get_lon_lat()
+        lat_vals = lat_vals[component_inds]
         component_inds = component_inds[
-            np.nonzero(
-                (self.skycoord.lat[component_inds] >= lat_range[0])
-                & (self.skycoord.lat[component_inds] <= lat_range[1])
-            )[0]
+            np.nonzero((lat_vals >= lat_range[0]) & (lat_vals <= lat_range[1]))[0]
         ]
         return component_inds
 
@@ -2845,21 +3056,16 @@ class SkyModel(UVBase):
             raise TypeError("lon_range must be an astropy Longitude object.")
         if np.asarray(lon_range).size != 2:
             raise ValueError("lon_range must be 2 element range.")
+        lon_vals, _ = self.get_lon_lat()
+        lon_vals = lon_vals[component_inds]
         if lon_range[1] < lon_range[0]:
             # we're wrapping around longitude = 2*pi = 0
-            component_inds1 = component_inds[
-                np.nonzero(self.skycoord.lon[component_inds] >= lon_range[0])[0]
-            ]
-            component_inds2 = component_inds[
-                np.nonzero(self.skycoord.lon[component_inds] <= lon_range[1])[0]
-            ]
+            component_inds1 = component_inds[np.nonzero(lon_vals >= lon_range[0])[0]]
+            component_inds2 = component_inds[np.nonzero(lon_vals <= lon_range[1])[0]]
             component_inds = np.union1d(component_inds1, component_inds2)
         else:
             component_inds = component_inds[
-                np.nonzero(
-                    (self.skycoord.lon[component_inds] >= lon_range[0])
-                    & (self.skycoord.lon[component_inds] <= lon_range[1])
-                )[0]
+                np.nonzero((lon_vals >= lon_range[0]) & (lon_vals <= lon_range[1]))[0]
             ]
         return component_inds
 
@@ -3317,7 +3523,15 @@ class SkyModel(UVBase):
 
         max_name_len = np.max([len(name) for name in self.name])
         fieldtypes = ["U" + str(max_name_len), "f8", "f8"]
-        fieldnames = ["source_id", "ra_j2000", "dec_j2000"]
+        comp_names = self._get_lon_lat_component_names()
+        frame_obj = self._get_frame_obj()
+        frame_desc_str = _get_frame_desc_str(frame_obj)
+
+        component_fieldnames = []
+        for comp_name in comp_names:
+            # This will add e.g. ra_J2000 and dec_J2000 for FK5
+            component_fieldnames.append(comp_name + "_" + frame_desc_str)
+        fieldnames = ["source_id"] + component_fieldnames
         # Alias "flux_density_" for "I", etc.
         stokes_names = [(f"flux_density_{k}", k) for k in ["I", "Q", "U", "V"]]
         fieldshapes = [()] * 3
@@ -3381,12 +3595,9 @@ class SkyModel(UVBase):
 
         arr = np.empty(self.Ncomponents, dtype=dt)
         arr["source_id"] = self.name
-        if self.skycoord.frame == "ICRS":
-            arr["ra_j2000"] = self.skycoord.ra.deg
-            arr["dec_j2000"] = self.skycoord.dec.deg
-        else:
-            arr["lat_" + self.skycoord.frame.to_lower()] = self.skycoord.lat.deg
-            arr["lon" + self.skycoord.frame.to_lower()] = self.skycoord.lon.deg
+
+        for comp_ind, comp in enumerate(comp_names):
+            arr[component_fieldnames[comp_ind]] = getattr(self.skycoord, comp).deg
 
         for ii in range(4):
             if stokes_keep[ii]:
@@ -3441,8 +3652,6 @@ class SkyModel(UVBase):
             DeprecationWarning,
         )
 
-        if not self.skycoord.frame == "ICRS":
-            raise ValueError("to_recarray only supports the ICRS coordinate frame")
         return self._text_write_preprocess()
 
     @classmethod
@@ -3483,8 +3692,15 @@ class SkyModel(UVBase):
             DeprecationWarning,
         )
 
-        ra = Longitude(recarray_in["ra_j2000"], units.deg)
-        dec = Latitude(recarray_in["dec_j2000"], units.deg)
+        fieldnames = recarray_in.dtype.names
+
+        frame_use, lon_col, lat_col = _get_frame_comp_cols(fieldnames)
+        skycoord = SkyCoord(
+            Longitude(recarray_in[lon_col], unit="deg"),
+            Latitude(recarray_in[lat_col], unit="deg"),
+            frame=frame_use,
+        )
+
         ids = np.asarray(recarray_in["source_id"]).astype(str)
 
         Ncomponents = ids.size
@@ -3492,7 +3708,6 @@ class SkyModel(UVBase):
         rise_lst = None
         set_lst = None
 
-        fieldnames = recarray_in.dtype.names
         if "reference_frequency" in fieldnames:
             reference_frequency = Quantity(
                 np.atleast_1d(recarray_in["reference_frequency"]), "hertz"
@@ -3557,8 +3772,7 @@ class SkyModel(UVBase):
 
         self = cls(
             name=names,
-            ra=ra,
-            dec=dec,
+            skycoord=skycoord,
             stokes=stokes,
             spectral_type=spectral_type,
             freq_array=freq_array,
@@ -3635,7 +3849,6 @@ class SkyModel(UVBase):
             header_params = [
                 "_Ncomponents",
                 "_Nfreqs",
-                "_skycoord",
                 "_component_type",
                 "_spectral_type",
                 "_history",
@@ -3653,10 +3866,6 @@ class SkyModel(UVBase):
             ]
 
             optional_params = [
-                "_skycoord",
-                "_name",
-                "_nside",
-                "_hpx_inds",
                 "_hpx_order",
                 "_hpx_frame",
                 "_freq_array",
@@ -3670,14 +3879,20 @@ class SkyModel(UVBase):
             self.component_type = header["component_type"][()].tobytes().decode("utf-8")
 
             if self.component_type != "healpix":
+                optional_params.extend(["_nside", "_hpx_inds"])
                 if "skycoord" in header:
                     skycoord_dict = {}
-                    for key, dset in header["skycoord"].items():
-                        if issubclass(dset.dtype.type, np.bytes_):
-                            skycoord_dict[key] = bytes(dset[()]).decode("utf8")
+                    for key in header["skycoord"]:
+                        if key in ["frame", "representation_type"]:
+                            expected_type = str
                         else:
-                            skycoord_dict[key] = dset[()]
-                    self.skycoord = SkyCoord(**skycoord_dict)
+                            expected_type = None
+                        skycoord_dict[key] = _get_value_hdf5_group(
+                            header["skycoord"],
+                            key,
+                            expected_type,
+                        )
+                    init_params["skycoord"] = SkyCoord(**skycoord_dict)
                 else:
                     if "lat" in header and "lon" in header and "frame" in header:
                         header_params += ["lat", "lon", "frame"]
@@ -3694,18 +3909,33 @@ class SkyModel(UVBase):
                         "This skyh5 file was written by an older version of pyradiosky. "
                         "Consider re-writing this file to ensure future compatibility"
                     )
+            else:
+                optional_params.append("_name")
 
             for par in header_params:
                 if par in ["lat", "lon", "frame", "ra", "dec"]:
                     parname = par
+                    if par == "frame":
+                        expected_type = "str"
+                    else:
+                        expected_type = Quantity
                 else:
                     param = getattr(self, par)
                     parname = param.name
+                    expected_type = param.expected_type
 
                 # skip optional params if not present
                 if par in optional_params:
                     if parname not in header:
-                        continue
+                        if parname == "hpx_frame" and "frame" in header:
+                            parname = "frame"
+                        else:
+                            continue
+
+                if parname not in header:
+                    raise ValueError(
+                        f"Expected parameter {parname} is missing in file."
+                    )
 
                 if header["component_type"][()].tobytes().decode("utf-8") == "healpix":
                     # we can skip special handling for lon/lat for healpix models
@@ -3713,25 +3943,7 @@ class SkyModel(UVBase):
                     if parname in ["lon", "lat", "ra", "dec"]:
                         continue
 
-                dset = header[parname]
-
-                value = dset[()]
-
-                if "unit" in dset.attrs:
-                    value *= units.Unit(dset.attrs["unit"])
-
-                angtype = dset.attrs.get("angtype", None)
-
-                if angtype == "latitude":
-                    value = Latitude(value)
-                elif angtype == "longitude":
-                    value = Longitude(value)
-
-                if param.expected_type is str:
-                    if isinstance(value, np.ndarray):
-                        value = np.array([n.tobytes().decode("utf8") for n in value[:]])
-                    else:
-                        value = value.tobytes().decode("utf8")
+                value = _get_value_hdf5_group(header, parname, expected_type)
 
                 if parname == "nside":
                     value = int(value)
@@ -3740,23 +3952,11 @@ class SkyModel(UVBase):
 
             # check that the parameters not passed to the init make sense
             if init_params["component_type"] == "healpix":
-                if "nside" not in init_params.keys():
-                    raise ValueError(
-                        f"Component type is {init_params['component_type']} but 'nside' is missing in file."
-                    )
-                if "hpx_inds" not in init_params.keys():
-                    raise ValueError(
-                        f"Component type is {init_params['component_type']} but 'hpx_inds' is missing in file."
-                    )
                 if init_params["Ncomponents"] != init_params["hpx_inds"].size:
                     raise ValueError(
                         "Ncomponents is not equal to the size of 'hpx_inds'."
                     )
             else:
-                if "name" not in init_params.keys():
-                    raise ValueError(
-                        f"Component type is {init_params['component_type']} but 'name' is missing in file."
-                    )
                 if init_params["Ncomponents"] != init_params["name"].size:
                     raise ValueError("Ncomponents is not equal to the size of 'name'.")
 
@@ -3775,14 +3975,27 @@ class SkyModel(UVBase):
             )
             # frame is a new parameter, check if it exists and try to read
             # otherwise default to ICRS (the old assumed frame.)
-            if "frame" not in header:
-                warnings.warn(
-                    "No frame available in this file, assuming 'icrs'. "
-                    "Consider re-writing this file to ensure future compatility."
-                )
-                init_params["frame"] = "icrs"
-            else:
-                init_params["frame"] = header["frame"][()].tobytes().decode("utf8")
+            if "skycoord" not in init_params and self.component_type != "healpix":
+                if "frame" in header:
+                    init_params["frame"] = header["frame"][()].tobytes().decode("utf8")
+                else:
+                    warnings.warn(
+                        "No frame available in this file, assuming 'icrs'. "
+                        "Consider re-writing this file to ensure future compatility."
+                    )
+                    init_params["frame"] = "icrs"
+
+        if "hpx_frame" in init_params.keys():
+            if self.component_type == "healpix":
+                init_params["frame"] = init_params["hpx_frame"]
+            del init_params["hpx_frame"]
+
+        if self.component_type == "healpix" and "frame" not in init_params:
+            warnings.warn(
+                "No frame available in this file, assuming 'icrs'. "
+                "Consider re-writing this file to ensure future compatility."
+            )
+            init_params["frame"] = "icrs"
 
         self.__init__(**init_params)
 
@@ -3974,9 +4187,10 @@ class SkyModel(UVBase):
         votable_file,
         table_name,
         id_column,
-        ra_column,
-        dec_column,
+        lon_column,
+        lat_column,
         flux_columns,
+        frame="icrs",
         reference_frequency=None,
         freq_array=None,
         spectral_index_column=None,
@@ -4001,12 +4215,18 @@ class SkyModel(UVBase):
             Part of expected table name. Should match only one table name in votable_file.
         id_column : str
             Part of expected ID column. Should match only one column in the table.
-        ra_column : str
-            Part of expected RA column. Should match only one column in the table.
-        dec_column : str
-            Part of expected Dec column. Should match only one column in the table.
+        lon_column : str
+            Part of expected longitudinal coordinate (e.g. RA) column. Should match
+            only one column in the table.
+        lat_column : str
+            Part of expected latitudinal coordinate (e.g. Dec) column. Should match
+            only one column in the table.
         flux_columns : str or list of str
             Part of expected Flux column(s). Each one should match only one column in the table.
+        frame : str
+            Name of coordinate frame of source positions (lon/lat columns).
+            Defaults it "icrs". Must be interpretable by
+            `astropy.coordinates.frame_transform_graph.lookup_name()`.
         reference_frequency : :class:`astropy.units.Quantity`
             Reference frequency for flux values, assumed to be the same value for all rows.
         freq_array : :class:`astropy.units.Quantity`
@@ -4088,13 +4308,13 @@ class SkyModel(UVBase):
         # get ID column
         id_col_use = _get_matching_fields(id_column, astropy_table.colnames)
 
-        # get RA & Dec columns, if multiple matches, exclude VizieR calculated columns
+        # get lon & lat columns, if multiple matches, exclude VizieR calculated columns
         # which start with an underscore
-        ra_col_use = _get_matching_fields(
-            ra_column, astropy_table.colnames, exclude_start_pattern="_"
+        lon_col_use = _get_matching_fields(
+            lon_column, astropy_table.colnames, exclude_start_pattern="_"
         )
-        dec_col_use = _get_matching_fields(
-            dec_column, astropy_table.colnames, exclude_start_pattern="_"
+        lat_col_use = _get_matching_fields(
+            lat_column, astropy_table.colnames, exclude_start_pattern="_"
         )
 
         if isinstance(flux_columns, (str)):
@@ -4128,7 +4348,7 @@ class SkyModel(UVBase):
             spectral_index = None
 
         col_units = []
-        for index, col in enumerate(flux_cols_use):
+        for col in flux_cols_use:
             col_units.append(astropy_table[col].unit)
 
         allowed_units = ["Jy", "Jy/sr", "K", "K sr"]
@@ -4163,7 +4383,7 @@ class SkyModel(UVBase):
                 )
 
             err_col_units = []
-            for index, col in enumerate(flux_err_cols_use):
+            for col in flux_err_cols_use:
                 err_col_units.append(astropy_table[col].unit)
 
             if not np.all(
@@ -4186,8 +4406,9 @@ class SkyModel(UVBase):
 
         self.__init__(
             name=astropy_table[id_col_use].data.data.astype("str"),
-            ra=Longitude(astropy_table[ra_col_use].quantity),
-            dec=Latitude(astropy_table[dec_col_use].quantity),
+            lon=Longitude(astropy_table[lon_col_use].quantity),
+            lat=Latitude(astropy_table[lat_col_use].quantity),
+            frame=frame,
             stokes=stokes,
             spectral_type=spectral_type,
             freq_array=freq_array,
@@ -4340,6 +4561,7 @@ class SkyModel(UVBase):
             "GLEAM",
             "RAJ2000",
             "DEJ2000",
+            frame="fk5",
             flux_columns=flux_columns,
             freq_array=freq_array,
             reference_frequency=reference_frequency,
@@ -4387,7 +4609,7 @@ class SkyModel(UVBase):
         ----------
         catalog_csv: str
             Path to tab separated value file with the following required columns:
-            *  `Source_ID`: source name as a string of maximum 10 characters
+            *  `source_id`: source name as a string of maximum 10 characters
             *  `ra_j2000`: right ascension at J2000 epoch, in decimal degrees
             *  `dec_j2000`: declination at J2000 epoch, in decimal degrees
             *  `Flux [Jy]`: Stokes I flux density in Janskys
@@ -4435,6 +4657,8 @@ class SkyModel(UVBase):
             h.strip() for h in header.split() if not h[0] == "["
         ]  # Ignore units in header
 
+        frame_use, lon_col, lat_col = _get_frame_comp_cols(header)
+
         flux_fields = [
             colname for colname in header if colname.lower().startswith("flux")
         ]
@@ -4456,7 +4680,7 @@ class SkyModel(UVBase):
 
         header_lower = [colname.lower() for colname in header]
 
-        expected_cols = ["source_id", "ra_j2000", "dec_j2000"]
+        expected_cols = ["source_id", lon_col.lower(), lat_col.lower()]
         if "frequency" in header_lower:
             if len(flux_fields) != 1:
                 raise ValueError(
@@ -4526,8 +4750,14 @@ class SkyModel(UVBase):
         col_names = catalog_table.dtype.names
 
         names = catalog_table[col_names[0]].astype("str")
-        ras = Longitude(catalog_table[col_names[1]], units.deg)
-        decs = Latitude(catalog_table[col_names[2]], units.deg)
+
+        lon_ind = np.nonzero(np.array(header) == lon_col)[0][0]
+        lat_ind = np.nonzero(np.array(header) == lat_col)[0][0]
+        skycoord = SkyCoord(
+            Longitude(catalog_table[col_names[lon_ind]], units.deg),
+            Latitude(catalog_table[col_names[lat_ind]], units.deg),
+            frame=frame_use,
+        )
 
         stokes = Quantity(np.zeros((4, n_freqs, len(catalog_table))), "Jy")
         if len(flux_error_fields) > 0:
@@ -4557,8 +4787,7 @@ class SkyModel(UVBase):
 
         self.__init__(
             name=names,
-            ra=ras,
-            dec=decs,
+            skycoord=skycoord,
             stokes=stokes,
             spectral_type=spectral_type,
             freq_array=freq_array,
@@ -4759,6 +4988,7 @@ class SkyModel(UVBase):
             name=ids,
             ra=ra,
             dec=dec,
+            frame="icrs",
             stokes=stokes,
             spectral_type="spectral_index",
             reference_frequency=Quantity(source_freqs, "hertz"),
@@ -5240,47 +5470,17 @@ class SkyModel(UVBase):
                 if val is None:
                     continue
 
-                # Extra attributes for astropy Quantity-derived classes.
-                unit = None
-                angtype = None
-                if isinstance(val, units.Quantity):
-                    if isinstance(val, Latitude):
-                        angtype = "latitude"
-                    elif isinstance(val, Longitude):
-                        angtype = "longitude"
-                    # Use `str` to ensure this works for Composite units as well.
-                    unit = str(val.unit)
-                    val = val.value
-
-                try:
-                    dtype = val.dtype
-                except AttributeError:
-                    dtype = np.dtype(type(val))
-
-                # Strings and arrays of strings require special handling.
-                if dtype.kind == "U" or param.expected_type == str:
-                    if isinstance(val, (list, np.ndarray)):
-                        header[parname] = np.asarray(val, dtype="bytes")
-                    else:
-                        header[parname] = np.string_(val)
-                else:
-                    header[parname] = val
-
-                if unit is not None:
-                    header[parname].attrs["unit"] = unit
-                if angtype is not None:
-                    header[parname].attrs["angtype"] = angtype
+                _add_value_hdf5_group(header, parname, val, param.expected_type)
 
             # special handling for the skycoord
             # make a nested group based on the skycoord.info._represent_as_dict()
-            skycoord_info = self.skycoord.info
-            skycoord_dict = skycoord_info._represent_as_dict()
-            sc_group = header.create_group("skycoord")
-            for key, value in skycoord_dict.items():
-                if isinstance(value, str):
-                    sc_group[key] = np.bytes_(value)
-                else:
-                    sc_group[key] = value
+            if self.skycoord is not None:
+                skycoord_info = self.skycoord.info
+                skycoord_dict = skycoord_info._represent_as_dict()
+                sc_group = header.create_group("skycoord")
+                for key, value in skycoord_dict.items():
+                    expected_type = type(value)
+                    _add_value_hdf5_group(sc_group, key, value, expected_type)
 
             # write out the stokes array
             dgrp = fileobj.create_group("Data")
@@ -5379,7 +5579,15 @@ class SkyModel(UVBase):
 
         self.check()
 
-        header = "SOURCE_ID\tRA_J2000 [deg]\tDec_J2000 [deg]"
+        comp_names = self._get_lon_lat_component_names()
+        frame_obj = self._get_frame_obj()
+        frame_desc_str = _get_frame_desc_str(frame_obj)
+        comp_field = []
+        for comp_name in comp_names:
+            # This will add e.g. ra_J2000 and dec_J2000 for FK5
+            comp_field.append(comp_name + "_" + frame_desc_str)
+
+        header = f"source_id\t{comp_field[0]} [deg]\t{comp_field[1]} [deg]"
         format_str = "{}\t{:0.8f}\t{:0.8f}"
         if self.reference_frequency is not None:
             header += "\tFlux [Jy]"
@@ -5430,12 +5638,22 @@ class SkyModel(UVBase):
             fo.write(header)
             arr = self._text_write_preprocess()
             fieldnames = arr.dtype.names
+            comp_names = self._get_lon_lat_component_names()
+            lon_name = None
+            lat_name = None
+            for field in fieldnames:
+                if comp_names[0] in field:
+                    lon_name = field
+                if comp_names[1] in field:
+                    lat_name = field
+                if lon_name is not None and lat_name is not None:
+                    break
             for src in arr:
                 fieldvals = src
                 entry = dict(zip(fieldnames, fieldvals))
                 srcid = entry["source_id"]
-                ra = entry["ra_j2000"]
-                dec = entry["dec_j2000"]
+                lon = entry[lon_name]
+                lat = entry[lat_name]
                 flux_i = entry["I"]
                 if self.stokes_error is not None:
                     flux_i_err = entry["I_error"]
@@ -5451,15 +5669,15 @@ class SkyModel(UVBase):
                         spec_index = entry["spectral_index"]
                         fo.write(
                             format_str.format(
-                                srcid, ra, dec, *fluxes_write, rfreq, spec_index
+                                srcid, lon, lat, *fluxes_write, rfreq, spec_index
                             )
                         )
                     else:
                         fo.write(
-                            format_str.format(srcid, ra, dec, *fluxes_write, rfreq)
+                            format_str.format(srcid, lon, lat, *fluxes_write, rfreq)
                         )
                 else:
-                    fo.write(format_str.format(srcid, ra, dec, *fluxes_write))
+                    fo.write(format_str.format(srcid, lon, lat, *fluxes_write))
 
 
 def read_healpix_hdf5(hdf5_filename):
@@ -5541,12 +5759,14 @@ def write_healpix_hdf5(filename, hpmap, indices, freqs, nside=None, history=None
         try:
             nside = astropy_healpix.npix_to_nside(Npix)
         except ValueError:
-            raise ValueError("Need to provide nside if giving a subset of the map.")
+            raise ValueError(  # noqa: B904
+                "Need to provide nside if giving a subset of the map."
+            )
 
     try:
         assert hpmap.shape == (Nfreqs, Npix)
     except AssertionError:
-        raise ValueError("Invalid map shape {}".format(str(hpmap.shape)))
+        raise ValueError("Invalid map shape {}".format(str(hpmap.shape)))  # noqa: B904
 
     if history is None:
         history = ""
@@ -5840,7 +6060,8 @@ def read_votable_catalog(
     Returns
     -------
     recarray or :class:`pyradiosky.SkyModel`
-        if return_table, recarray of source parameters, otherwise :class:`pyradiosky.SkyModel` instance
+        if return_table, recarray of source parameters, otherwise
+        :class:`pyradiosky.SkyModel` instance
 
     """
     warnings.warn(
@@ -5905,7 +6126,8 @@ def read_gleam_catalog(
     Returns
     -------
     recarray or :class:`pyradiosky.SkyModel`
-        if return_table, recarray of source parameters, otherwise :class:`pyradiosky.SkyModel` instance
+        if return_table, recarray of source parameters,
+        otherwise :class:`pyradiosky.SkyModel` instance
     """
     warnings.warn(
         "This function is deprecated, use `SkyModel.read_gleam_catalog` instead. "
