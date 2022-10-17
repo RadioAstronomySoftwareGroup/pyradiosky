@@ -26,6 +26,7 @@
 - [ ] I have read the [contribution guide](https://github.com/RadioAstronomySoftwareGroup/pyradiosky/blob/main/.github/CONTRIBUTING.md).
 - [ ] My code follows the code style of this project.
 - [ ] I have added or updated the docstrings associated with my feature using the [numpy docstring format](https://numpydoc.readthedocs.io/en/latest/format.html).
+- [ ] I have updated the tutorial to highlight my new feature (if appropriate).
 - [ ] I have added tests to cover my new feature.
 - [ ] My change includes a breaking change
   - [ ] My change includes backwards compatibility and deprecation warnings (if possible).
@@ -61,6 +62,7 @@ Documentation change checklist:
 - [ ] I have read the [contribution guide](https://github.com/RadioAstronomySoftwareGroup/pyradiosky/blob/main/.github/CONTRIBUTING.md).
 - [ ] My code follows the code style of this project.
 - [ ] Any new or updated docstrings use the [numpy docstring format](https://numpydoc.readthedocs.io/en/latest/format.html).
+- [ ] I have updated the tutorial to highlight my new feature (if appropriate).
 - [ ] I have added tests to cover any changes.
 - [ ] My change includes a breaking change
   - [ ] My change includes backwards compatibility and deprecation warnings (if possible).
