@@ -711,6 +711,8 @@ class SkyModel(UVBase):
                     if param is not None:
                         raise ValueError(f"Cannot set {param} if the skycoord is set.")
 
+                if skycoord.isscalar:
+                    skycoord = SkyCoord([skycoord])
                 self.skycoord = skycoord
             else:
                 # Raise error if missing the right combination.
@@ -1134,7 +1136,6 @@ class SkyModel(UVBase):
     @property
     def ncomponent_length_params(self):
         """Iterate over ncomponent length paramters."""
-        # the filters below should be removed in version 0.3.0
         param_list = (
             param for param in self if getattr(self, param).form == ("Ncomponents",)
         )
@@ -1208,7 +1209,6 @@ class SkyModel(UVBase):
                 )
 
         # Run the basic check from UVBase
-        # the filters below should be removed in version 0.3.0
         super(SkyModel, self).check(
             check_extra=check_extra, run_check_acceptability=run_check_acceptability
         )
@@ -1260,7 +1260,6 @@ class SkyModel(UVBase):
                 )
 
         if not equal:
-            # the filters below should be removed in version 0.3.0
             equal = super(SkyModel, self).__eq__(other, check_extra=False)
 
             if equal:
@@ -1280,12 +1279,6 @@ class SkyModel(UVBase):
                 )
 
         return equal
-
-    def copy(self):
-        """Return a copy of this object."""
-        # Overload this method to filter ra/dec warnings that shouldn't be issued.
-        # this method should be removed in version 0.3.0
-        return super(SkyModel, self).copy()
 
     def transform_to(self, frame):
         """Transform to a different skycoord coordinate frame.
@@ -4181,7 +4174,6 @@ class SkyModel(UVBase):
         )
         return self
 
-    # TODO: work on skycoord starting here next time
     def read_votable_catalog(
         self,
         votable_file,
@@ -4908,7 +4900,7 @@ class SkyModel(UVBase):
                 beam_amp[3, src] = np.abs(catalog["beam"][src]["YX"][0])
 
         if len(np.unique(ids)) != len(ids):
-            warnings.warn("WARNING: Source IDs are not unique. Defining unique IDs.")
+            warnings.warn("Source IDs are not unique. Defining unique IDs.")
             unique_ids, counts = np.unique(ids, return_counts=True)
             for repeat_id in unique_ids[np.where(counts > 1)[0]]:
                 fix_id_inds = np.where(np.array(ids) == repeat_id)[0]
@@ -5666,7 +5658,9 @@ class SkyModel(UVBase):
 
         with open(filename, "w+") as fo:
             fo.write(header)
-            arr = self._text_write_preprocess()
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                arr = self._text_write_preprocess()
             fieldnames = arr.dtype.names
             comp_names = self._get_lon_lat_component_names()
             lon_name = None
