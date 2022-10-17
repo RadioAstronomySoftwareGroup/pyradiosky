@@ -3402,7 +3402,7 @@ def test_fhd_catalog_reader():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
 
     with uvtest.check_warnings(
-        UserWarning, match="WARNING: Source IDs are not unique. Defining unique IDs."
+        UserWarning, match="Source IDs are not unique. Defining unique IDs."
     ):
         skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
 
@@ -3414,7 +3414,7 @@ def test_fhd_catalog_reader():
         [DeprecationWarning, UserWarning],
         match=[
             "This function is deprecated, use `SkyModel.read_fhd_catalog` instead.",
-            "WARNING: Source IDs are not unique. Defining unique IDs.",
+            "Source IDs are not unique. Defining unique IDs.",
         ],
     ):
         skyobj2 = skymodel.read_idl_catalog(catfile, expand_extended=False)
@@ -3425,7 +3425,7 @@ def test_fhd_catalog_reader():
         [DeprecationWarning, UserWarning],
         match=[
             "This method is deprecated, use `read_fhd_catalog` instead.",
-            "WARNING: Source IDs are not unique. Defining unique IDs.",
+            "Source IDs are not unique. Defining unique IDs.",
         ],
     ):
         skyobj3 = SkyModel()
@@ -3438,7 +3438,7 @@ def test_fhd_catalog_reader_source_cuts():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
 
     with uvtest.check_warnings(
-        UserWarning, match="WARNING: Source IDs are not unique. Defining unique IDs."
+        UserWarning, match="Source IDs are not unique. Defining unique IDs."
     ):
         skyobj = SkyModel.from_file(catfile, expand_extended=False, filetype="fhd")
 
@@ -3451,7 +3451,7 @@ def test_fhd_catalog_reader_source_cuts():
     with uvtest.check_warnings(
         [UserWarning, DeprecationWarning, DeprecationWarning],
         match=[
-            "WARNING: Source IDs are not unique. Defining unique IDs.",
+            "Source IDs are not unique. Defining unique IDs.",
             "The source_select_kwds parameter is deprecated",
             "The `source_cuts` method is deprecated",
         ],
@@ -3467,7 +3467,7 @@ def test_fhd_catalog_reader_extended_sources():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
     skyobj = SkyModel()
     with uvtest.check_warnings(
-        UserWarning, match="WARNING: Source IDs are not unique. Defining unique IDs."
+        UserWarning, match="Source IDs are not unique. Defining unique IDs."
     ):
         skyobj.read_fhd_catalog(catfile, expand_extended=True)
 
@@ -3528,7 +3528,7 @@ def test_fhd_catalog_reader_labeling_extended_sources():
     catfile = os.path.join(SKY_DATA_PATH, "extended_source_test.sav")
     skyobj = SkyModel()
     with uvtest.check_warnings(
-        UserWarning, match="WARNING: Source IDs are not unique. Defining unique IDs."
+        UserWarning, match="Source IDs are not unique. Defining unique IDs."
     ):
         skyobj.read_fhd_catalog(catfile, expand_extended=True)
 
