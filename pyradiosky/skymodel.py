@@ -5111,6 +5111,8 @@ class SkyModel(UVBase):
         id_column=None,
         ra_column=None,
         dec_column=None,
+        lon_column=None,
+        lat_column=None,
         flux_columns=None,
         reference_frequency=None,
         freq_array=None,
@@ -5170,10 +5172,16 @@ class SkyModel(UVBase):
             Part of expected VOTable name. Should match only one table name in the file.
         id_column : str
             Part of expected VOTable ID column. Should match only one column in the file.
+        lon_column : str
+            Part of expected VOTable longitudinal coordinate column. Should match only
+            one column in the file.
+        lat_column : str
+            Part of expected VOTable latitudinal coordinate column. Should match only
+            one column in the file.
         ra_column : str
-            Part of expected VOTable RA column. Should match only one column in the file.
+            Deprecated synonym for lon_column.
         dec_column : str
-            Part of expected VOTable Dec column. Should match only one column in the file.
+            Deprecated synonym for lat_column.
         flux_columns : str or list of str
             Part of expected vot Flux column(s). Each one should match only one column
             in the file. Only used for vot files.
@@ -5222,12 +5230,24 @@ class SkyModel(UVBase):
                 filename, spectral_type=spectral_type, with_error=with_error
             )
         elif filetype == "vot":
+            if ra_column is not None:
+                warnings.warn(
+                    DeprecationWarning,
+                    "The `ra_column` keyword is deprecated, use `lon_column` instead",
+                )
+
+            if dec_column is not None:
+                warnings.warn(
+                    DeprecationWarning,
+                    "The `dec_column` keyword is deprecated, use `lat_column` instead",
+                )
+
             self.read_votable_catalog(
                 filename,
                 table_name,
                 id_column,
-                ra_column,
-                dec_column,
+                lon_column,
+                lat_column,
                 flux_columns,
                 reference_frequency=reference_frequency,
                 freq_array=freq_array,
@@ -5274,6 +5294,8 @@ class SkyModel(UVBase):
         # VOTable
         table_name=None,
         id_column=None,
+        lon_column=None,
+        lat_column=None,
         ra_column=None,
         dec_column=None,
         flux_columns=None,
@@ -5335,10 +5357,16 @@ class SkyModel(UVBase):
             Part of expected VOTable name. Should match only one table name in the file.
         id_column : str
             Part of expected VOTable ID column. Should match only one column in the file.
+        lon_column : str
+            Part of expected VOTable longitudinal coordinate column. Should match only
+            one column in the file.
+        lat_column : str
+            Part of expected VOTable latitudinal coordinate column. Should match only
+            one column in the file.
         ra_column : str
-            Part of expected VOTable RA column. Should match only one column in the file.
+            Deprecated synonym for lon_column.
         dec_column : str
-            Part of expected VOTable Dec column. Should match only one column in the file.
+            Deprecated synonym for lat_column.
         flux_columns : str or list of str
             Part of expected vot Flux column(s). Each one should match only one column
             in the file. Only used for vot files.
@@ -5373,6 +5401,8 @@ class SkyModel(UVBase):
             # vot
             table_name=table_name,
             id_column=id_column,
+            lon_column=lon_column,
+            lat_column=lat_column,
             ra_column=ra_column,
             dec_column=dec_column,
             flux_columns=flux_columns,

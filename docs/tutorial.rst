@@ -77,25 +77,25 @@ c) VOTable
   >>> sm = SkyModel()
 
   >>> # Use the `read` method, optionally specify the file type. VOTable required parameters: table_name, id_column,
-  >>> # ra_column, dec_column, and flux_columns. Can also use the file type specific `read_votable_catalog` method.
+  >>> # lon_column, lat_column, and flux_columns. Can also use the file type specific `read_votable_catalog` method.
   >>> filename = os.path.join(DATA_PATH, "simple_test.vot")
-  >>> sm.read(filename, table_name="VIII_1000_single", id_column="source_id", ra_column="RAJ2000",
-  ...         dec_column="DEJ2000", flux_columns="Si")
-  >>> sm.read(filename, filetype="vot", table_name="VIII_1000_single", id_column="source_id", ra_column="RAJ2000",
-  ...         dec_column="DEJ2000", flux_columns="Si")
-  >>> sm.read_votable_catalog(filename, table_name="VIII_1000_single", id_column="source_id", ra_column="RAJ2000",
-  ...                         dec_column="DEJ2000", flux_columns="Si")
+  >>> sm.read(filename, table_name="VIII_1000_single", id_column="source_id", lon_column="RAJ2000",
+  ...         lat_column="DEJ2000", flux_columns="Si")
+  >>> sm.read(filename, filetype="vot", table_name="VIII_1000_single", id_column="source_id", lon_column="RAJ2000",
+  ...         lat_column="DEJ2000", flux_columns="Si")
+  >>> sm.read_votable_catalog(filename, table_name="VIII_1000_single", id_column="source_id", lon_column="RAJ2000",
+  ...                         lat_column="DEJ2000", flux_columns="Si")
 
   >>> # Use the `from_file` method to create SkyModel object without initalizing empty object, optionally specify
   >>> # the file type.
-  >>> # VOTable required parameters: table_name, id_column, ra_column, dec_column, and flux_columns.
+  >>> # VOTable required parameters: table_name, id_column, lon_column, lat_column, and flux_columns.
   >>> # Can also use the file type specific `read_votable_catalog` method.
-  >>> sm = SkyModel.from_file(filename, table_name="VIII_1000_single", id_column="source_id", ra_column="RAJ2000",
-  ...                         dec_column="DEJ2000", flux_columns="Si")
+  >>> sm = SkyModel.from_file(filename, table_name="VIII_1000_single", id_column="source_id", lon_column="RAJ2000",
+  ...                         lat_column="DEJ2000", flux_columns="Si")
   >>> sm = SkyModel.from_file(filename, filetype="vot", table_name="VIII_1000_single", id_column="source_id",
-  ...                         ra_column="RAJ2000", dec_column="DEJ2000", flux_columns="Si")
+  ...                         lon_column="RAJ2000", lat_column="DEJ2000", flux_columns="Si")
   >>> sm = SkyModel.from_votable_catalog(filename, table_name="VIII_1000_single", id_column="source_id",
-  ...                                    ra_column="RAJ2000", dec_column="DEJ2000", flux_columns="Si")
+  ...                                    lon_column="RAJ2000", lat_column="DEJ2000", flux_columns="Si")
 
 d) text
 *******
@@ -187,10 +187,14 @@ a) using extended_model_group attribute
   >>> # since Nfreqs = 1 for spectral index type), Ncomponents index = : (all components)
   >>> print(np.unique(sm.beam_amp[0,0,:]))
   [0.12874769 0.56623143 0.59106636]
+
+  >>> # Use `calc_frame_coherency` to calculate and optionally save it on the object
+  >>> # default is `store=True` which will save it on the object rather than returning it
+  >>> sm.calc_frame_coherency()
   >>> # coherency (2 x 2 matrix of electric field correlation) for polarization1 index = 0 (North),
   >>> # polarization2 index = 0 (North), Nfreqs index = 0 (first and only frequency since Nfreqs = 1 for
   >>> # spectral index type), Ncomponents index = 0 (first component)
-  >>> print(sm.coherency_radec[0,0,0,0])
+  >>> print(sm.frame_coherency[0,0,0,0])
   (8.400908470153809+0j) Jy
 
   >>> # dividing by 10^6 since frequency typically plotted in units of MHz
@@ -317,7 +321,10 @@ c) incorporating astropy healpix package (like plotting pixels), changing compon
   8
   >>> print(sm.frame)
   icrs
-  >>> print(sm.coherency_radec[:,:,0,0])
+  >>> # Use `calc_frame_coherency` to calculate the frame coherency, set store=False to
+  >>> # return it and not store it.
+  >>> frame_coherency = sm.calc_frame_coherency(store=False)
+  >>> print(frame_coherency[:,:,0,0])
   [[2352.45649693+0.j    0.        +0.j]
    [   0.        +0.j 2352.45649693+0.j]] K
 
@@ -327,21 +334,21 @@ c) incorporating astropy healpix package (like plotting pixels), changing compon
   >>> plt.show() # doctest: +SKIP
 
   >>> sm.healpix_to_point()
-  >>> print(sm.lon[:3])
+  >>> print(sm.ra[:3])
   [45d00m00s 135d00m00s 225d00m00s]
-  >>> print(sm.lat[:3])
+  >>> print(sm.dec[:3])
   [84d08m59.03857067s 84d08m59.03857067s 84d08m59.03857067s]
-  >>> print(sm.lat[:3].value)
+  >>> print(sm.dec[:3].value)
   [84.14973294 84.14973294 84.14973294]
   >>> sm.transform_to("galactic")
   >>> sm.transform_to("icrs")
   >>> # confirms same RA and DEC after transforming point catalog back to icrs frame
-  >>> print(sm.lon[:3])
+  >>> print(sm.ra[:3])
   [45d00m00s 135d00m00s 225d00m00s]
-  >>> print(sm.lat[:3])
+  >>> print(sm.dec[:3])
   [84d08m59.03857067s 84d08m59.03857067s 84d08m59.03857067s]
 
-  >>> sm.point_to_healpix()
+  >>> sm.assign_to_healpix()
   >>> print(sm.nside)
   8
   >>> print(sm.hpx_order)
@@ -513,10 +520,9 @@ b) creating and writing out point catalog, using calculate_rise_set_lsts and cle
   _above_horizon
   _extended_model_group
   _hpx_inds
-  _lat
-  _lon
   _name
   _reference_frequency
+  _skycoord
   _spectral_index
   >>> print(sm.Ncomponents)
   1
@@ -581,8 +587,8 @@ a) using cut_nonrising method
   >>> print(sm2.Ncomponents)
   320
 
-b) using plotly package and select and source_cuts methods
-******************************************************************
+b) using plotly package and select and select methods
+*****************************************************
 .. code-block:: python
 
   >>> import os
@@ -672,7 +678,9 @@ b) using plotly package and select and source_cuts methods
   >>> fig["layout"]["xaxis"].update(autorange = True) # doctest: +SKIP
   >>> fig.show() # doctest: +SKIP
 
-  >>> sm4 = sm.source_cuts(min_flux=0.2 * units.Jy, max_flux=1.5 * units.Jy, inplace=False)
+  >>> sm4 = sm.select(
+  ...   min_brightness=0.2 * units.Jy, max_brightness=1.5 * units.Jy, inplace=False
+  ... )
 
   >>> print(sm.Ncomponents)
   50
@@ -745,8 +753,9 @@ c) using select method, incorporating astropy healpix package
   >>> cone_index = hp.cone_search_lonlat(10 * u.deg, 10 * u.deg, radius=5 * u.deg)
   >>> print(cone_index)
   [304 273 337 305]
-  >>> plt.scatter(sm.lon.value[cone_index], sm.lat.value[cone_index]) # doctest: +SKIP
-  >>> plt.xlim(max(sm.lon.value[cone_index]), min(sm.lon.value[cone_index])) # doctest: +SKIP
+  >>> lon, lat = sm.get_lon_lat()
+  >>> plt.scatter(lon.value[cone_index], lat.value[cone_index]) # doctest: +SKIP
+  >>> plt.xlim(max(lon.value[cone_index]), min(lon.value[cone_index])) # doctest: +SKIP
   >>> plt.autoscale() # doctest: +SKIP
   >>> plt.xlabel("Galactic Longitude (deg)") # doctest: +SKIP
   >>> plt.ylabel("Galactic Latitude (deg)") # doctest: +SKIP
@@ -755,8 +764,8 @@ c) using select method, incorporating astropy healpix package
   >>> neighbours_10 = hp.neighbours(10)
   >>> print(neighbours_10)
   [21 20  9  2  3 11 22 37]
-  >>> plt.scatter(sm.lon.value[neighbours_10], sm.lat.value[neighbours_10]) # doctest: +SKIP
-  >>> plt.xlim(max(sm.lon.value[neighbours_10]), min(sm.lon.value[neighbours_10])) # doctest: +SKIP
+  >>> plt.scatter(lon.value[neighbours_10], lat.value[neighbours_10]) # doctest: +SKIP
+  >>> plt.xlim(max(lon.value[neighbours_10]), min(lon.value[neighbours_10])) # doctest: +SKIP
   >>> plt.autoscale() # doctest: +SKIP
   >>> plt.xlabel("Galactic Longitude (deg)") # doctest: +SKIP
   >>> plt.ylabel("Galactic Latitude (deg)") # doctest: +SKIP
