@@ -29,19 +29,16 @@ a) FHD
   >>> from pyradiosky.data import DATA_PATH
   >>> sm = SkyModel()
 
-  >>> # Use the `read` method, optionally specify the file type. FHD default: expand_extended=True. Can also use the
-  >>> # file type specific `read_fhd_catalog` method.
+  >>> # Use the `read` method, optionally specify the file type. FHD default: expand_extended=True.
   >>> filename = os.path.join(DATA_PATH, "fhd_catalog.sav")
   >>> sm.read(filename)
+  >>> # If the file type is not properly recognized, set the `filetype` parameter
   >>> sm.read(filename, filetype="fhd")
-  >>> sm.read_fhd_catalog(filename)
 
-  >>> # Use the `from_file` method to create SkyModel object without initalizing empty object, optionally specify
-  >>> # the file type.
-  >>> # FHD default: expand_extended=True. Can also use the file type specific `from_fhd_catalog` method.
+  >>> # Use the `from_file` method to create SkyModel object without initalizing
+  >>> # an empty object, optionally specify the file type.
+  >>> # FHD default: expand_extended=True.
   >>> sm = SkyModel.from_file(filename)
-  >>> sm = SkyModel.from_file(filename, filetype="fhd")
-  >>> sm = SkyModel.from_fhd_catalog(filename)
 
 b) GLEAM
 ********
@@ -53,19 +50,13 @@ b) GLEAM
   >>> sm = SkyModel()
 
   >>> # Use the `read` method, optionally specify the file type. GLEAM defaults: spectral_type="subband", with_error=False.
-  >>> # Can also use the file type specific `read_gleam_catalog` method.
   >>> filename = os.path.join(DATA_PATH, "gleam_50srcs.vot")
   >>> sm.read(filename)
-  >>> sm.read(filename, filetype="gleam")
-  >>> sm.read_gleam_catalog(filename)
 
-  >>> # Use the `from_file` method to create SkyModel object without initalizing empty object, optionally specify
-  >>> # the file type.
-  >>> # GLEAM defaults: spectral_type="subband", with_error=False. Can also use the
-  >>> # file type specific `from_gleam_catalog` method.
+  >>> # Use the `from_file` method to create SkyModel object without initalizing
+  >>> # an empty object, optionally specify the file type.
+  >>> # GLEAM defaults: spectral_type="subband", with_error=False.
   >>> sm = SkyModel.from_file(filename)
-  >>> sm = SkyModel.from_file(filename, filetype="gleam")
-  >>> sm = SkyModel.from_gleam_catalog(filename)
 
 c) VOTable
 **********
@@ -77,25 +68,17 @@ c) VOTable
   >>> sm = SkyModel()
 
   >>> # Use the `read` method, optionally specify the file type. VOTable required parameters: table_name, id_column,
-  >>> # lon_column, lat_column, and flux_columns. Can also use the file type specific `read_votable_catalog` method.
+  >>> # lon_column, lat_column, and flux_columns.
   >>> filename = os.path.join(DATA_PATH, "simple_test.vot")
-  >>> sm.read(filename, table_name="VIII_1000_single", id_column="source_id", lon_column="RAJ2000",
-  ...         lat_column="DEJ2000", flux_columns="Si")
-  >>> sm.read(filename, filetype="vot", table_name="VIII_1000_single", id_column="source_id", lon_column="RAJ2000",
-  ...         lat_column="DEJ2000", flux_columns="Si")
-  >>> sm.read_votable_catalog(filename, table_name="VIII_1000_single", id_column="source_id", lon_column="RAJ2000",
-  ...                         lat_column="DEJ2000", flux_columns="Si")
+  >>> # The following are all functionally the same:
+  >>> sm.read(filename, table_name="VIII_1000_single", id_column="source_id",
+  ...          lon_column="RAJ2000",lat_column="DEJ2000", flux_columns="Si")
 
-  >>> # Use the `from_file` method to create SkyModel object without initalizing empty object, optionally specify
-  >>> # the file type.
+  >>> # Use the `from_file` method to create SkyModel object without initalizing
+  >>> # an empty object, optionally specify the file type.
   >>> # VOTable required parameters: table_name, id_column, lon_column, lat_column, and flux_columns.
-  >>> # Can also use the file type specific `read_votable_catalog` method.
-  >>> sm = SkyModel.from_file(filename, table_name="VIII_1000_single", id_column="source_id", lon_column="RAJ2000",
-  ...                         lat_column="DEJ2000", flux_columns="Si")
-  >>> sm = SkyModel.from_file(filename, filetype="vot", table_name="VIII_1000_single", id_column="source_id",
-  ...                         lon_column="RAJ2000", lat_column="DEJ2000", flux_columns="Si")
-  >>> sm = SkyModel.from_votable_catalog(filename, table_name="VIII_1000_single", id_column="source_id",
-  ...                                    lon_column="RAJ2000", lat_column="DEJ2000", flux_columns="Si")
+  >>> sm = SkyModel.from_file(filename, table_name="VIII_1000_single", id_column="source_id",
+  ...                          lon_column="RAJ2000",lat_column="DEJ2000", flux_columns="Si")
 
 d) text
 *******
@@ -106,18 +89,13 @@ d) text
   >>> from pyradiosky.data import DATA_PATH
   >>> sm = SkyModel()
 
-  >>> # Use the `read` method, optionally specify the file type. See Attributes section for required columns of text file.
-  >>> # Can also use the file type specific `read_text_catalog` method.
+  >>> # Use the `read` method, optionally specify the file type. See API docs for required columns of text file.
   >>> filename = os.path.join(DATA_PATH, "pointsource_catalog.txt")
   >>> sm.read(filename)
-  >>> sm.read(filename, filetype="text")
-  >>> sm.read_text_catalog(filename)
 
-  >>> # Use the `from_file` method to create SkyModel object without initalizing empty object, optionally specify
-  >>> # the file type.
+  >>> # Use the `from_file` method to create SkyModel object without initalizing
+  >>> # an empty object, optionally specify the file type.
   >>> sm = SkyModel.from_file(filename)
-  >>> sm = SkyModel.from_file(filename, filetype="text")
-  >>> sm = SkyModel.from_text_catalog(filename)
 
 e) skyh5
 ********
@@ -128,18 +106,13 @@ e) skyh5
   >>> from pyradiosky.data import DATA_PATH
   >>> sm = SkyModel()
 
-  >>> # Use the `read` method, optionally specify the file type. See Attributes section for required columns of text file.
-  >>> # Can also use the file type specific `read_text_catalog` method.
+  >>> # Use the `read` method, optionally specify the file type.
   >>> filename = os.path.join(DATA_PATH, "gsm_icrs.skyh5")
   >>> sm.read(filename)
-  >>> sm.read(filename, filetype="skyh5")
-  >>> sm.read_skyh5(filename)
 
-  >>> # Use the `from_file` method to create SkyModel object without initalizing empty object, optionally specify
-  >>> # the file type.
+  >>> # Use the `from_file` method to create SkyModel object without initalizing
+  >>> # an empty object, optionally specify the file type.
   >>> sm = SkyModel.from_file(filename)
-  >>> sm = SkyModel.from_file(filename, filetype="skyh5")
-  >>> sm = SkyModel.from_skyh5(filename)
 
 SkyModel: Plotting
 ------------------
@@ -276,7 +249,7 @@ b) using stokes_error attribute, changing component type
     :width: 600
 
 c) incorporating astropy healpix package (like plotting pixels), changing component type cont., changing frames
-************************************************************************************************************************
+***************************************************************************************************************
 .. code-block:: python
 
   >>> import os
@@ -333,28 +306,21 @@ c) incorporating astropy healpix package (like plotting pixels), changing compon
   >>> plt.ylabel("Counts") # doctest: +SKIP
   >>> plt.show() # doctest: +SKIP
 
-  >>> sm.healpix_to_point()
-  >>> print(sm.ra[:3])
+  >>> sm_point = sm.copy()
+  >>> sm_point.healpix_to_point()
+  >>> print(sm_point.ra[:3])
   [45d00m00s 135d00m00s 225d00m00s]
-  >>> print(sm.dec[:3])
+  >>> print(sm_point.dec[:3])
   [84d08m59.03857067s 84d08m59.03857067s 84d08m59.03857067s]
-  >>> print(sm.dec[:3].value)
+  >>> print(sm_point.dec[:3].value)
   [84.14973294 84.14973294 84.14973294]
-  >>> sm.transform_to("galactic")
-  >>> sm.transform_to("icrs")
+  >>> sm_point.transform_to("galactic")
+  >>> sm_point.transform_to("icrs")
   >>> # confirms same RA and DEC after transforming point catalog back to icrs frame
-  >>> print(sm.ra[:3])
+  >>> print(sm_point.ra[:3])
   [45d00m00s 135d00m00s 225d00m00s]
-  >>> print(sm.dec[:3])
+  >>> print(sm_point.dec[:3])
   [84d08m59.03857067s 84d08m59.03857067s 84d08m59.03857067s]
-
-  >>> sm.assign_to_healpix()
-  >>> print(sm.nside)
-  8
-  >>> print(sm.hpx_order)
-  ring
-  >>> print(sm.frame)
-  icrs
 
   >>> # used instead of transform_to since this interpolates to new pixel centers, as pixels defined by coordinate system
   >>> sm.healpix_interp_transform("galactic")
@@ -370,18 +336,19 @@ c) incorporating astropy healpix package (like plotting pixels), changing compon
   >>> print(round(hp.interpolate_bilinear_skycoord(coord, sm.stokes.value[0,0,:])))
   6540
 
-  >>> a = (sm.gl.radian/math.pi)[:3]
-  >>> z = np.cos(sm.gb.radian)[:3]
+  >>> gal_l, gal_b = sm.get_lon_lat()
+  >>> gal_l_pi = (gal_l.radian/math.pi)[:3]
+  >>> gal_b_cos = np.cos(gal_b.radian)[:3]
   >>> fig, ax = plt.subplots() # doctest: +SKIP
-  >>> ax.scatter(a, z, alpha = 0) # doctest: +SKIP
+  >>> ax.scatter(gal_l_pi, gal_b_cos, alpha = 0) # doctest: +SKIP
   >>> ax.set_xlabel("phi / pi") # doctest: +SKIP
-  >>> ax.set_ylabel("z = cos(theta)") # doctest: +SKIP
+  >>> ax.set_ylabel("cos(theta)") # doctest: +SKIP
   >>> for i, txt in enumerate(sm.hpx_inds[:3]): # doctest: +SKIP
   ...     #adds pixel index at center of each pixel
-  ...     ax.annotate(txt, (a[i], z[i]), fontsize=8) # doctest: +SKIP
-  >>> for j in range(len(sm.hpx_inds[:3])): # doctest: +SKIP
-  ...     lon = hp.boundaries_lonlat(sm.hpx_inds[j], 100)[0]/math.pi # doctest: +SKIP
-  ...     lat = np.cos(hp.boundaries_lonlat(sm.hpx_inds[j], 100)[1]) # doctest: +SKIP
+  ...     ax.annotate(txt, (gal_l_pi[i], gal_b_cos[i]), fontsize=8) # doctest: +SKIP
+  >>> for hpx_ind in sm.hpx_inds[:3]: # doctest: +SKIP
+  ...     lon = hp.boundaries_lonlat(hpx_ind, 100)[0]/math.pi # doctest: +SKIP
+  ...     lat = np.cos(hp.boundaries_lonlat(hpx_ind, 100)[1]) # doctest: +SKIP
   ...     lon = lon.value # doctest: +SKIP
   ...     lat = lat.value # doctest: +SKIP
   ...     vertices = np.vstack([lon.ravel(), lat.ravel()]).transpose() # doctest: +SKIP
@@ -389,18 +356,19 @@ c) incorporating astropy healpix package (like plotting pixels), changing compon
   ...     # adds boundaries around each pixel
   ...     ax.add_patch(p) # doctest: +SKIP
 
-  >>> a = (sm.gl.radian/math.pi)[:3]
-  >>> z = np.cos(sm.gb.radian)[:3]
+  >>> gal_l, gal_b = sm.get_lon_lat()
+  >>> gal_l_pi = (gal_l.radian/math.pi)[:3]
+  >>> gal_b_cos = np.cos(gal_b.radian)[:3]
   >>> fig, ax = plt.subplots() # doctest: +SKIP
-  >>> ax.scatter(a, z, alpha = 0) # doctest: +SKIP
+  >>> ax.scatter(gal_l_pi, gal_b_cos, alpha = 0) # doctest: +SKIP
   >>> ax.set_xlabel("phi / pi") # doctest: +SKIP
-  >>> ax.set_ylabel("z = cos(theta)") # doctest: +SKIP
+  >>> ax.set_ylabel("cos(theta)") # doctest: +SKIP
   >>> # nested instead of ring
-  >>> for i, txt in enumerate(hp.ring_to_nested(sm.hpx_inds)[:3]): # doctest: +SKIP
-  ...     ax.annotate(txt, (a[i], z[i]), fontsize=8) # doctest: +SKIP
-  >>> for j in range(len(sm.hpx_inds[:3])): # doctest: +SKIP
-  ...     lon = hp.boundaries_lonlat(sm.hpx_inds[j], 100)[0]/math.pi # doctest: +SKIP
-  ...     lat = np.cos(hp.boundaries_lonlat(sm.hpx_inds[j], 100)[1]) # doctest: +SKIP
+  >>> for ind, txt in enumerate(hp.ring_to_nested(sm.hpx_inds)[:3]): # doctest: +SKIP
+  ...     ax.annotate(txt, (gal_l_pi[ind], gal_b_cos[ind]), fontsize=8) # doctest: +SKIP
+  >>> for hpx_ind in sm.hpx_inds[:3]: # doctest: +SKIP
+  ...     lon = hp.boundaries_lonlat(hpx_ind, 100)[0]/math.pi # doctest: +SKIP
+  ...     lat = np.cos(hp.boundaries_lonlat(hpx_ind, 100)[1]) # doctest: +SKIP
   ...     lon = lon.value # doctest: +SKIP
   ...     lat = lat.value # doctest: +SKIP
   ...     vertices = np.vstack([lon.ravel(), lat.ravel()]).transpose() # doctest: +SKIP
@@ -423,16 +391,20 @@ SkyModel: Creating and writing out catalogs
 -------------------------------------------
 
 a) creating and writing out healpix catalog, using get_lon_lat method
-********
+*********************************************************************
 .. code-block:: python
 
   >>> import os
   >>> import numpy as np
   >>> import matplotlib.pyplot as plt # doctest: +SKIP
+  >>> from astropy import units
   >>> from pyradiosky import SkyModel
 
-  >>> sm = SkyModel(component_type="healpix", nside=1, hpx_inds=[0,1,2,3], stokes=np.zeros((4,1,4)), spectral_type="flat",
-  ...               hpx_order="ring")
+  >>> sm = SkyModel(
+  ...   component_type="healpix", nside=1, hpx_inds=[0,1,2,3],
+  ...   stokes=np.zeros((4,1,4)) * units.K,
+  ...   spectral_type="flat", hpx_order="ring", frame="icrs"
+  ... )
   >>> print(sm.get_lon_lat())
   (<Longitude [ 45., 135., 225., 315.] deg>, <Latitude [41.8103149, 41.8103149, 41.8103149, 41.8103149] deg>)
 
@@ -440,7 +412,7 @@ a) creating and writing out healpix catalog, using get_lon_lat method
   >>> sm.write_skyh5(write_file)
 
 b) creating and writing out point catalog, using calculate_rise_set_lsts and clear_time_position_specific_params methods
-*********************************
+************************************************************************************************************************
 .. code-block:: python
 
   >>> import os
@@ -468,9 +440,10 @@ b) creating and writing out point catalog, using calculate_rise_set_lsts and cle
   ...     location=array_location)
   >>> icrs_coord = source_coord.transform_to("icrs")
   >>> # unpolarized only
-  >>> sm = SkyModel(name="zen_source", ra=icrs_coord.ra, dec=icrs_coord.dec, stokes=[1.0, 0, 0, 0] * units.Jy,
-  ...               spectral_type="flat", history = "drawn from zenith_skymodel in test_skymodel.py")
-  >>> sm._set_spectral_type_params(sm.spectral_type)
+  >>> sm = SkyModel(
+  ...   name="zen_source", skycoord=icrs_coord, stokes=[1.0, 0, 0, 0] * units.Jy,
+  ...   spectral_type="flat", history = "drawn from zenith_skymodel in test_skymodel.py"
+  ... )
   >>> print(sm.check(check_extra=True, run_check_acceptability=True))
   True
 
@@ -543,14 +516,7 @@ a) using cut_nonrising method
   >>> from pyradiosky import SkyModel
   >>> from pyradiosky.data import DATA_PATH
   >>> from astropy import units
-  >>> from astropy.coordinates import (
-  ...     SkyCoord,
-  ...     EarthLocation,
-  ...     Angle,
-  ...     AltAz,
-  ...     Longitude,
-  ...     Latitude,
-  ...     Galactic)
+  >>> from astropy.coordinates import EarthLocation
   >>> from astropy.time import Time, TimeDelta
 
   >>> array_location = EarthLocation(lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0)
@@ -578,7 +544,7 @@ a) using cut_nonrising method
   >>> # stokes I (unpolarized) sources given 1 Jy flux, otherwise no flux
   >>> stokes[0, ...] = 1.0 * units.Jy
 
-  >>> sm = SkyModel(name=names, ra=ra, dec=dec, stokes=stokes, spectral_type="flat")
+  >>> sm = SkyModel(name=names, ra=ra, dec=dec, frame="icrs", stokes=stokes, spectral_type="flat")
 
   >>> sm2 = sm.cut_nonrising(array_location.lat, inplace=False)
 
