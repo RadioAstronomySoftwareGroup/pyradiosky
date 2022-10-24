@@ -10,5 +10,5 @@ dependencies:
   - coverage
   - pytest
   - pytest-cov
-  - pyuvdata>=2.2.1
+  - pyuvdata>=2.2.10
   - setuptools_scm
