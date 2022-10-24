@@ -35,7 +35,7 @@ setup_args = {
         "scipy",
         "astropy>=5.0.4",
         "h5py",
-        "pyuvdata>=2.2.1",
+        "pyuvdata>=2.2.10",
         "setuptools_scm",
     ],
     "extras_require": {

@@ -2,7 +2,27 @@
 
 ## [Unreleased]
 
-## Changed
+### Added
+- Add support for all astropy coordinate frames with the new `skycoord` attribute (which
+contains an astropy SkyCoord object) on point objects and the new `hpx_frame` attribute
+on healpix objects. Users can interact with the SkyCoord object directly or use
+convenience methods on SkyModel as appropriate. References to older SkyModel attributes
+are handled for backwards compatibility.
+- Read/write methods for text and votable files now support more astropy frames (not
+just `icrs`).
+- New `lon_column`, `lat_column` and `frame` parameters to the `read` and `from_file`
+methods which apply when reading votable files.
+- Added `calc_frame_coherency` method to calculate and optionally store the
+frame_coherency on the object.
+
+### Changed
+- No longer calculate frame_coherency (previously ra_dec_coherency) on SkyModel
+initialization to save memory.
+- `J2000` in ra and dec columns names of text files are now properly identified as
+indicating that the coordinates are in the FK5 frame rather than ICRS.
+- Added handling for the new `skycoord` and `hpx_frame` parameters in skyh5 read/write
+methods.
+- Updated the pyuvdata requirement to >= 2.2.10
 - Added support for `allowed_failures` keyword in `SkyModel.__eq__` to match
 `pyuvdata.UVBase`, update pyuvdata minimum version to 2.2.1 when that keyword was
 introduced.
@@ -10,6 +30,13 @@ introduced.
 - Dropped support for python 3.7
 
 ### Deprecated
+- The `ra_dec_coherency` attribute in favor of `frame_coherency` because SkyModel
+objects can be in frames that do not use ra/dec coordinates.
+- The `lon`, `lat` and `frame` attributes, in favor of the `skycoord` attribute for
+point objects and the `hpx_inds` and `hpx_frame` attributes for healpix objects.
+- The `ra_column` and `dec_column` parameters in the `read` and `from_file` methods in
+favor of the `lon_column` and `lat_column` as a part of supporting more frames in
+votable files.
 - The `to_recarray` and `from_recarray` methods.
 
 ## [0.1.3] - 2022-02-22

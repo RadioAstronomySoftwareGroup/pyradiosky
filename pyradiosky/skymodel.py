@@ -1083,7 +1083,8 @@ class SkyModel(UVBase):
                     if galactic_warning:
                         warnings.warn(
                             "gl and gb are no longer a parameters on SkyModel objects "
-                            "in the galactic frame. Use l and b instead. "
+                            "in the galactic frame. Use the standard astropy labels "
+                            "l and b instead. "
                             "Starting in version 0.3.0 this call will error.",
                             category=DeprecationWarning,
                         )
@@ -1666,6 +1667,7 @@ class SkyModel(UVBase):
             ) from e
 
         self.skycoord = SkyCoord(*self.get_lon_lat(), frame=self.hpx_frame)
+        self.hpx_frame = None
         self._set_component_type_params("point")
         self.stokes = self.stokes * astropy_healpix.nside_to_pixel_area(self.nside)
         if self.frame_coherency is not None:
@@ -1899,7 +1901,7 @@ class SkyModel(UVBase):
             sky.hpx_frame = sky.skycoord.frame.name
         else:
             warnings.warn(
-                "The frame keyword is deprecated, in the future this method will use "
+                "The frame keyword is deprecated, in version 0.3.0 this method will use "
                 "the frame of this object's skycoord attribute.",
                 DeprecationWarning,
             )
@@ -1917,8 +1919,8 @@ class SkyModel(UVBase):
             if sky.skycoord.frame.name != coords.frame.name:
                 warnings.warn(
                     f"Input parameter frame (value: {frame_obj.name}) differs "
-                    f"from the skycoord frame on this object (value: "
-                    "{sky.skycoord.frame.name}). "
+                    "from the skycoord frame on this object (value: "
+                    f"{sky.skycoord.frame.name}). "
                     "Using input frame for coordinate calculations."
                 )
             sky.hpx_frame = frame_obj.name
@@ -2400,7 +2402,8 @@ class SkyModel(UVBase):
         sky.Nfreqs = freqs.size
         sky.spectral_type = "full"
         sky.freq_array = freqs
-        sky.coherency_radec = sky.calc_frame_coherency()
+        if sky.frame_coherency is not None:
+            sky.coherency_radec = sky.calc_frame_coherency()
 
         if run_check:
             sky.check()
@@ -4217,7 +4220,7 @@ class SkyModel(UVBase):
             Part of expected Flux column(s). Each one should match only one column in the table.
         frame : str
             Name of coordinate frame of source positions (lon/lat columns).
-            Defaults it "icrs". Must be interpretable by
+            Defaults to "icrs". Must be interpretable by
             `astropy.coordinates.frame_transform_graph.lookup_name()`.
         reference_frequency : :class:`astropy.units.Quantity`
             Reference frequency for flux values, assumed to be the same value for all rows.
@@ -5105,6 +5108,7 @@ class SkyModel(UVBase):
         dec_column=None,
         lon_column=None,
         lat_column=None,
+        frame=None,
         flux_columns=None,
         reference_frequency=None,
         freq_array=None,
@@ -5177,6 +5181,11 @@ class SkyModel(UVBase):
         flux_columns : str or list of str
             Part of expected vot Flux column(s). Each one should match only one column
             in the file. Only used for vot files.
+        frame : str
+            Name of coordinate frame for VOTable source positions (lon/lat columns).
+            Defaults to "icrs". Must be interpretable by
+            `astropy.coordinates.frame_transform_graph.lookup_name()`. Only used for
+            vot files.
         reference_frequency : :class:`astropy.units.Quantity`
             Reference frequency for VOTable flux values, assumed to be the same value
             for all components.
@@ -5224,15 +5233,21 @@ class SkyModel(UVBase):
         elif filetype == "vot":
             if ra_column is not None:
                 warnings.warn(
+                    "The `ra_column` keyword is deprecated and will be removed in "
+                    "version 0.3.0, use `lon_column` instead",
                     DeprecationWarning,
-                    "The `ra_column` keyword is deprecated, use `lon_column` instead",
                 )
+                if lon_column is None:
+                    lon_column = ra_column
 
             if dec_column is not None:
                 warnings.warn(
+                    "The `dec_column` keyword is deprecated and will be removed in "
+                    "version 0.3.0, use `lat_column` instead",
                     DeprecationWarning,
-                    "The `dec_column` keyword is deprecated, use `lat_column` instead",
                 )
+                if lat_column is None:
+                    lat_column = dec_column
 
             self.read_votable_catalog(
                 filename,
@@ -5241,6 +5256,7 @@ class SkyModel(UVBase):
                 lon_column,
                 lat_column,
                 flux_columns,
+                frame=frame,
                 reference_frequency=reference_frequency,
                 freq_array=freq_array,
                 spectral_index_column=spectral_index_column,
@@ -5291,6 +5307,7 @@ class SkyModel(UVBase):
         ra_column=None,
         dec_column=None,
         flux_columns=None,
+        frame=None,
         reference_frequency=None,
         freq_array=None,
         spectral_index_column=None,
@@ -5362,6 +5379,11 @@ class SkyModel(UVBase):
         flux_columns : str or list of str
             Part of expected vot Flux column(s). Each one should match only one column
             in the file. Only used for vot files.
+        frame : str
+            Name of coordinate frame for VOTable source positions (lon/lat columns).
+            Defaults to "icrs". Must be interpretable by
+            `astropy.coordinates.frame_transform_graph.lookup_name()`. Only used for
+            vot files.
         reference_frequency : :class:`astropy.units.Quantity`
             Reference frequency for VOTable flux values, assumed to be the same value
             for all components.
@@ -5398,6 +5420,7 @@ class SkyModel(UVBase):
             ra_column=ra_column,
             dec_column=dec_column,
             flux_columns=flux_columns,
+            frame=frame,
             reference_frequency=reference_frequency,
             freq_array=freq_array,
             spectral_index_column=spectral_index_column,
@@ -6102,6 +6125,7 @@ def read_votable_catalog(
         ra_column,
         dec_column,
         flux_columns,
+        frame="icrs",
         reference_frequency=reference_frequency,
         freq_array=freq_array,
         spectral_index_column=spectral_index_column,

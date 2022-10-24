@@ -7,7 +7,7 @@ dependencies:
   - numpy
   - h5py
   - scipy
-  - pyuvdata>=2.2.1
+  - pyuvdata>=2.2.10
   - setuptools_scm
   - pip
   - pip:
