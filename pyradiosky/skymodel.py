@@ -4185,7 +4185,7 @@ class SkyModel(UVBase):
         lon_column,
         lat_column,
         flux_columns,
-        frame="icrs",
+        frame=None,
         reference_frequency=None,
         freq_array=None,
         spectral_index_column=None,
@@ -4220,7 +4220,8 @@ class SkyModel(UVBase):
             Part of expected Flux column(s). Each one should match only one column in the table.
         frame : str
             Name of coordinate frame of source positions (lon/lat columns).
-            Defaults to "icrs". Must be interpretable by
+            Currently defaults to "icrs" to maintain backwards compatibility, in the
+            future will be a required parameter. Must be interpretable by
             `astropy.coordinates.frame_transform_graph.lookup_name()`.
         reference_frequency : :class:`astropy.units.Quantity`
             Reference frequency for flux values, assumed to be the same value for all rows.
@@ -4311,6 +4312,14 @@ class SkyModel(UVBase):
         lat_col_use = _get_matching_fields(
             lat_column, astropy_table.colnames, exclude_start_pattern="_"
         )
+
+        if frame is None:
+            warnings.warn(
+                "frame parameter was not set. Defaulting to 'icrs'. This will become "
+                "an error in version 0.3",
+                DeprecationWarning,
+            )
+            frame = "icrs"
 
         if isinstance(flux_columns, (str)):
             flux_columns = [flux_columns]

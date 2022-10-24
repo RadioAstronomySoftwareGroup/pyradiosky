@@ -2291,12 +2291,14 @@ def test_healpix_import_err(zenith_skymodel):
             skymodel.healpix_to_sky(hpmap, inds, freqs)
 
         with pytest.raises(ImportError, match=errstr):
-            SkyModel(
+            sm = SkyModel(
                 nside=8,
                 hpx_inds=[0],
+                frame="icrs",
                 stokes=Quantity([1.0, 0.0, 0.0, 0.0], unit=units.K),
                 spectral_type="flat",
             )
+            sm.get_lon_lat()
 
         with pytest.raises(ImportError, match=errstr):
             SkyModel.from_healpix_hdf5(os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5"))
@@ -3250,7 +3252,9 @@ def test_read_deprecated_votable():
 
     skyobj = SkyModel()
     msg_expected = [
-        "contains tables with no name or ID, " "Support for such files is deprecated."
+        "contains tables with no name or ID, Support for such files is deprecated.",
+        "frame parameter was not set. Defaulting to 'icrs'. This will become an error "
+        "in version 0.3",
     ]
     with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
         skyobj.read_votable_catalog(
@@ -3260,7 +3264,7 @@ def test_read_deprecated_votable():
     assert skyobj.Ncomponents == 1
 
     msg_expected = [
-        "contains tables with no name or ID, " "Support for such files is deprecated."
+        "contains tables with no name or ID, Support for such files is deprecated.",
     ]
     with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
         with pytest.raises(ValueError, match=("More than one matching table.")):
