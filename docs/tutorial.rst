@@ -72,13 +72,13 @@ c) VOTable
   >>> filename = os.path.join(DATA_PATH, "simple_test.vot")
   >>> # The following are all functionally the same:
   >>> sm.read(filename, table_name="VIII_1000_single", id_column="source_id",
-  ...          lon_column="RAJ2000",lat_column="DEJ2000", flux_columns="Si")
+  ...         lon_column="RAJ2000", lat_column="DEJ2000", frame="fk5", flux_columns="Si")
 
   >>> # Use the `from_file` method to create SkyModel object without initalizing
   >>> # an empty object, optionally specify the file type.
   >>> # VOTable required parameters: table_name, id_column, lon_column, lat_column, and flux_columns.
   >>> sm = SkyModel.from_file(filename, table_name="VIII_1000_single", id_column="source_id",
-  ...                          lon_column="RAJ2000",lat_column="DEJ2000", flux_columns="Si")
+  ...                         lon_column="RAJ2000", lat_column="DEJ2000", frame="fk5", flux_columns="Si")
 
 d) text
 *******
