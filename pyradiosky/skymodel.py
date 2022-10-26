@@ -179,16 +179,22 @@ def _get_frame_comp_cols(colnames):
                 lat_col = name
             if lon_col is not None and lat_col is not None:
                 break
-        frame_str = lon_col.lower().split(lon_name + "_", 1)[1]
+        if lon_col is not None:
+            frame_str = lon_col.lower().split(lon_name + "_", 1)[1]
+        elif lat_col is not None:
+            frame_str = lat_col.lower().split(lat_name + "_", 1)[1]
 
         if frame_str == frame_use:
             frame_use = default_frame.frame
         elif frame_use in ["fk4", "fk5"]:
-            equinox = Time(frame_str.split("_equinox", 1)[1])
+            if frame_use == "fk4":
+                equinox = Time("b" + frame_str.split("_b", 1)[1])
+            else:
+                equinox = Time("j" + frame_str.split("_j", 1)[1])
             frame_use = SkyCoord(
                 0, 0, unit="deg", frame=frame_use, equinox=equinox
             ).frame
-    else:
+    elif frame_use is not None:
         if frame_use.name == "fk5":
             for name in colnames:
                 if ra_fk5_pattern.match(name.lower()):
@@ -206,13 +212,14 @@ def _get_frame_comp_cols(colnames):
                 if lon_col is not None and lat_col is not None:
                     break
 
+    if not isinstance(frame_use, BaseCoordinateFrame):
+        raise ValueError("frame not recognized from coordinate column")
+
     if lon_col is None:
         raise ValueError("Longitudinal component column not identified.")
     if lat_col is None:
         raise ValueError("Latitudinal component column not identified.")
 
-    if not isinstance(frame_use, BaseCoordinateFrame):
-        raise ValueError(f"frame {frame_use} not recognized from coordinate column")
     return frame_use, lon_col, lat_col
 
 
@@ -1059,7 +1066,6 @@ class SkyModel(UVBase):
             )
             if self.frame_coherency is None:
                 self.calc_frame_coherency()
-
             return self.frame_coherency
 
         if name == "frame":
@@ -1082,7 +1088,7 @@ class SkyModel(UVBase):
                 if self.skycoord is not None:
                     if galactic_warning:
                         warnings.warn(
-                            "gl and gb are no longer a parameters on SkyModel objects "
+                            "gl and gb are no longer parameters on SkyModel objects "
                             "in the galactic frame. Use the standard astropy labels "
                             "l and b instead. "
                             "Starting in version 0.3.0 this call will error.",
@@ -1185,6 +1191,12 @@ class SkyModel(UVBase):
                 "Only one of freq_array and reference_frequency can be specified, not both."
             )
 
+        # Run the basic check from UVBase
+        super(SkyModel, self).check(
+            check_extra=check_extra, run_check_acceptability=run_check_acceptability
+        )
+
+        # check units on stokes & frame_coherency
         for param in [self._stokes, self._frame_coherency]:
             if param.value is None:
                 continue
@@ -1208,11 +1220,6 @@ class SkyModel(UVBase):
                     "stokes_error parameter must have units that are equivalent to the "
                     "units of the stokes parameter."
                 )
-
-        # Run the basic check from UVBase
-        super(SkyModel, self).check(
-            check_extra=check_extra, run_check_acceptability=run_check_acceptability
-        )
 
         # make sure freq_array or reference_frequency if present is compatible with Hz
         if not (self.freq_array is None or self.freq_array.unit.is_equivalent("Hz")):
@@ -1532,7 +1539,7 @@ class SkyModel(UVBase):
                 self.stokes_error = self.stokes_error.to(units.Jy)
 
         if self.frame_coherency is not None:
-            self.frame_coherency = self.calc_frame_coherency()
+            self.calc_frame_coherency()
 
     def jansky_to_kelvin(self):
         """
@@ -1576,7 +1583,7 @@ class SkyModel(UVBase):
             self.stokes_error = self.stokes_error * conv_factor
 
         if self.frame_coherency is not None:
-            self.frame_coherency = self.calc_frame_coherency()
+            self.calc_frame_coherency()
 
     def _get_frame_obj(self):
         if self.component_type == "healpix":
@@ -2867,21 +2874,19 @@ class SkyModel(UVBase):
                 other_param = getattr(other, param)
                 param_name = this_param.name
                 if this_param.value is not None and other_param.value is not None:
-                    setattr(
-                        this,
-                        param_name,
-                        np.concatenate((this_param.value, other_param.value)),
-                    )
-                elif this_param.value is not None:
+                    if param == "_skycoord":
+                        final_val = sc_concatenate(
+                            (this_param.value, other_param.value)
+                        )
+                    else:
+                        final_val = np.concatenate(
+                            (this_param.value, other_param.value)
+                        )
+                    setattr(this, param_name, final_val)
+                elif this_param.value is not None or other_param.value is not None:
                     warnings.warn(
-                        f"This object has {param_name} values, other object does not, "
-                        f"setting {param_name} to None. "
-                    )
-                    setattr(this, param_name, None)
-                elif other_param.value is not None:
-                    warnings.warn(
-                        f"This object does not have {param_name} values, other object "
-                        f"does, setting {param_name} to None. "
+                        f"Only one object has {param_name} values, setting "
+                        f"{param_name} to None on final object."
                     )
                     setattr(this, param_name, None)
         else:
@@ -2890,12 +2895,12 @@ class SkyModel(UVBase):
         this.stokes = np.concatenate((this.stokes, other.stokes), axis=2)
 
         if this.frame_coherency is not None and other.frame_coherency is not None:
-            this.frame_coherency = (
-                np.concatenate((this.frame_coherency, other.frame_coherency), axis=3),
+            this.frame_coherency = np.concatenate(
+                (this.frame_coherency, other.frame_coherency), axis=3
             )
         elif this.frame_coherency is not None or other.frame_coherency is not None:
             warnings.warn(
-                "Only one object has frame coherencies, setting frame_coherency"
+                "Only one object has frame_coherency values, setting frame_coherency "
                 "to None on final object. Use `calc_frame_coherency` to "
                 "recalculate them."
             )
@@ -2932,7 +2937,7 @@ class SkyModel(UVBase):
                 setattr(this, param, new_param)
             elif this_param is not None:
                 warnings.warn(
-                    f"This object has {param} values, other object does not. "
+                    f"Only one object has {param} values. "
                     f"Filling missing values with {fill_str}."
                 )
                 fill_shape = list(this_param.shape)
@@ -2963,7 +2968,7 @@ class SkyModel(UVBase):
                 setattr(this, param, new_param)
             elif other_param is not None:
                 warnings.warn(
-                    f"This object does not have {param} values, other object does. "
+                    f"Only one object has {param} values. "
                     f"Filling missing values with {fill_str}."
                 )
                 fill_shape = list(other_param.shape)
@@ -3933,12 +3938,6 @@ class SkyModel(UVBase):
                         f"Expected parameter {parname} is missing in file."
                     )
 
-                if header["component_type"][()].tobytes().decode("utf-8") == "healpix":
-                    # we can skip special handling for lon/lat for healpix models
-                    # these parameters are no longer needed in healpix
-                    if parname in ["lon", "lat", "ra", "dec"]:
-                        continue
-
                 value = _get_value_hdf5_group(header, parname, expected_type)
 
                 if parname == "nside":
@@ -4099,6 +4098,7 @@ class SkyModel(UVBase):
             try:
                 history = history.decode("utf8")
             except (UnicodeDecodeError, AttributeError):
+                history = ""
                 pass
             try:
                 nside = int(fileobj.attrs["nside"])
@@ -5575,11 +5575,8 @@ class SkyModel(UVBase):
         hpmap = self.stokes[0, :, :].to(units.K).value
 
         history = self.history
-        if history is None:
-            history = self.pyradiosky_version_str
-        else:
-            if not uvutils._check_history_version(history, self.pyradiosky_version_str):
-                history += self.pyradiosky_version_str
+        if not uvutils._check_history_version(history, self.pyradiosky_version_str):
+            history += self.pyradiosky_version_str
 
         valid_params = {
             "Npix": self.Ncomponents,
@@ -5603,7 +5600,7 @@ class SkyModel(UVBase):
             for k in valid_params:
                 d = valid_params[k]
                 if k in dsets:
-                    if np.isscalar(d):
+                    if k == "history":
                         fileobj.create_dataset(k, data=d, dtype=dsets[k])
                     else:
                         fileobj.create_dataset(
