@@ -328,6 +328,17 @@ def test_init_error(zenith_skycoord):
             component_type="foo",
         )
 
+    with pytest.raises(
+        ValueError, match="skycoord parameter must be a SkyCoord object."
+    ):
+        SkyModel(
+            name="zenith_source",
+            skycoord="foo",
+            stokes=[1.0, 0, 0, 0],
+            spectral_type="flat",
+            component_type="point",
+        )
+
 
 @pytest.mark.parametrize("spec_type", ["spectral_index", "full", "subband"])
 def test_init_error_freqparams(zenith_skycoord, spec_type):
