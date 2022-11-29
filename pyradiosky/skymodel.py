@@ -138,10 +138,10 @@ def _get_frame_comp_cols(colnames):
     frame_names = frame_transform_graph.get_names()
     lon_col = None
     lat_col = None
-    ra_fk5_pattern = re.compile("ra[_]?j2000")
-    dec_fk5_pattern = re.compile("de[c]?[_]?j2000")
-    ra_fk4_pattern = re.compile("ra[_]?b1950")
-    dec_fk4_pattern = re.compile("de[c]?[_]?b1950")
+    ra_fk5_pattern = re.compile("ra_j2000")
+    dec_fk5_pattern = re.compile("de[c]?_j2000")
+    ra_fk4_pattern = re.compile("ra_b1950")
+    dec_fk4_pattern = re.compile("de[c]?_b1950")
     for name in colnames:
         if (
             ra_fk5_pattern.match(name.casefold()) is not None
