@@ -22,6 +22,7 @@ from astropy.coordinates import (
     ICRS,
     concatenate as sc_concatenate,
     BaseCoordinateFrame,
+    SkyCoord,
 )
 from astropy.time import Time
 import astropy.units as units
@@ -54,21 +55,12 @@ __all__ = [
     "write_healpix_hdf5",
 ]
 
-
 try:
-    from lunarsky import SkyCoord, MoonLocation, LunarTopo
+    from lunarsky import MoonLocation, LunarTopo
 
     hasmoon = True
 except ImportError:
-    from astropy.coordinates import SkyCoord
-
     hasmoon = False
-
-    class MoonLocation:
-        pass
-
-    class LunarTopo:
-        pass
 
 
 class TelescopeLocationParameter(UVParameter):
@@ -79,11 +71,13 @@ class TelescopeLocationParameter(UVParameter):
 def _get_matching_fields(
     name_to_match, name_list, exclude_start_pattern=None, brittle=True
 ):
-    match_list = [name for name in name_list if name_to_match.lower() in name.lower()]
+    match_list = [
+        name for name in name_list if name_to_match.casefold() in name.casefold()
+    ]
     if len(match_list) > 1:
         # try requiring exact match
         match_list_temp = [
-            name for name in match_list if name_to_match.lower() == name.lower()
+            name for name in match_list if name_to_match.casefold() == name.casefold()
         ]
         if len(match_list_temp) == 1:
             match_list = match_list_temp
@@ -144,48 +138,48 @@ def _get_frame_comp_cols(colnames):
     frame_names = frame_transform_graph.get_names()
     lon_col = None
     lat_col = None
-    ra_fk5_pattern = re.compile("ra[_]*j2000")
-    dec_fk5_pattern = re.compile("de[c_]*j2000")
-    ra_fk4_pattern = re.compile("ra[_]*b1950")
-    dec_fk4_pattern = re.compile("de[c_]*b1950")
+    ra_fk5_pattern = re.compile("ra[_]?j2000")
+    dec_fk5_pattern = re.compile("de[c]?[_]?j2000")
+    ra_fk4_pattern = re.compile("ra[_]?b1950")
+    dec_fk4_pattern = re.compile("de[c]?[_]?b1950")
     for name in colnames:
         if (
-            ra_fk5_pattern.match(name.lower()) is not None
-            or dec_fk5_pattern.match(name.lower()) is not None
+            ra_fk5_pattern.match(name.casefold()) is not None
+            or dec_fk5_pattern.match(name.casefold()) is not None
         ):
             frame_use = SkyCoord(0, 0, unit="deg", frame="fk5").frame
             break
         elif (
-            ra_fk4_pattern.match(name.lower()) is not None
-            or dec_fk4_pattern.match(name.lower()) is not None
+            ra_fk4_pattern.match(name.casefold()) is not None
+            or dec_fk4_pattern.match(name.casefold()) is not None
         ):
             frame_use = SkyCoord(0, 0, unit="deg", frame="fk4").frame
             break
 
         for frame in frame_names:
-            if frame in name.lower():
+            if frame in name.casefold():
                 frame_use = frame
                 break
         if frame_use is not None:
             break
 
     if isinstance(frame_use, str):
-        default_frame = SkyCoord(0, 0, unit="deg", frame=frame_use)
-        lon_name, lat_name = _get_lon_lat_component_names(default_frame)
+        default_skycoord = SkyCoord(0, 0, unit="deg", frame=frame_use)
+        lon_name, lat_name = _get_lon_lat_component_names(default_skycoord)
         for name in colnames:
-            if lon_name in name.lower():
+            if lon_name in name.casefold():
                 lon_col = name
-            if lat_name in name.lower():
+            if lat_name in name.casefold():
                 lat_col = name
             if lon_col is not None and lat_col is not None:
                 break
         if lon_col is not None:
-            frame_str = lon_col.lower().split(lon_name + "_", 1)[1]
+            frame_str = lon_col.casefold().split(lon_name + "_", 1)[1]
         elif lat_col is not None:
-            frame_str = lat_col.lower().split(lat_name + "_", 1)[1]
+            frame_str = lat_col.casefold().split(lat_name + "_", 1)[1]
 
         if frame_str == frame_use:
-            frame_use = default_frame.frame
+            frame_use = default_skycoord.frame
         elif frame_use in ["fk4", "fk5"]:
             if frame_use == "fk4":
                 equinox = Time("b" + frame_str.split("_b", 1)[1])
@@ -197,17 +191,17 @@ def _get_frame_comp_cols(colnames):
     elif frame_use is not None:
         if frame_use.name == "fk5":
             for name in colnames:
-                if ra_fk5_pattern.match(name.lower()):
+                if ra_fk5_pattern.match(name.casefold()):
                     lon_col = name
-                if dec_fk5_pattern.match(name.lower()):
+                if dec_fk5_pattern.match(name.casefold()):
                     lat_col = name
                 if lon_col is not None and lat_col is not None:
                     break
         else:
             for name in colnames:
-                if ra_fk4_pattern.match(name.lower()):
+                if ra_fk4_pattern.match(name.casefold()):
                     lon_col = name
-                if dec_fk4_pattern.match(name.lower()):
+                if dec_fk4_pattern.match(name.casefold()):
                     lat_col = name
                 if lon_col is not None and lat_col is not None:
                     break
@@ -718,9 +712,11 @@ class SkyModel(UVBase):
                     if param is not None:
                         raise ValueError(f"Cannot set {param} if the skycoord is set.")
 
+                if not isinstance(skycoord, SkyCoord):
+                    raise ValueError("skycoord parameter must be a SkyCoord object.")
+
                 if skycoord.isscalar:
                     skycoord = SkyCoord([skycoord])
-                self.skycoord = skycoord
             else:
                 # Raise error if missing the right combination.
                 coords_given = {
@@ -864,7 +860,7 @@ class SkyModel(UVBase):
             if hpx_inds is not None:
                 self.hpx_inds = np.atleast_1d(hpx_inds)
             if hpx_order is not None:
-                self.hpx_order = str(hpx_order).lower()
+                self.hpx_order = str(hpx_order).casefold()
 
                 # Check healpix ordering scheme
                 if not self._hpx_order.check_acceptability()[0]:
@@ -1863,10 +1859,11 @@ class SkyModel(UVBase):
             sources mapped to them will be included in the object.
         sort : bool
             Option to sort the object in order of the healpix indicies.
-        frame : str, `BaseCoordinateFrame` class or instance.
-            The frame of the input point source catalog.
-            This is optional if the frame attribute is set on the SkyModel object.
-            Currently frame must be one of ["galactic", "icrs"].
+        frame : str, `BaseCoordinateFrame` class or instance
+            Deprecated. The frame of the input point source catalog.
+            Defaults to the the object's skycoord.frame attribute. Only "galactic" or
+            "icrs" are accepted through this keyword but any astropy compatible frame
+            can be used from the object's skycoord.frame attribute.
         inplace : bool
             Option to do the change in place on the object rather than return a new
             object.
@@ -2442,7 +2439,7 @@ class SkyModel(UVBase):
                 "time must be an astropy Time object. value was: {t}".format(t=time)
             )
 
-        if not isinstance(telescope_location, (EarthLocation, MoonLocation)):
+        if not isinstance(telescope_location, self._telescope_location.expected_type):
 
             errm = "telescope_location must be an :class:`astropy.EarthLocation` object"
             if hasmoon:
@@ -2470,7 +2467,7 @@ class SkyModel(UVBase):
             warnings.filterwarnings(
                 "ignore",
                 message="The get_frame_attr_names",
-            if isinstance(self.telescope_location, MoonLocation):
+            if hasmoon and isinstance(self.telescope_location, MoonLocation):
                 source_altaz = skycoord_use.transform_to(
                     LunarTopo(obstime=self.time, location=self.telescope_location)
                 )
@@ -2696,7 +2693,9 @@ class SkyModel(UVBase):
             )
             self.update_positions(self.time, deprecated_location)
 
-        if not isinstance(self.telescope_location, (EarthLocation, MoonLocation)):
+        if not isinstance(
+            self.telescope_location, self._telescope_location.expected_type
+        ):
 
             errm = "telescope_location must be an astropy EarthLocation object"
             if hasmoon:
@@ -4613,10 +4612,18 @@ class SkyModel(UVBase):
         ----------
         catalog_csv: str
             Path to tab separated value file with the following required columns:
-            *  `source_id`: source name as a string of maximum 10 characters
-            *  `ra_j2000`: right ascension at J2000 epoch, in decimal degrees
-            *  `dec_j2000`: declination at J2000 epoch, in decimal degrees
-            *  `Flux [Jy]`: Stokes I flux density in Janskys
+            * `source_id`: source name as a string of maximum 10 characters
+            * `<lon_coord>_<frame_info>`: Longitudinal coordinate in degrees, can be
+            FK4 or FK5 (noted by a `b` or `j` followed by the equinox) or any frame
+            supported by astropy which does not require extra attributes. Tested
+            examples include ICRS (`ra_icrs`), Galactic (`l_galactic`), FK4 (`ra_b1950`)
+            and FK5 (`ra_j2000`).
+            * `<lat_coord>_<frame_info>`: Latitudinal coordinate in degrees, can be
+            FK4 or FK5 (noted by a `b` or `j` followed by the equinox) or any frame
+            supported by astropy which does not require extra attributes. Tested
+            examples include ICRS (`dec_icrs`), Galactic (`b_galactic`),
+            FK4 (`dec_b1950`) and FK5 (`dec_j2000`).
+            * `Flux [Jy]`: Stokes I flux density in Janskys
 
             If flux is specified at multiple frequencies (must be the same set for all
             components), the frequencies must be included in each column name,
@@ -4664,27 +4671,29 @@ class SkyModel(UVBase):
         frame_use, lon_col, lat_col = _get_frame_comp_cols(header)
 
         flux_fields = [
-            colname for colname in header if colname.lower().startswith("flux")
+            colname for colname in header if colname.casefold().startswith("flux")
         ]
         flux_error_fields = [
-            colname for colname in flux_fields if "error" in colname.lower()
+            colname for colname in flux_fields if "error" in colname.casefold()
         ]
         if len(flux_error_fields) > 0:
             for colname in flux_error_fields:
                 flux_fields.remove(colname)
 
-        flux_fields_lower = [colname.lower() for colname in flux_fields]
+        flux_fields_lower = [colname.casefold() for colname in flux_fields]
 
         if len(flux_error_fields) > 0:
             if len(flux_error_fields) != len(flux_fields):
                 raise ValueError(
                     "Number of flux error fields does not match number of flux fields."
                 )
-            flux_error_fields_lower = [colname.lower() for colname in flux_error_fields]
+            flux_error_fields_lower = [
+                colname.casefold() for colname in flux_error_fields
+            ]
 
-        header_lower = [colname.lower() for colname in header]
+        header_lower = [colname.casefold() for colname in header]
 
-        expected_cols = ["source_id", lon_col.lower(), lat_col.lower()]
+        expected_cols = ["source_id", lon_col.casefold(), lat_col.casefold()]
         if "frequency" in header_lower:
             if len(flux_fields) != 1:
                 raise ValueError(
@@ -5222,7 +5231,7 @@ class SkyModel(UVBase):
             if extension == ".txt":
                 filetype = "text"
             elif extension == ".vot":
-                if "gleam" in filename.lower():
+                if "gleam" in filename.casefold():
                     filetype = "gleam"
                 else:
                     filetype = "vot"
@@ -5901,7 +5910,7 @@ def healpix_to_sky(hpmap, indices, freqs, hpx_order="ring"):
         "This function will be removed in version 0.2.0.",
         category=DeprecationWarning,
     )
-    hpx_order = str(hpx_order).lower()
+    hpx_order = str(hpx_order).casefold()
     if hpx_order not in ["ring", "nested"]:
         raise ValueError("order must be 'nested' or 'ring'")
 
