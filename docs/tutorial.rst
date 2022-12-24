@@ -937,8 +937,8 @@ b) spectral index spectral type
   >>> plt.show() # doctest: +SKIP
 
   >>> sm.at_frequencies(freqs=[200*10**6]*units.Hz, inplace=True, run_check=True, atol=None)
-  >>> print(sm.stokes[0,0,8235])
-  0.5330077352813429 Jy
+  >>> print(f"{sm.stokes[0,0,8235]:.4f}")
+  0.5330 Jy
 
 .. image:: Images/fhd_catalog_refflux_nonzerospec.png
     :width: 600
