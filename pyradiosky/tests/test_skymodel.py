@@ -90,7 +90,14 @@ def moonsky():
         location=array_location,
     )
 
-    icrs_coord = zen_coord.transform_to("icrs")
+    # This filter can be removed when lunarsky is updated to not trigger this
+    # astropy deprecation warning.
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="The get_frame_attr_names",
+        )
+        icrs_coord = zen_coord.transform_to("icrs")
 
     ra = icrs_coord.ra
     dec = icrs_coord.dec
@@ -116,8 +123,8 @@ def healpix_data():
     frequencies = np.linspace(100, 110, 10)
     pixel_area = astropy_healpix.nside_to_pixel_area(nside)
 
-    # Note that the cone search includes any pixels that overlap with the search
-    # region. With such a low resolution, this returns some slightly different
+    # Note that the cone search includes any pixels that overlap with the search region.
+    # With such a low resolution, this returns some slightly different
     # results from the equivalent healpy search. Subtracting(0.75 * pixres) from
     # the pixel area resolves this discrepancy for the test.
 
@@ -4371,6 +4378,9 @@ def test_skymodel_init_galactic_warning():
         )
 
 
+# This filter can be removed when lunarsky is updated to not trigger this
+# astropy deprecation warning.
+@pytest.mark.filterwarnings("ignore:The get_frame_attr_names")
 def test_skymodel_transform_unsupported_frame(zenith_skymodel):
     with pytest.raises(
         ValueError, match="Supplied frame GCRS is not supported at this time."
@@ -4378,6 +4388,9 @@ def test_skymodel_transform_unsupported_frame(zenith_skymodel):
         zenith_skymodel.transform_to("gcrs")
 
 
+# This filter can be removed when lunarsky is updated to not trigger this
+# astropy deprecation warning.
+@pytest.mark.filterwarnings("ignore:The get_frame_attr_names")
 def test_skymodel_tranform_frame(zenith_skymodel, zenith_skycoord):
     zenith_skymodel.transform_to("galactic")
     zenith_skycoord = zenith_skycoord.transform_to("galactic")
@@ -4387,6 +4400,9 @@ def test_skymodel_tranform_frame(zenith_skymodel, zenith_skycoord):
     assert units.allclose(zenith_skymodel.gb, zenith_skycoord.b)
 
 
+# This filter can be removed when lunarsky is updated to not trigger this
+# astropy deprecation warning.
+@pytest.mark.filterwarnings("ignore:The get_frame_attr_names")
 def test_skymodel_tranform_frame_roundtrip(zenith_skymodel, zenith_skycoord):
     original_sky = copy.deepcopy(zenith_skymodel)
 
