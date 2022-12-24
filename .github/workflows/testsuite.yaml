@@ -116,12 +116,16 @@ jobs:
           file: ./coverage.xml #optional
 
   min_versions:
-    needs: tests
+    # needs: tests
     env:
       ENV_NAME: min_versions
       PYTHON: 3.8
     name: Min Versions Testing
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
+      # should go to ubuntu instead when we require at least pyuvdata 2.2.4
+      # there are no linux packages on conda forge between 2.1.15 and 2.2.4 for some
+      # reason
+    # runs-on: ubuntu-latest
     strategy:
       fail-fast: false
     defaults:
