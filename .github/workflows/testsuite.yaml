@@ -210,9 +210,10 @@ jobs:
 
       - name: Run Tests
         run: |
+          mkdir test-reports
           mkdir -p empty
           cd empty
-          python -m pytest -W error --pyargs pyradiosky --cov=pyradiosky --cov-config=../.coveragerc --cov-report xml:.././coverage.xml --junitxml=../test-reports/xunit.xml
+          python -m pytest -W error --pyargs pyradiosky --cov=pyradiosky --cov-config="../.coveragerc" --cov-report xml:".././coverage.xml" --junitxml="../test-reports/xunit.xml"
           cd ..
 
       - uses: codecov/codecov-action@v2.0.2
