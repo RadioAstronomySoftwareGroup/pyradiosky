@@ -998,16 +998,28 @@ class SkyModel(UVBase):
         # Error if attribute not found
         return self.__getattribute__(name)
 
-    def __eq__(self, other, check_extra=True, allowed_failures="filename"):
+    def __eq__(
+        self, other, check_extra=True, allowed_failures="filename", silent=False
+    ):
         """Check for equality, check for future equality."""
         # Run the basic __eq__ from UVBase
         # the filters below should be removed in version 0.3.0
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message="lon is no longer")
             warnings.filterwarnings("ignore", message="lat is no longer")
-            equal = super(SkyModel, self).__eq__(
-                other, check_extra=check_extra, allowed_failures=allowed_failures
-            )
+            try:
+                # The `silent` parameter was added in the version *after* pyuvdata
+                # version 2.2.12
+                equal = super(SkyModel, self).__eq__(
+                    other,
+                    check_extra=check_extra,
+                    allowed_failures=allowed_failures,
+                    silent=silent,
+                )
+            except TypeError:
+                equal = super(SkyModel, self).__eq__(
+                    other, check_extra=check_extra, allowed_failures=allowed_failures
+                )
 
             # Issue deprecation warning if ra/decs aren't close to future_angle_tol levels
             if self._lon.value is not None and not units.quantity.allclose(
@@ -1191,7 +1203,14 @@ class SkyModel(UVBase):
         # we will need the starting frame for some interpolation later
         old_frame = coords.frame
 
-        coords = coords.transform_to(frame)
+        # This filter can be removed when lunarsky is updated to not trigger this
+        # astropy deprecation warning.
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="The get_frame_attr_names",
+            )
+            coords = coords.transform_to(frame)
 
         frame = coords.frame
 
@@ -1718,7 +1737,14 @@ class SkyModel(UVBase):
 
         hpx_obj = astropy_healpix.HEALPix(nside, order=order, frame=frame)
         coords = SkyCoord(self.lon, self.lat, frame=frame)
-        hpx_inds = hpx_obj.skycoord_to_healpix(coords)
+        # This filter can be removed when lunarsky is updated to not trigger this
+        # astropy deprecation warning.
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="The get_frame_attr_names",
+            )
+            hpx_inds = hpx_obj.skycoord_to_healpix(coords)
 
         sky._set_component_type_params("healpix")
         sky.nside = nside
@@ -2231,14 +2257,21 @@ class SkyModel(UVBase):
         lon, lat = self.get_lon_lat()
 
         skycoord_use = SkyCoord(lon, lat, frame=self._frame_inst)
-        if isinstance(self.telescope_location, MoonLocation):
-            source_altaz = skycoord_use.transform_to(
-                LunarTopo(obstime=self.time, location=self.telescope_location)
+        # This filter can be removed when lunarsky is updated to not trigger this
+        # astropy deprecation warning.
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="The get_frame_attr_names",
             )
-        else:
-            source_altaz = skycoord_use.transform_to(
-                AltAz(obstime=self.time, location=self.telescope_location)
-            )
+            if isinstance(self.telescope_location, MoonLocation):
+                source_altaz = skycoord_use.transform_to(
+                    LunarTopo(obstime=self.time, location=self.telescope_location)
+                )
+            else:
+                source_altaz = skycoord_use.transform_to(
+                    AltAz(obstime=self.time, location=self.telescope_location)
+                )
 
         alt_az = np.array([source_altaz.alt.rad, source_altaz.az.rad])
 
@@ -2285,7 +2318,14 @@ class SkyModel(UVBase):
             representation_type="cartesian",
         )
 
-        axes_altaz = axes_icrs.transform_to("altaz")
+        # This filter can be removed when lunarsky is updated to not trigger this
+        # astropy deprecation warning.
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="The get_frame_attr_names",
+            )
+            axes_altaz = axes_icrs.transform_to("altaz")
         axes_altaz.representation_type = "cartesian"
 
         """ This transformation matrix is generally not orthogonal

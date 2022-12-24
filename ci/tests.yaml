@@ -4,16 +4,15 @@ channels:
   - defaults
 dependencies:
   - astropy>=5.0.4
-  - astropy-healpix
-  - astroquery
-  - h5py
-  - numpy
-  - h5py
-  - scipy
+  - astropy-healpix>=0.6
+  - astroquery>=0.4.4
+  - h5py>=3.0
+  - numpy>=1.19.*
+  - scipy>=1.3
   - coverage
   - pytest-cov
-  - setuptools_scm
+  - setuptools_scm>=7.0.3
   - pyuvdata>=2.2.1
   - pip
   - pip:
-      - lunarsky
+      - lunarsky>=0.1.2
