@@ -107,7 +107,7 @@ jobs:
 
       - name: Run Tests
         run: |
-          python -m pytest -v --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml --junitxml=test-reports/xunit.xml
+          python -m pytest --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml --junitxml=test-reports/xunit.xml
 
       - uses: codecov/codecov-action@v2.0.2
         if: success()
@@ -116,7 +116,7 @@ jobs:
           file: ./coverage.xml #optional
 
   min_versions:
-    # needs: tests
+    needs: tests
     env:
       ENV_NAME: min_versions
       PYTHON: 3.8
@@ -162,7 +162,7 @@ jobs:
 
       - name: Run Tests
         run: |
-          python -m pytest -v --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml --junitxml=test-reports/xunit.xml
+          python -m pytest --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml --junitxml=test-reports/xunit.xml
 
       - uses: codecov/codecov-action@v2.0.2
         if: success()
@@ -210,7 +210,10 @@ jobs:
 
       - name: Run Tests
         run: |
-          python -m pytest -W error --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml --junitxml=test-reports/xunit.xml
+          mkdir -p empty
+          cd empty
+          python -m pytest -W error --pyargs pyradiosky --cov=pyradiosky --cov-config=../.coveragerc --cov-report xml:.././coverage.xml --junitxml=../test-reports/xunit.xml
+          cd ..
 
       - uses: codecov/codecov-action@v2.0.2
         if: success()
