@@ -235,6 +235,7 @@ def _add_value_hdf5_group(group, name, value, expected_type):
         value = value.value
 
     if isinstance(value, Time):
+        object_type = "time"
         value = str(value)
 
     try:
@@ -268,12 +269,14 @@ def _get_value_hdf5_group(group, name, expected_type):
     # Now we use `object_type` but we used to use `angtype` so check for both
     angtype = dset.attrs.get("angtype", None)
     object_type = dset.attrs.get("object_type", None)
-    if object_type == "earthlocation":
-        value = EarthLocation.from_geocentric(*value)
     if object_type == "latitude" or angtype == "latitude":
         value = Latitude(value)
     elif object_type == "longitude" or angtype == "longitude":
         value = Longitude(value)
+    elif object_type == "earthlocation":
+        value = EarthLocation.from_geocentric(*value)
+    elif object_type == "time":
+        value = Time(value)
 
     if expected_type is str:
         if isinstance(value, np.ndarray):
