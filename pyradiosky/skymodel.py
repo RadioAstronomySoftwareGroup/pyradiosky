@@ -220,12 +220,16 @@ def _get_frame_comp_cols(colnames):
 def _add_value_hdf5_group(group, name, value, expected_type):
     # Extra attributes for astropy Quantity-derived classes.
     unit = None
-    angtype = None
+    object_type = None
     if isinstance(value, units.Quantity):
         if isinstance(value, Latitude):
-            angtype = "latitude"
+            object_type = "latitude"
         elif isinstance(value, Longitude):
-            angtype = "longitude"
+            object_type = "longitude"
+        elif isinstance(value, EarthLocation):
+            object_type = "earthlocation"
+            value = Quantity(value.to_geocentric())
+
         # Use `str` to ensure this works for Composite units as well.
         unit = str(value.unit)
         value = value.value
@@ -249,8 +253,8 @@ def _add_value_hdf5_group(group, name, value, expected_type):
 
     if unit is not None:
         group[name].attrs["unit"] = unit
-    if angtype is not None:
-        group[name].attrs["angtype"] = angtype
+    if object_type is not None:
+        group[name].attrs["object_type"] = object_type
 
 
 def _get_value_hdf5_group(group, name, expected_type):
@@ -261,11 +265,14 @@ def _get_value_hdf5_group(group, name, expected_type):
     if "unit" in dset.attrs:
         value *= units.Unit(dset.attrs["unit"])
 
+    # Now we use `object_type` but we used to use `angtype` so check for both
     angtype = dset.attrs.get("angtype", None)
-
-    if angtype == "latitude":
+    object_type = dset.attrs.get("object_type", None)
+    if object_type == "earthlocation":
+        value = EarthLocation.from_geocentric(*value)
+    if object_type == "latitude" or angtype == "latitude":
         value = Latitude(value)
-    elif angtype == "longitude":
+    elif object_type == "longitude" or angtype == "longitude":
         value = Longitude(value)
 
     if expected_type is str:
@@ -308,10 +315,10 @@ class SkyModel(UVBase):
     gb : :class:`astropy.coordinates.Latitude`
         source latitude in Galactic coordinates, shape (Ncomponents,). Not needed if
         the `skycoord` is passed.
-    frame : str
-        Name of coordinates frame of source positions.
+    frame : str or subclass of astropy.coordinates.BaseCoordinateFrame
+        Astropy Frame or name of frame of source positions.
         If ra/dec or gl/gb are provided, this will be set to `icrs` or `galactic` by
-        default. Must be interpretable by
+        default. Strings must be interpretable by
         `astropy.coordinates.frame_transform_graph.lookup_name()`.
         Required if keywords `lon` and `lat` are used. Not needed if  the `skycoord` is
         passed.
@@ -477,11 +484,11 @@ class SkyModel(UVBase):
             required=False,
             acceptable_vals=["ring", "nested"],
         )
-        desc = "Name of the Healpix coordinate frame."
+        desc = "Healpix coordinate frame, a subclass of astropy.coordinates.BaseCoordinateFrame."
         self._hpx_frame = UVParameter(
             "hpx_frame",
             description=desc,
-            expected_type=str,
+            expected_type=object,
             required=False,
         )
 
@@ -750,7 +757,7 @@ class SkyModel(UVBase):
                             "but this will become an error in version 0.3 and later.",
                             DeprecationWarning,
                         )
-                        frame = "icrs"
+                        frame = ICRS
                 elif (gl is not None) and (gb is not None):
                     lon = gl
                     lat = gb
@@ -760,25 +767,31 @@ class SkyModel(UVBase):
                             "but this will become an error in version 0.3 and later.",
                             DeprecationWarning,
                         )
-                        frame = "galactic"
+                        frame = Galactic
 
                 if isinstance(frame, str):
                     frame_class = frame_transform_graph.lookup_name(frame)
                     if frame_class is None:
                         raise ValueError(f"Invalid frame name {frame}.")
                     frame = frame_class()
+                elif frame is not None:
+                    if not issubclass(frame, BaseCoordinateFrame):
+                        raise ValueError(
+                            "Invalid frame object, must be a subclass of "
+                            "astropy.coordinates.BaseCoordinateFrame."
+                        )
 
                 if (ra is not None) and (dec is not None):
-                    frame_obj = SkyCoord(0, 0, unit="deg", frame=frame)
-                    comp_names = _get_lon_lat_component_names(frame_obj)
+                    dummy_skycoord = SkyCoord(0, 0, unit="deg", frame=frame)
+                    comp_names = _get_lon_lat_component_names(dummy_skycoord)
                     if comp_names[0] != "ra" or comp_names[1] != "dec":
                         raise ValueError(
                             f"ra or dec supplied but specified frame {frame.name} does "
                             "not support ra and dec coordinate."
                         )
                 elif (gl is not None) and (gb is not None):
-                    frame_obj = SkyCoord(0, 0, unit="deg", frame=frame)
-                    comp_names = _get_lon_lat_component_names(frame_obj)
+                    dummy_skycoord = SkyCoord(0, 0, unit="deg", frame=frame)
+                    comp_names = _get_lon_lat_component_names(dummy_skycoord)
                     if comp_names[0] != "l" or comp_names[1] != "b":
                         raise ValueError(
                             f"gl or gb supplied but specified frame {frame.name} does "
@@ -878,10 +891,40 @@ class SkyModel(UVBase):
                         "HEALPix maps. Defaulting to ICRS",
                         category=DeprecationWarning,
                     )
-                    self.hpx_frame = "icrs"
-                    frame = frame_transform_graph.lookup_name(self.hpx_frame)()
+                    dummy_skycoord = SkyCoord(0, 0, unit="deg", frame="icrs")
+                    self.hpx_frame = dummy_skycoord.frame.replicate_without_data(
+                        copy=True
+                    )
                 else:
-                    self.hpx_frame = frame
+                    if frame is not None:
+                        if isinstance(frame, str):
+                            frame_class = frame_transform_graph.lookup_name(frame)
+                            if frame_class is None:
+                                raise ValueError(f"Invalid frame {frame}.")
+                            dummy_skycoord = SkyCoord(
+                                0, 0, unit="deg", frame=frame_class
+                            )
+                        else:
+                            # Note cannot just check if this is a subclass of
+                            # astropy.coordinates.BaseCoordinateFrame because that
+                            # errors with a TypeError, which appears to be a bug caused
+                            # by using ABCMeta, see https://bugs.python.org/issue44847,
+                            # Also see python/cpython#89010
+                            # Instead check to see if there's a frame name that is in
+                            # the frame_transform_graph
+                            if (
+                                not hasattr(frame, "name")
+                                or frame_transform_graph.lookup_name(frame.name) is None
+                            ):
+                                raise ValueError(
+                                    "Invalid frame object, must be a subclass of "
+                                    "astropy.coordinates.BaseCoordinateFrame."
+                                )
+                            dummy_skycoord = SkyCoord(0, 0, unit="deg", frame=frame)
+
+                    self.hpx_frame = dummy_skycoord.frame.replicate_without_data(
+                        copy=True
+                    )
 
                 self.Ncomponents = self.hpx_inds.size
 
@@ -1068,7 +1111,7 @@ class SkyModel(UVBase):
             if self.skycoord is not None:
                 return self.skycoord.frame.name
             else:
-                return self.hpx_frame
+                return self.hpx_frame.name
 
         if not name.startswith("__"):
             # Naming for galactic is different from astropy:
@@ -1344,7 +1387,6 @@ class SkyModel(UVBase):
         ----------
         frame : str, :class:`astropy.coordinates.BaseCoordinateFrame` class or instance.
             The frame to transform this coordinate into.
-            Currently frame must be one of ["galactic", "icrs"].
         full_sky : bool
             When True returns a full sky catalog even when some pixels are zero.
             Defaults to False.
@@ -1395,7 +1437,7 @@ class SkyModel(UVBase):
         coords = SkyCoord(0, 0, unit="rad", frame=this.hpx_frame)
 
         # we will need the starting frame object for some interpolation later
-        old_frame = coords.frame
+        old_frame = coords.frame.replicate_without_data(copy=True)
 
         # This filter can be removed when lunarsky is updated to not trigger this
         # astropy deprecation warning.
@@ -1406,7 +1448,7 @@ class SkyModel(UVBase):
             )
             coords = coords.transform_to(frame)
 
-        frame = coords.frame
+        frame = coords.frame.replicate_without_data(copy=True)
 
         hp_obj_new = astropy_healpix.HEALPix(
             nside=this.nside,
@@ -1465,7 +1507,7 @@ class SkyModel(UVBase):
         # the number of components can change when making this transformation!
         this.Ncomponents = this.stokes.shape[2]
 
-        this._hpx_frame.value = frame.name
+        this._hpx_frame.value = frame
         # recalculate the coherency now that we are in the new frame
         if this.frame_coherency is not None:
             this.frame_coherency = this.calc_frame_coherency()
@@ -1577,8 +1619,7 @@ class SkyModel(UVBase):
 
     def _get_frame_obj(self):
         if self.component_type == "healpix":
-            coord = SkyCoord(0, 0, frame=self.hpx_frame, unit="deg")
-            return coord.frame
+            return self.hpx_frame
         else:
             return self.skycoord.frame
 
@@ -1746,7 +1787,7 @@ class SkyModel(UVBase):
             self.frame_coherency = (
                 self.frame_coherency / astropy_healpix.nside_to_pixel_area(self.nside)
             )
-        self.hpx_frame = self.skycoord.frame.name
+        self.hpx_frame = self.skycoord.frame.replicate_without_data(copy=True)
         self.name = None
         self.skycoord = None
 
@@ -1857,7 +1898,8 @@ class SkyModel(UVBase):
             Deprecated. The frame of the input point source catalog.
             Defaults to the the object's skycoord.frame attribute. Only "galactic" or
             "icrs" are accepted through this keyword but any astropy compatible frame
-            can be used from the object's skycoord.frame attribute.
+            can be used from the object's skycoord.frame attribute. Use the
+            `transform_to` method to change the skycoord frame.
         inplace : bool
             Option to do the change in place on the object rather than return a new
             object.
@@ -1895,8 +1937,8 @@ class SkyModel(UVBase):
         sky = self if inplace else self.copy()
 
         if frame is None:
-            frame_obj = sky.skycoord.frame
-            sky.hpx_frame = sky.skycoord.frame.name
+            frame_obj = self.skycoord.frame.replicate_without_data(copy=True)
+            sky.hpx_frame = frame_obj
         else:
             warnings.warn(
                 "The frame keyword is deprecated, in version 0.3.0 this method will use "
@@ -1906,13 +1948,7 @@ class SkyModel(UVBase):
             # easiest way to do frame checking is through making a dummy skycoord
             coords = SkyCoord(0, 0, unit="deg", frame=frame)
 
-            frame_obj = coords.frame
-
-            if not isinstance(frame_obj, (Galactic, ICRS)):
-                raise ValueError(
-                    f"Supplied frame {frame_obj.__class__.__name__} is not supported at "
-                    "this time. Only 'galactic' and 'icrs' frames are currently supported.",
-                )
+            frame_obj = coords.frame.replicate_without_data(copy=True)
 
             if sky.skycoord.frame.name != coords.frame.name:
                 warnings.warn(
@@ -1921,7 +1957,7 @@ class SkyModel(UVBase):
                     f"{sky.skycoord.frame.name}). "
                     "Using input frame for coordinate calculations."
                 )
-            sky.hpx_frame = frame_obj.name
+            sky.hpx_frame = frame_obj
 
         # clear time & position specific parameters
         sky.clear_time_position_specific_params()
@@ -3851,7 +3887,6 @@ class SkyModel(UVBase):
                 "_nside",
                 "_hpx_order",
                 "_hpx_inds",
-                "_hpx_frame",
                 "_freq_array",
                 "_reference_frequency",
                 "_spectral_index",
@@ -3862,7 +3897,6 @@ class SkyModel(UVBase):
 
             optional_params = [
                 "_hpx_order",
-                "_hpx_frame",
                 "_freq_array",
                 "_reference_frequency",
                 "_spectral_index",
@@ -3907,6 +3941,40 @@ class SkyModel(UVBase):
             else:
                 optional_params.append("_name")
 
+                if "hpx_frame" in header:
+                    if isinstance(header["hpx_frame"], h5py.Dataset):
+                        # hpx_frame was stored as a string
+                        frame_str = _get_value_hdf5_group(header, "hpx_frame", str)
+                        dummy_coord = SkyCoord(0, 0, unit="rad", frame=frame_str)
+                        init_params[
+                            "hpx_frame"
+                        ] = dummy_coord.frame.replicate_without_data(copy=True)
+                    else:
+                        # hpx_frame was stored as a nested dset
+                        skycoord_dict = {}
+                        for key in header["hpx_frame"]:
+                            if key in ["frame", "representation_type"]:
+                                expected_type = str
+                            else:
+                                expected_type = None
+                            skycoord_dict[key] = _get_value_hdf5_group(
+                                header["hpx_frame"],
+                                key,
+                                expected_type,
+                            )
+                        print(skycoord_dict)
+                        dummy_coord = SkyCoord(0, 0, unit="rad", **skycoord_dict)
+                        init_params[
+                            "hpx_frame"
+                        ] = dummy_coord.frame.replicate_without_data(copy=True)
+                elif "frame" in header:
+                    # frame was stored as a string
+                    frame_str = _get_value_hdf5_group(header, "frame", str)
+                    dummy_coord = SkyCoord(0, 0, unit="rad", frame=frame_str)
+                    init_params["hpx_frame"] = dummy_coord.frame.replicate_without_data(
+                        copy=True
+                    )
+
             for par in header_params:
                 if par in ["lat", "lon", "frame", "ra", "dec"]:
                     parname = par
@@ -3922,10 +3990,7 @@ class SkyModel(UVBase):
                 # skip optional params if not present
                 if par in optional_params:
                     if parname not in header:
-                        if parname == "hpx_frame" and "frame" in header:
-                            parname = "frame"
-                        else:
-                            continue
+                        continue
 
                 if parname not in header:
                     raise ValueError(
@@ -5511,7 +5576,6 @@ class SkyModel(UVBase):
                 "_nside",
                 "_hpx_order",
                 "_hpx_inds",
-                "_hpx_frame",
                 "_freq_array",
                 "_reference_frequency",
                 "_spectral_index",
@@ -5532,11 +5596,32 @@ class SkyModel(UVBase):
 
             # special handling for the skycoord
             # make a nested group based on the skycoord.info._represent_as_dict()
-            if self.skycoord is not None:
-                skycoord_info = self.skycoord.info
+            for attr in ["skycoord", "hpx_frame"]:
+                this_attr = getattr(self, attr)
+                if this_attr is None:
+                    continue
+
+                if attr == "hpx_frame":
+                    # the skycoord info object we use to get a dict to describe the
+                    # frame fully only exists on SkyCoord, not on the base frames.
+                    # SkyCoord objects cannot be initialized without data, so make some
+                    # up but skip adding them to the file.
+                    dummy_skycoord = SkyCoord(0, 0, unit="deg", frame=this_attr)
+                    skycoord_info = dummy_skycoord.info
+                else:
+                    skycoord_info = this_attr.info
                 skycoord_dict = skycoord_info._represent_as_dict()
-                sc_group = header.create_group("skycoord")
+                if attr == "hpx_frame":
+                    # skip the keys related to the dummy positions we added
+                    keys_to_skip = list(
+                        dummy_skycoord.frame.get_representation_component_names().keys()
+                    ) + ["representation_type"]
+                else:
+                    keys_to_skip = []
+                sc_group = header.create_group(attr)
                 for key, value in skycoord_dict.items():
+                    if key in keys_to_skip:
+                        continue
                     expected_type = type(value)
                     _add_value_hdf5_group(sc_group, key, value, expected_type)
 

@@ -1132,10 +1132,14 @@ def test_assign_to_healpix(assign_hpx_data):
 
 
 @pytest.mark.parametrize("spectral_type", ["subband", "spectral_index"])
-def test_assign_to_healpix_fullsky(assign_hpx_data, spectral_type):
+@pytest.mark.parametrize("frame", ["icrs", "fk5"])
+def test_assign_to_healpix_fullsky(assign_hpx_data, spectral_type, frame):
     import astropy_healpix
 
     nside, pix_num, sky = assign_hpx_data
+    if frame != "icrs":
+        sky.transform_to(frame)
+
     jy_to_ksr_conv_factor = skyutils.jy_to_ksr(sky.freq_array[0])
 
     if spectral_type != "subband":
@@ -1183,33 +1187,12 @@ def test_assign_to_healpix_fullsky(assign_hpx_data, spectral_type):
         assert not np.any(np.nonzero(sky_hpx.stokes_error[:, :, 26:]))
 
 
-@pytest.mark.parametrize(
-    "frame,err_type,err_msg",
-    [("gcrs", ValueError, "Supplied frame GCRS is not supported at this time.")],
-)
-def test_assign_to_healpix_frame_errors(assign_hpx_data, frame, err_type, err_msg):
-    nside, _, sky = assign_hpx_data
-    # null the frame info out for these tests
-    sky.frame = None
-    sky._frame_inst = None
-
-    with pytest.raises(
-        err_type,
-        match=err_msg,
-    ):
-        with uvtest.check_warnings(
-            DeprecationWarning,
-            match="The frame keyword is deprecated, in version 0.3.0",
-        ):
-            sky.assign_to_healpix(nside, frame=frame)
-
-
 def test_assign_to_healpix_frame_inst_none(assign_hpx_data):
     nside, _, sky = assign_hpx_data
     assert sky.skycoord.frame.name == "icrs"
     assert sky.frame == "icrs"
     sky.assign_to_healpix(nside, inplace=True)
-    assert sky.hpx_frame == "icrs"
+    assert sky.hpx_frame.name == "icrs"
     assert sky.frame == "icrs"
 
 
@@ -1230,7 +1213,7 @@ def test_assign_healpix_frame_override_attribute(assign_hpx_data):
         ],
     ):
         sky.assign_to_healpix(nside, frame="icrs", inplace=True)
-    assert sky.hpx_frame == "icrs"
+    assert sky.hpx_frame.name == "icrs"
     assert sky.frame == "icrs"
 
 
@@ -2089,6 +2072,10 @@ def test_healpix_to_sky(healpix_data, healpix_disk_old):
     sky.history = history + sky.pyradiosky_version_str
 
     assert healpix_disk_old.filename == ["healpix_disk.hdf5"]
+    print(healpix_disk_old.hpx_frame)
+    print(type(healpix_disk_old.hpx_frame))
+    print(sky.hpx_frame)
+    print(type(sky.hpx_frame))
     assert healpix_disk_old == sky
     assert units.quantity.allclose(healpix_disk_old.stokes[0], hmap_orig)
 
@@ -4181,8 +4168,19 @@ def test_at_frequencies_nan_handling_allsrc(nan_handling):
 
 
 @pytest.mark.parametrize("stype", ["full", "subband", "spectral_index", "flat"])
-def test_skyh5_file_loop(mock_point_skies, stype, tmpdir):
+@pytest.mark.parametrize("frame", ["icrs", "fk5", "galactic", "altaz"])
+def test_skyh5_file_loop(mock_point_skies, time_location, stype, frame, tmpdir):
     sky = mock_point_skies(stype)
+
+    if frame == "altaz":
+        time, array_location = time_location
+        frame_use = AltAz(obstime=time, location=array_location)
+    else:
+        frame_use = SkyCoord(
+            0, 0, unit="rad", frame=frame
+        ).frame.replicate_without_data()
+    sky.transform_to(frame_use)
+
     testfile = str(tmpdir.join("testfile.skyh5"))
 
     sky.write_skyh5(testfile)
@@ -4603,16 +4601,23 @@ def test_skymodel_transform_healpix_error(healpix_disk_new):
         sky_obj.transform_to("galactic")
 
 
-@pytest.mark.parametrize("frame", ["icrs", "galactic"])
-def test_skyh5_write_frames(healpix_disk_new, tmpdir, frame):
+@pytest.mark.parametrize("frame", ["icrs", "galactic", "altaz"])
+def test_skyh5_write_frames(healpix_disk_new, time_location, tmpdir, frame):
     sky = healpix_disk_new
 
-    sky.hpx_frame = frame
+    if frame == "altaz":
+        time, array_location = time_location
+        frame_use = AltAz(obstime=time, location=array_location)
+    else:
+        frame_use = SkyCoord(
+            0, 0, unit="rad", frame=frame
+        ).frame.replicate_without_data()
+    sky.hpx_frame = frame_use
     outfile = tmpdir.join("testfile.skyh5")
     sky.write_skyh5(outfile)
 
     new_sky = SkyModel.from_file(outfile)
-    assert new_sky.hpx_frame == frame
+    assert new_sky.hpx_frame.name == frame
 
 
 def test_skyh5_write_read_no_frame(healpix_disk_new, tmpdir):
@@ -4623,7 +4628,7 @@ def test_skyh5_write_read_no_frame(healpix_disk_new, tmpdir):
 
     with h5py.File(outfile, "a") as h5file:
         header = h5file["/Header"]
-        assert header["hpx_frame"][()].tobytes().decode("utf-8") == "icrs"
+        assert header["hpx_frame"]["frame"][()].tobytes().decode("utf-8") == "icrs"
         del header["hpx_frame"]
 
     with uvtest.check_warnings(
@@ -4633,7 +4638,7 @@ def test_skyh5_write_read_no_frame(healpix_disk_new, tmpdir):
     ):
         new_sky = SkyModel.from_file(outfile)
 
-    assert new_sky.hpx_frame == "icrs"
+    assert new_sky.hpx_frame.name == "icrs"
 
 
 @pytest.mark.parametrize("frame", ["icrs", "gcrs", "altaz"])
