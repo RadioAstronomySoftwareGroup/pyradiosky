@@ -4636,14 +4636,23 @@ def test_skyh5_write_read_no_frame(healpix_disk_new, tmpdir):
     assert new_sky.hpx_frame == "icrs"
 
 
-def test_skymodel_transform_healpix(healpix_gsm_galactic, healpix_gsm_icrs):
+@pytest.mark.parametrize("frame", ["icrs", "gcrs", "altaz"])
+def test_skymodel_transform_healpix(
+    healpix_gsm_galactic, healpix_gsm_icrs, time_location, frame
+):
     pytest.importorskip("astropy_healpix")
     sky_obj = healpix_gsm_galactic
     sky_obj2 = sky_obj.copy()
-    sky_obj.healpix_interp_transform("icrs")
+
+    if frame == "altaz":
+        time, array_location = time_location
+        frame = AltAz(obstime=time, location=array_location)
+    sky_obj.healpix_interp_transform(frame)
 
     assert sky_obj2 != sky_obj
-    assert sky_obj == healpix_gsm_icrs
+
+    if frame == "icrs":
+        assert sky_obj == healpix_gsm_icrs
 
 
 def test_skymodel_transform_healpix_not_inplace(healpix_gsm_galactic, healpix_gsm_icrs):
@@ -4655,15 +4664,11 @@ def test_skymodel_transform_healpix_not_inplace(healpix_gsm_galactic, healpix_gs
     assert new_obj == healpix_gsm_icrs
 
 
-def test_skymodel_healpix_transform_unsupported_frame(healpix_gsm_galactic):
-    with pytest.raises(
-        ValueError, match="Supplied frame GCRS is not supported at this time."
-    ):
-        healpix_gsm_galactic.healpix_interp_transform("gcrs")
-
-
 def test_skymod_transform_healpix_point_error(zenith_skymodel):
-    with pytest.raises(ValueError, match="Healpix frame interpolation is not valid"):
+    with pytest.raises(
+        ValueError,
+        match="Healpix frame interpolation is not valid for point source catalogs.",
+    ):
         zenith_skymodel.healpix_interp_transform("galactic")
 
 

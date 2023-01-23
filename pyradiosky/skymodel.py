@@ -1408,12 +1408,6 @@ class SkyModel(UVBase):
 
         frame = coords.frame
 
-        if not isinstance(frame, (Galactic, ICRS)):
-            raise ValueError(
-                f"Supplied frame {frame.__class__.__name__} is not supported at "
-                "this time. Only 'galactic' and 'icrs' frames are currently supported.",
-            )
-
         hp_obj_new = astropy_healpix.HEALPix(
             nside=this.nside,
             order=this.hpx_order,
@@ -2467,6 +2461,7 @@ class SkyModel(UVBase):
             warnings.filterwarnings(
                 "ignore",
                 message="The get_frame_attr_names",
+            )
             if hasmoon and isinstance(self.telescope_location, MoonLocation):
                 source_altaz = skycoord_use.transform_to(
                     LunarTopo(obstime=self.time, location=self.telescope_location)
@@ -2474,7 +2469,7 @@ class SkyModel(UVBase):
             else:
                 source_altaz = skycoord_use.transform_to(
                     AltAz(obstime=self.time, location=self.telescope_location)
-            )
+                )
 
         alt_az = np.array([source_altaz.alt.rad, source_altaz.az.rad])
 
