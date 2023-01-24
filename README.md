@@ -51,18 +51,18 @@ following packages before installing `pyradiosky`:
 
 Required:
 
-* astropy>=4.0
-* h5py
-* numpy
-* scipy>1.0.1
+* astropy>=5.2
+* h5py>=3.1
+* numpy>=1.20
+* scipy>=1.3
 * pyuvdata>=2.2.10
-* setuptools_scm
+* setuptools_scm>=7.0.3
 
 Optional:
 
-* astropy-healpix (for working with beams in HEALPix formats)
-* astroquery (for downloading GLEAM and other VizieR catalogs)
-* lunarsky (for supporting telescope locations on the moon)
+* astropy-healpix>=0.6 (for working with beams in HEALPix formats)
+* astroquery>=0.4.4 (for downloading GLEAM and other VizieR catalogs)
+* lunarsky>=0.1.2 (for supporting telescope locations on the moon)
 
 We suggest using conda to install all the dependencies. To install
 pyuvdata, astropy-healpix and astroquery, you'll need to add conda-forge as a channel
