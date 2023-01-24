@@ -339,6 +339,14 @@ def test_init_error(zenith_skycoord):
             component_type="point",
         )
 
+    with pytest.raises(ValueError, match="Cannot set frame if the skycoord is set."):
+        SkyModel(
+            skycoord=zenith_skycoord,
+            frame="fk5",
+            stokes=[1.0, 0, 0, 0] * units.Jy,
+            spectral_type="flat",
+        )
+
 
 @pytest.mark.parametrize("spec_type", ["spectral_index", "full", "subband"])
 def test_init_error_freqparams(zenith_skycoord, spec_type):
@@ -2072,10 +2080,6 @@ def test_healpix_to_sky(healpix_data, healpix_disk_old):
     sky.history = history + sky.pyradiosky_version_str
 
     assert healpix_disk_old.filename == ["healpix_disk.hdf5"]
-    print(healpix_disk_old.hpx_frame)
-    print(type(healpix_disk_old.hpx_frame))
-    print(sky.hpx_frame)
-    print(type(sky.hpx_frame))
     assert healpix_disk_old == sky
     assert units.quantity.allclose(healpix_disk_old.stokes[0], hmap_orig)
 
@@ -4278,25 +4282,38 @@ def test_skyh5_units(tmpdir):
     assert sky2 == sky
 
 
-def test_skyh5_backwards_compatibility(tmpdir):
+@pytest.mark.parametrize("include_frame", [True, False])
+def test_skyh5_backwards_compatibility(tmpdir, include_frame):
     sky = SkyModel.from_file(GLEAM_vot, with_error=True)
+
+    if not include_frame:
+        sky.transform_to("icrs")
 
     testfile = str(tmpdir.join("testfile.skyh5"))
     sky.write_skyh5(testfile)
 
+    err_msg = [
+        "Parameter skycoord not found in skyh5 file. This skyh5 file was written "
+        "by an older version of pyradiosky. Consider re-writing this file to ensure "
+        "future compatibility"
+    ]
+
     with h5py.File(testfile, "r+") as h5f:
         del h5f["/Header/skycoord"]
         header = h5f["/Header"]
-        skymodel._add_value_hdf5_group(header, "lat", sky.dec, Latitude)
-        skymodel._add_value_hdf5_group(header, "lon", sky.ra, Longitude)
-        skymodel._add_value_hdf5_group(header, "frame", sky.frame, str)
+        if include_frame:
+            skymodel._add_value_hdf5_group(header, "lat", sky.dec, Latitude)
+            skymodel._add_value_hdf5_group(header, "lon", sky.ra, Longitude)
+            skymodel._add_value_hdf5_group(header, "frame", sky.frame, str)
+        else:
+            skymodel._add_value_hdf5_group(header, "dec", sky.dec, Latitude)
+            skymodel._add_value_hdf5_group(header, "ra", sky.ra, Longitude)
+            err_msg.append(
+                "No frame available in this file, assuming 'icrs'. "
+                "Consider re-writing this file to ensure future compatility."
+            )
 
-    with uvtest.check_warnings(
-        UserWarning,
-        match="Parameter skycoord not found in skyh5 file. This skyh5 file was written "
-        "by an older version of pyradiosky. Consider re-writing this file to ensure "
-        "future compatibility",
-    ):
+    with uvtest.check_warnings(UserWarning, match=err_msg):
         sky2 = SkyModel.from_file(testfile)
     assert sky == sky2
 
@@ -4306,6 +4323,13 @@ def test_skyh5_backwards_compatibility_healpix(healpix_disk_new, tmpdir):
 
     testfile = str(tmpdir.join("testfile.skyh5"))
     sky.write_skyh5(testfile)
+
+    with h5py.File(testfile, "r+") as h5f:
+        del h5f["/Header/hpx_frame"]
+        h5f["/Header/hpx_frame"] = np.string_(sky.hpx_frame.name)
+
+    sky2 = SkyModel.from_file(testfile)
+    assert sky == sky2
 
     with h5py.File(testfile, "r+") as h5f:
         del h5f["/Header/hpx_frame"]
@@ -4462,6 +4486,18 @@ def test_write_clobber(mock_point_skies, tmpdir):
         ({"ra": Longitude("1d"), "dec": Latitude("1d")}, None, "icrs"),
         ({"gl": Longitude("1d"), "gb": Latitude("1d")}, None, "galactic"),
         (
+            {"ra": Longitude("1d"), "dec": Latitude("1d"), "frame": "galactic"},
+            "ra or dec supplied but specified frame galactic does "
+            "not support ra and dec coordinates.",
+            None,
+        ),
+        (
+            {"gl": Longitude("1d"), "gb": Latitude("1d"), "frame": "icrs"},
+            "gl or gb supplied but specified frame icrs does "
+            "not support gl and gb coordinates.",
+            None,
+        ),
+        (
             {"ra": Longitude("1d"), "gb": Latitude("1d")},
             "Invalid input coordinate combination",
             None,
@@ -4474,6 +4510,12 @@ def test_write_clobber(mock_point_skies, tmpdir):
         (
             {"lon": Longitude("1d"), "lat": Latitude("1d"), "frame": "picture"},
             "Invalid frame name",
+            None,
+        ),
+        (
+            {"lon": Longitude("1d"), "lat": Latitude("1d"), "frame": 23},
+            "Invalid frame object, must be a subclass of "
+            "astropy.coordinates.BaseCoordinateFrame.",
             None,
         ),
         (
@@ -4536,20 +4578,6 @@ def test_skymodel_init_with_frame(coord_kwds, err_msg, exp_frame):
             if exp_frame == "icrs":
                 assert lon == sky.ra
                 assert lat == sky.dec
-
-
-def test_skymodel_init_galactic_warning():
-    with pytest.raises(
-        ValueError, match="gl or gb supplied but specified frame icrs does not support"
-    ):
-        SkyModel(
-            name=["src"],
-            gl=Longitude("1d"),
-            gb=Latitude("1d"),
-            stokes=np.zeros((4, 1, 1)) * units.Jy,
-            spectral_type="flat",
-            frame="icrs",
-        )
 
 
 # This filter can be removed when lunarsky is updated to not trigger this
@@ -4647,6 +4675,7 @@ def test_skymodel_transform_healpix(
 ):
     pytest.importorskip("astropy_healpix")
     sky_obj = healpix_gsm_galactic
+    sky_obj.calc_frame_coherency()
     sky_obj2 = sky_obj.copy()
 
     if frame == "altaz":

@@ -217,6 +217,31 @@ def _get_frame_comp_cols(colnames):
     return frame_use, lon_col, lat_col
 
 
+def _get_frame_obj(frame):
+    if isinstance(frame, str):
+        frame_class = frame_transform_graph.lookup_name(frame)
+        if frame_class is None:
+            raise ValueError(f"Invalid frame name {frame}.")
+        frame = frame_class()
+    elif frame is not None:
+        # Note cannot just check if this is a subclass of
+        # astropy.coordinates.BaseCoordinateFrame because that
+        # errors with a TypeError, which appears to be a bug caused
+        # by using ABCMeta, see https://bugs.python.org/issue44847,
+        # Also see python/cpython#89010
+        # Instead check to see if there's a frame name that is in
+        # the frame_transform_graph
+        if (
+            not hasattr(frame, "name")
+            or frame_transform_graph.lookup_name(frame.name) is None
+        ):
+            raise ValueError(
+                "Invalid frame object, must be a subclass of "
+                "astropy.coordinates.BaseCoordinateFrame."
+            )
+    return frame
+
+
 def _add_value_hdf5_group(group, name, value, expected_type):
     # Extra attributes for astropy Quantity-derived classes.
     unit = None
@@ -717,10 +742,14 @@ class SkyModel(UVBase):
             ]
         else:
             if skycoord is not None:
+                location_param_names = ["lon", "lat", "ra", "dec", "gl", "gb", "frame"]
                 location_params = [lon, lat, ra, dec, gl, gb, frame]
-                for param in location_params:
+                for lpind, param in enumerate(location_params):
                     if param is not None:
-                        raise ValueError(f"Cannot set {param} if the skycoord is set.")
+                        raise ValueError(
+                            f"Cannot set {location_param_names[lpind]} if the skycoord "
+                            "is set."
+                        )
 
                 if not isinstance(skycoord, SkyCoord):
                     raise ValueError("skycoord parameter must be a SkyCoord object.")
@@ -772,17 +801,7 @@ class SkyModel(UVBase):
                         )
                         frame = Galactic
 
-                if isinstance(frame, str):
-                    frame_class = frame_transform_graph.lookup_name(frame)
-                    if frame_class is None:
-                        raise ValueError(f"Invalid frame name {frame}.")
-                    frame = frame_class()
-                elif frame is not None:
-                    if not issubclass(frame, BaseCoordinateFrame):
-                        raise ValueError(
-                            "Invalid frame object, must be a subclass of "
-                            "astropy.coordinates.BaseCoordinateFrame."
-                        )
+                frame = _get_frame_obj(frame)
 
                 if (ra is not None) and (dec is not None):
                     dummy_skycoord = SkyCoord(0, 0, unit="deg", frame=frame)
@@ -790,7 +809,7 @@ class SkyModel(UVBase):
                     if comp_names[0] != "ra" or comp_names[1] != "dec":
                         raise ValueError(
                             f"ra or dec supplied but specified frame {frame.name} does "
-                            "not support ra and dec coordinate."
+                            "not support ra and dec coordinates."
                         )
                 elif (gl is not None) and (gb is not None):
                     dummy_skycoord = SkyCoord(0, 0, unit="deg", frame=frame)
@@ -798,7 +817,7 @@ class SkyModel(UVBase):
                     if comp_names[0] != "l" or comp_names[1] != "b":
                         raise ValueError(
                             f"gl or gb supplied but specified frame {frame.name} does "
-                            "not support l and b coordinates."
+                            "not support gl and gb coordinates."
                         )
 
                 if lon is not None:
@@ -899,31 +918,8 @@ class SkyModel(UVBase):
                         copy=True
                     )
                 else:
-                    if frame is not None:
-                        if isinstance(frame, str):
-                            frame_class = frame_transform_graph.lookup_name(frame)
-                            if frame_class is None:
-                                raise ValueError(f"Invalid frame {frame}.")
-                            dummy_skycoord = SkyCoord(
-                                0, 0, unit="deg", frame=frame_class
-                            )
-                        else:
-                            # Note cannot just check if this is a subclass of
-                            # astropy.coordinates.BaseCoordinateFrame because that
-                            # errors with a TypeError, which appears to be a bug caused
-                            # by using ABCMeta, see https://bugs.python.org/issue44847,
-                            # Also see python/cpython#89010
-                            # Instead check to see if there's a frame name that is in
-                            # the frame_transform_graph
-                            if (
-                                not hasattr(frame, "name")
-                                or frame_transform_graph.lookup_name(frame.name) is None
-                            ):
-                                raise ValueError(
-                                    "Invalid frame object, must be a subclass of "
-                                    "astropy.coordinates.BaseCoordinateFrame."
-                                )
-                            dummy_skycoord = SkyCoord(0, 0, unit="deg", frame=frame)
+                    frame = _get_frame_obj(frame)
+                    dummy_skycoord = SkyCoord(0, 0, unit="deg", frame=frame)
 
                     self.hpx_frame = dummy_skycoord.frame.replicate_without_data(
                         copy=True
@@ -3965,7 +3961,6 @@ class SkyModel(UVBase):
                                 key,
                                 expected_type,
                             )
-                        print(skycoord_dict)
                         dummy_coord = SkyCoord(0, 0, unit="rad", **skycoord_dict)
                         init_params[
                             "hpx_frame"
