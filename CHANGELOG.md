@@ -16,6 +16,7 @@ methods which apply when reading votable files.
 frame_coherency on the object.
 
 ### Changed
+- Updated the astropy requirement to >= 5.2
 - No longer calculate frame_coherency (previously ra_dec_coherency) on SkyModel
 initialization to save memory.
 - `J2000` in ra and dec columns names of text files are now properly identified as
