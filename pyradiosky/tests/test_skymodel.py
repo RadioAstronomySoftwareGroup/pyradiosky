@@ -2,34 +2,34 @@
 # Copyright (c) 2019 Radio Astronomy Software Group
 # Licensed under the 3-clause BSD License
 
-import os
-import re
 import copy
 import fileinput
+import os
+import re
+import warnings
 
 import h5py
-import pytest
-import scipy.io
-import warnings
 import numpy as np
-from astropy import units
-from astropy.units import Quantity
-from astropy.coordinates import (
-    SkyCoord,
-    EarthLocation,
-    Angle,
-    AltAz,
-    Longitude,
-    Latitude,
-    Galactic,
-)
-from astropy.time import Time, TimeDelta
+import pytest
 import pyuvdata.tests as uvtest
 import pyuvdata.utils as uvutils
+import scipy.io
+from astropy import units
+from astropy.coordinates import (
+    AltAz,
+    Angle,
+    EarthLocation,
+    Galactic,
+    Latitude,
+    Longitude,
+    SkyCoord,
+)
+from astropy.time import Time, TimeDelta
+from astropy.units import Quantity
 
-from pyradiosky.data import DATA_PATH as SKY_DATA_PATH
+from pyradiosky import SkyModel, skymodel
 from pyradiosky import utils as skyutils
-from pyradiosky import skymodel, SkyModel
+from pyradiosky.data import DATA_PATH as SKY_DATA_PATH
 
 GLEAM_vot = os.path.join(SKY_DATA_PATH, "gleam_50srcs.vot")
 
@@ -75,7 +75,8 @@ def zenith_skymodel(zenith_skycoord):
 def moonsky():
     pytest.importorskip("lunarsky")
 
-    from lunarsky import MoonLocation, SkyCoord as SkyC
+    from lunarsky import MoonLocation
+    from lunarsky import SkyCoord as SkyC
 
     # Tranquility base
     array_location = MoonLocation(lat="00d41m15s", lon="23d26m00s", height=0.0)
@@ -92,10 +93,7 @@ def moonsky():
     # This filter can be removed when lunarsky is updated to not trigger this
     # astropy deprecation warning.
     with warnings.catch_warnings():
-        warnings.filterwarnings(
-            "ignore",
-            message="The get_frame_attr_names",
-        )
+        warnings.filterwarnings("ignore", message="The get_frame_attr_names")
         icrs_coord = zen_coord.transform_to("icrs")
 
     names = "zen_source"
@@ -238,11 +236,7 @@ def assign_hpx_data():
     nside = 32
     pix_num = 25
     hpx_inds = [pix_num]
-    ra, dec = astropy_healpix.healpix_to_lonlat(
-        hpx_inds,
-        nside,
-        order="ring",
-    )
+    ra, dec = astropy_healpix.healpix_to_lonlat(hpx_inds, nside, order="ring")
     ras_use = Longitude(ra + Angle([-0.01, 0.01], unit=units.degree))
     decs_use = Latitude(dec + Angle([-0.01, 0.01], unit=units.degree))
     skycoord = SkyCoord(ras_use, decs_use, frame="icrs")
@@ -518,11 +512,7 @@ def test_init_lists(spec_type, param, zenith_skycoord):
             "stokes",
             "Stokes should be passed as an astropy Quantity array not a list",
         ),
-        (
-            "flat",
-            "stokes_obj",
-            "Stokes should be passed as an astropy Quantity array.",
-        ),
+        ("flat", "stokes_obj", "Stokes should be passed as an astropy Quantity array."),
         (
             "spectral_index",
             "reference_frequency",
@@ -671,10 +661,7 @@ def test_skymodel_init_errors(zenith_skycoord):
     dec = icrs_coord.dec
 
     # Check error cases
-    with pytest.raises(
-        ValueError,
-        match=("ra must be one or more Longitude objects"),
-    ):
+    with pytest.raises(ValueError, match=("ra must be one or more Longitude objects")):
         SkyModel(
             name="icrs_zen",
             ra=ra.rad,
@@ -684,10 +671,7 @@ def test_skymodel_init_errors(zenith_skycoord):
             spectral_type="flat",
         )
 
-    with pytest.raises(
-        ValueError,
-        match=("dec must be one or more Latitude objects"),
-    ):
+    with pytest.raises(ValueError, match=("dec must be one or more Latitude objects")):
         SkyModel(
             name="icrs_zen",
             ra=ra,
@@ -1121,12 +1105,10 @@ def test_assign_to_healpix(assign_hpx_data):
     assert sky_hpx.hpx_inds[0] == pix_num
 
     assert np.allclose(
-        sky_hpx.stokes[0, 0, 0],
-        4.5 * units.Jy * jy_to_ksr_conv_factor / hpx_area,
+        sky_hpx.stokes[0, 0, 0], 4.5 * units.Jy * jy_to_ksr_conv_factor / hpx_area
     )
     assert np.allclose(
-        sky_hpx.stokes[1, 0, 0],
-        0.5 * units.Jy * jy_to_ksr_conv_factor / hpx_area,
+        sky_hpx.stokes[1, 0, 0], 0.5 * units.Jy * jy_to_ksr_conv_factor / hpx_area
     )
 
     assert np.allclose(
@@ -1134,8 +1116,7 @@ def test_assign_to_healpix(assign_hpx_data):
         np.sqrt(0.15**2 + 0.25**2) * units.Jy * jy_to_ksr_conv_factor / hpx_area,
     )
     assert np.allclose(
-        sky_hpx.stokes_error[1, 0, 0],
-        0.2 * units.Jy * jy_to_ksr_conv_factor / hpx_area,
+        sky_hpx.stokes_error[1, 0, 0], 0.2 * units.Jy * jy_to_ksr_conv_factor / hpx_area
     )
 
 
@@ -1168,12 +1149,10 @@ def test_assign_to_healpix_fullsky(assign_hpx_data, spectral_type, frame):
     assert sky_hpx.Ncomponents == astropy_healpix.nside_to_npix(nside)
 
     assert np.allclose(
-        sky_hpx.stokes[0, 0, pix_num],
-        4.5 * units.Jy * jy_to_ksr_conv_factor / hpx_area,
+        sky_hpx.stokes[0, 0, pix_num], 4.5 * units.Jy * jy_to_ksr_conv_factor / hpx_area
     )
     assert np.allclose(
-        sky_hpx.stokes[1, 0, pix_num],
-        0.5 * units.Jy * jy_to_ksr_conv_factor / hpx_area,
+        sky_hpx.stokes[1, 0, pix_num], 0.5 * units.Jy * jy_to_ksr_conv_factor / hpx_area
     )
 
     assert not np.any(np.nonzero(sky_hpx.stokes[:, :, :25]))
@@ -1366,10 +1345,7 @@ def test_coherency_calc_errors():
     stokes_radec = [1, -0.2, 0.3, 0.1] * units.Jy
 
     source = SkyModel(
-        name="test",
-        skycoord=coord,
-        stokes=stokes_radec,
-        spectral_type="flat",
+        name="test", skycoord=coord, stokes=stokes_radec, spectral_type="flat"
     )
 
     with uvtest.check_warnings(UserWarning, match="Horizon cutoff undefined"):
@@ -1645,10 +1621,7 @@ def test_polarized_source_smooth_visibilities():
     stokes_radec = [1, -0.2, 0.3, 0.1] * units.Jy
 
     source = SkyModel(
-        name="icrs_zen",
-        skycoord=zenith_icrs,
-        stokes=stokes_radec,
-        spectral_type="flat",
+        name="icrs_zen", skycoord=zenith_icrs, stokes=stokes_radec, spectral_type="flat"
     )
 
     coherency_matrix_local = np.zeros([2, 2, ntimes], dtype="complex128") * units.Jy
@@ -2305,8 +2278,7 @@ def test_write_healpix_error(tmp_path):
     test_filename = os.path.join(tmp_path, "tempfile.hdf5")
 
     with pytest.raises(
-        ValueError,
-        match="component_type must be 'healpix' to use this method.",
+        ValueError, match="component_type must be 'healpix' to use this method."
     ):
         skyobj.write_healpix_hdf5(test_filename)
 
@@ -2657,10 +2629,7 @@ def test_flux_cuts(function, spec_type, init_kwargs, cut_kwargs):
         )
     else:
         skyobj.source_cuts(
-            latitude_deg=30.0,
-            min_flux=minI_cut,
-            max_flux=maxI_cut,
-            **cut_kwargs,
+            latitude_deg=30.0, min_flux=minI_cut, max_flux=maxI_cut, **cut_kwargs
         )
 
     if function != "select":
@@ -2773,10 +2742,7 @@ def test_flux_cut_error(
             )
         else:
             skyobj.source_cuts(
-                latitude_deg=30.0,
-                min_flux=minI_cut,
-                max_flux=maxI_cut,
-                **cut_kwargs,
+                latitude_deg=30.0, min_flux=minI_cut, max_flux=maxI_cut, **cut_kwargs
             )
 
 
@@ -3005,7 +2971,7 @@ def test_circumpolar_nonrising(time_location, function):
             DeprecationWarning,
             match=[
                 "This function is deprecated, use the `SkyModel.select` and/or"
-                "`SkyModel.cut_nonrising` methods instead.",
+                "`SkyModel.cut_nonrising` methods instead."
             ],
         ):
             src_arr = skymodel.source_cuts(
@@ -3075,7 +3041,7 @@ def test_circumpolar_nonrising(time_location, function):
         with uvtest.check_warnings(
             DeprecationWarning,
             match=[
-                "This function is deprecated, and will be removed in version 0.2.0.",
+                "This function is deprecated, and will be removed in version 0.2.0."
             ],
         ):
             src_arr2 = skymodel.skymodel_to_array(new_sky)
@@ -3206,9 +3172,7 @@ def test_read_gleam(spec_type):
     ]
     with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
         cut_obj = skymodel.read_gleam_catalog(
-            GLEAM_vot,
-            spectral_type=spec_type,
-            source_select_kwds=source_select_kwds,
+            GLEAM_vot, spectral_type=spec_type, source_select_kwds=source_select_kwds
         )
 
     assert len(cut_catalog) == cut_obj.Ncomponents
@@ -3285,7 +3249,7 @@ def test_read_votable():
     assert skyobj == skyobj2
 
     msg_expected = [
-        "This function is deprecated, use `SkyModel.read_votable_catalog` instead.",
+        "This function is deprecated, use `SkyModel.read_votable_catalog` instead."
     ]
     with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
         skyarr = skymodel.read_votable_catalog(
@@ -3320,7 +3284,7 @@ def test_read_deprecated_votable():
     assert skyobj.Ncomponents == 1
 
     msg_expected = [
-        "contains tables with no name or ID, Support for such files is deprecated.",
+        "contains tables with no name or ID, Support for such files is deprecated."
     ]
     with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
         with pytest.raises(ValueError, match=("More than one matching table.")):
@@ -3666,7 +3630,7 @@ def test_text_catalog_loop(tmp_path, spec_type, with_error):
     fname = os.path.join(tmp_path, "temp_cat.txt")
 
     msg_expected = [
-        "This function is deprecated, use `SkyModel.write_text_catalog` instead.",
+        "This function is deprecated, use `SkyModel.write_text_catalog` instead."
     ]
 
     with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
@@ -4740,9 +4704,7 @@ def test_healpix_transform_full_sky(healpix_disk_new):
     )
 
     # get rid of half the data
-    healpix_disk_new.select(
-        component_inds=np.arange(healpix_disk_new.Ncomponents)[::2],
-    )
+    healpix_disk_new.select(component_inds=np.arange(healpix_disk_new.Ncomponents)[::2])
     assert healpix_disk_new.Ncomponents != hp_obj.npix
 
     healpix_disk_new.healpix_interp_transform("galactic", full_sky=True)
@@ -4753,8 +4715,7 @@ def test_healpix_transform_full_sky(healpix_disk_new):
 def test_old_skyh5_reading_ra_dec():
     testfile = os.path.join(SKY_DATA_PATH, "old_skyh5_point_sources.skyh5")
     with uvtest.check_warnings(
-        UserWarning,
-        match="Parameter skycoord not found in skyh5 file.",
+        UserWarning, match="Parameter skycoord not found in skyh5 file."
     ):
         sky = SkyModel.from_file(testfile)
     assert sky.check()

@@ -1,10 +1,10 @@
 """Define namespace."""
-from setuptools_scm import get_version
 from pathlib import Path
-from pkg_resources import get_distribution, DistributionNotFound
+
+from pkg_resources import DistributionNotFound, get_distribution
+from setuptools_scm import get_version
 
 from .branch_scheme import branch_scheme
-
 
 try:  # pragma: nocover
     # get accurate version for developer installs
@@ -22,15 +22,15 @@ except (LookupError, ImportError):
 
 from .skymodel import (
     SkyModel,
-    read_healpix_hdf5,
-    healpix_to_sky,
-    skymodel_to_array,
     array_to_skymodel,
-    source_cuts,
-    read_votable_catalog,
+    healpix_to_sky,
     read_gleam_catalog,
-    read_text_catalog,
+    read_healpix_hdf5,
     read_idl_catalog,
+    read_text_catalog,
+    read_votable_catalog,
+    skymodel_to_array,
+    source_cuts,
     write_catalog_to_file,
     write_healpix_hdf5,
 )

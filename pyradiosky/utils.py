@@ -5,13 +5,12 @@
 import os
 import warnings
 
-import numpy as np
-
+import astropy.units as units
 import erfa
+import numpy as np
+from astropy.coordinates import Angle
 from astropy.coordinates.builtin_frames.utils import get_jd12
 from astropy.time import Time
-from astropy.coordinates import Angle
-import astropy.units as units
 from astropy.units import Quantity
 
 from pyradiosky.data import DATA_PATH as SKY_DATA_PATH
@@ -198,11 +197,7 @@ def jy_to_ksr(freqs):
 
 
 def download_gleam(
-    path=".",
-    filename="gleam.vot",
-    overwrite=False,
-    row_limit=None,
-    for_testing=False,
+    path=".", filename="gleam.vot", overwrite=False, row_limit=None, for_testing=False
 ):
     """
     Download the GLEAM vot table from Vizier.
