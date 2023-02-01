@@ -69,7 +69,7 @@ except ImportError:
 
 
 class TelescopeLocationParameter(UVParameter):
-    def __eq__(self, other):
+    def __eq__(self, other, silent=False):
         return self.value == other.value
 
 
