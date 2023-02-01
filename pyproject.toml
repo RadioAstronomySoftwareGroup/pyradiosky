@@ -1,3 +1,12 @@
 [build-system]
 requires = ["setuptools>=30.3.0", "wheel", "setuptools_scm"]
 build-backend = "setuptools.build_meta"
+
+[tool.isort]
+profile = "black"
+
+[darglint]
+docstring_style = "numpy"
+
+[tool.black]
+skip_magic_trailing_comma = true
