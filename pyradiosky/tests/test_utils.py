@@ -3,14 +3,14 @@
 # Licensed under the 3-clause BSD License
 import os
 
+import astropy.units as units
 import numpy as np
 import pytest
 from astropy.coordinates import Angle
-import astropy.units as units
 from astropy.time import Time
 
-from pyradiosky import SkyModel
 import pyradiosky.utils as skyutils
+from pyradiosky import SkyModel
 
 
 def test_tee_ra_loop():

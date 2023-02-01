@@ -1,10 +1,12 @@
 # -*- mode: python; coding: utf-8 -*-
 
 """Format the SkyModel object parameters into a sphinx rst file."""
-import os
 import inspect
-from pyradiosky import SkyModel
+import os
+
 from astropy.time import Time
+
+from pyradiosky import SkyModel
 
 
 def write_skymodel_rst(write_file=None):

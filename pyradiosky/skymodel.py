@@ -7,37 +7,35 @@ import os
 import re
 import warnings
 
+import astropy.units as units
 import h5py
 import numpy as np
-from scipy.linalg import orthogonal_procrustes as ortho_procr
+import pyuvdata.utils as uvutils
 import scipy.io
 from astropy.coordinates import (
-    Angle,
-    EarthLocation,
+    ICRS,
     AltAz,
+    Angle,
+    BaseCoordinateFrame,
+    EarthLocation,
+    Galactic,
     Latitude,
     Longitude,
-    frame_transform_graph,
-    Galactic,
-    ICRS,
-    concatenate as sc_concatenate,
-    BaseCoordinateFrame,
     SkyCoord,
 )
-from astropy.time import Time
-import astropy.units as units
-from astropy.units import Quantity
+from astropy.coordinates import concatenate as sc_concatenate
+from astropy.coordinates import frame_transform_graph
 from astropy.io import votable
-
+from astropy.time import Time
+from astropy.units import Quantity
+from pyuvdata.parameter import SkyCoordParameter, UVParameter
 from pyuvdata.uvbase import UVBase
-from pyuvdata.parameter import UVParameter, SkyCoordParameter
-import pyuvdata.utils as uvutils
 from pyuvdata.uvbeam.cst_beam import CSTBeam
+from scipy.linalg import orthogonal_procrustes as ortho_procr
 
-from . import utils as skyutils
-from . import spherical_coords_transforms as sct
 from . import __version__
-
+from . import spherical_coords_transforms as sct
+from . import utils as skyutils
 
 __all__ = [
     "hasmoon",
@@ -56,7 +54,7 @@ __all__ = [
 ]
 
 try:
-    from lunarsky import MoonLocation, LunarTopo
+    from lunarsky import LunarTopo, MoonLocation
 
     hasmoon = True
 except ImportError:
@@ -496,10 +494,7 @@ class SkyModel(UVBase):
 
         desc = "Healpix nside, only required for HEALPix maps."
         self._nside = UVParameter(
-            "nside",
-            description=desc,
-            expected_type=int,
-            required=False,
+            "nside", description=desc, expected_type=int, required=False
         )
         desc = (
             "Healpix pixel ordering (ring or nested). Only required for HEALPix maps."
@@ -512,12 +507,12 @@ class SkyModel(UVBase):
             required=False,
             acceptable_vals=["ring", "nested"],
         )
-        desc = "Healpix coordinate frame, a subclass of astropy.coordinates.BaseCoordinateFrame."
+        desc = (
+            "Healpix coordinate frame, a subclass of "
+            "astropy.coordinates.BaseCoordinateFrame."
+        )
         self._hpx_frame = UVParameter(
-            "hpx_frame",
-            description=desc,
-            expected_type=object,
-            required=False,
+            "hpx_frame", description=desc, expected_type=object, required=False
         )
 
         desc = "Healpix indices, only required for HEALPix maps."
@@ -629,10 +624,7 @@ class SkyModel(UVBase):
         )
 
         self._history = UVParameter(
-            "history",
-            description="String of history.",
-            form="str",
-            expected_type=str,
+            "history", description="String of history.", form="str", expected_type=str
         )
 
         desc = (
@@ -640,10 +632,7 @@ class SkyModel(UVBase):
             "input files."
         )
         self._filename = UVParameter(
-            "filename",
-            required=False,
-            description=desc,
-            expected_type=str,
+            "filename", required=False, description=desc, expected_type=str
         )
 
         desc = "Time for local position calculations."
@@ -874,8 +863,7 @@ class SkyModel(UVBase):
         args_set_req = np.array(args_set_req, dtype=bool)
 
         arg_set_opt = np.array(
-            [freq_array is not None, reference_frequency is not None],
-            dtype=bool,
+            [freq_array is not None, reference_frequency is not None], dtype=bool
         )
 
         if np.any(np.concatenate((args_set_req, arg_set_opt))):
@@ -938,7 +926,7 @@ class SkyModel(UVBase):
                     # the elements are Quantities with compatible units or if all the
                     # elements are just numeric (in which case the units will be "").
                     warnings.warn(
-                        "freq_array is a list. Attempting to convert to a Quantity.",
+                        "freq_array is a list. Attempting to convert to a Quantity."
                     )
                     try:
                         freq_array = Quantity(freq_array)
@@ -968,7 +956,7 @@ class SkyModel(UVBase):
                     # elements are just numeric (in which case the units will be "").
                     warnings.warn(
                         "reference_frequency is a list. Attempting to convert to a "
-                        "Quantity.",
+                        "Quantity."
                     )
                     try:
                         reference_frequency = Quantity(reference_frequency)
@@ -998,7 +986,7 @@ class SkyModel(UVBase):
                 self.stokes = stokes
             elif isinstance(stokes, list):
                 raise ValueError(
-                    "Stokes should be passed as an astropy Quantity array not a list",
+                    "Stokes should be passed as an astropy Quantity array not a list"
                 )
             elif isinstance(stokes, np.ndarray):
                 # this catches stokes supplied as a numpy array
@@ -1135,7 +1123,7 @@ class SkyModel(UVBase):
                     return getattr(self.skycoord, name)
                 warnings.warn(
                     "It is more efficient to use the `get_lon_lat` method to get "
-                    "longitudinal and latitudinal coordinates for HEALPix maps.",
+                    "longitudinal and latitudinal coordinates for HEALPix maps."
                 )
                 comp_ind = np.nonzero(np.array(comp_names) == name)[0][0]
                 lon_lat = self.get_lon_lat()
@@ -1190,13 +1178,7 @@ class SkyModel(UVBase):
     @property
     def _time_position_params(self):
         """List of strings giving the time & position specific parameters."""
-        return [
-            "time",
-            "telescope_location",
-            "alt_az",
-            "pos_lmn",
-            "above_horizon",
-        ]
+        return ["time", "telescope_location", "alt_az", "pos_lmn", "above_horizon"]
 
     def clear_time_position_specific_params(self):
         """Set  parameters which are time & position specific to ``None``."""
@@ -1441,23 +1423,16 @@ class SkyModel(UVBase):
         # This filter can be removed when lunarsky is updated to not trigger this
         # astropy deprecation warning.
         with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                message="The get_frame_attr_names",
-            )
+            warnings.filterwarnings("ignore", message="The get_frame_attr_names")
             coords = coords.transform_to(frame)
 
         frame = coords.frame.replicate_without_data(copy=True)
 
         hp_obj_new = astropy_healpix.HEALPix(
-            nside=this.nside,
-            order=this.hpx_order,
-            frame=frame,
+            nside=this.nside, order=this.hpx_order, frame=frame
         )
         hp_obj_old = astropy_healpix.HEALPix(
-            nside=this.nside,
-            order=this.hpx_order,
-            frame=old_frame,
+            nside=this.nside, order=this.hpx_order, frame=old_frame
         )
 
         # It is not immediately obvious how many unique pixels the output
@@ -1488,13 +1463,11 @@ class SkyModel(UVBase):
                 ].value
 
                 masked_new_frame = hp_obj_old.interpolate_bilinear_skycoord(
-                    new_pixel_locs,
-                    masked_old_frame,
+                    new_pixel_locs, masked_old_frame
                 )
 
                 out_stokes[stokes_ind, freq_ind] = units.Quantity(
-                    masked_new_frame.data,
-                    unit=this.stokes.unit,
+                    masked_new_frame.data, unit=this.stokes.unit
                 )
         if not full_sky:
             # Each frequency/stokes combination should have the same input pixels
@@ -1644,13 +1617,9 @@ class SkyModel(UVBase):
                     "methods"
                 ) from e
             hp_obj = astropy_healpix.HEALPix(
-                nside=self.nside,
-                order=self.hpx_order,
-                frame=self.hpx_frame,
+                nside=self.nside, order=self.hpx_order, frame=self.hpx_frame
             )
-            coords = hp_obj.healpix_to_skycoord(
-                self.hpx_inds,
-            )
+            coords = hp_obj.healpix_to_skycoord(self.hpx_inds)
 
             return getattr(coords, comp_names[0]), getattr(coords, comp_names[1])
         else:
@@ -1659,11 +1628,7 @@ class SkyModel(UVBase):
             )
 
     def healpix_to_point(
-        self,
-        to_jy=True,
-        run_check=True,
-        check_extra=True,
-        run_check_acceptability=True,
+        self, to_jy=True, run_check=True, check_extra=True, run_check_acceptability=True
     ):
         """
         Convert a healpix component_type object to a point component_type.
@@ -1726,11 +1691,7 @@ class SkyModel(UVBase):
             )
 
     def _point_to_healpix(
-        self,
-        to_k=True,
-        run_check=True,
-        check_extra=True,
-        run_check_acceptability=True,
+        self, to_k=True, run_check=True, check_extra=True, run_check_acceptability=True
     ):
         """
         Convert a point component_type object to a healpix component_type.
@@ -1799,11 +1760,7 @@ class SkyModel(UVBase):
             )
 
     def point_to_healpix(
-        self,
-        to_k=True,
-        run_check=True,
-        check_extra=True,
-        run_check_acceptability=True,
+        self, to_k=True, run_check=True, check_extra=True, run_check_acceptability=True
     ):
         """
         Convert a point component_type object to a healpix component_type.
@@ -1965,10 +1922,7 @@ class SkyModel(UVBase):
         # This filter can be removed when lunarsky is updated to not trigger this
         # astropy deprecation warning.
         with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                message="The get_frame_attr_names",
-            )
+            warnings.filterwarnings("ignore", message="The get_frame_attr_names")
             hpx_inds = hpx_obj.skycoord_to_healpix(sky.skycoord)
 
         sky._set_component_type_params("healpix")
@@ -2493,10 +2447,7 @@ class SkyModel(UVBase):
         # This filter can be removed when lunarsky is updated to not trigger this
         # astropy deprecation warning.
         with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                message="The get_frame_attr_names",
-            )
+            warnings.filterwarnings("ignore", message="The get_frame_attr_names")
             if hasmoon and isinstance(self.telescope_location, MoonLocation):
                 source_altaz = skycoord_use.transform_to(
                     LunarTopo(obstime=self.time, location=self.telescope_location)
@@ -2572,10 +2523,7 @@ class SkyModel(UVBase):
         # This filter can be removed when lunarsky is updated to not trigger this
         # astropy deprecation warning.
         with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                message="The get_frame_attr_names",
-            )
+            warnings.filterwarnings("ignore", message="The get_frame_attr_names")
             axes_altaz = axes_frame.transform_to("altaz")
         axes_altaz.representation_type = "cartesian"
 
@@ -2831,8 +2779,7 @@ class SkyModel(UVBase):
 
         # Check that both objects are SkyModel and valid
         this.check(
-            check_extra=check_extra,
-            run_check_acceptability=run_check_acceptability,
+            check_extra=check_extra, run_check_acceptability=run_check_acceptability
         )
         if not issubclass(other.__class__, this.__class__):
             if not issubclass(this.__class__, other.__class__):
@@ -2841,15 +2788,11 @@ class SkyModel(UVBase):
                     "added to a SkyModel (or subclass) object"
                 )
         other.check(
-            check_extra=check_extra,
-            run_check_acceptability=run_check_acceptability,
+            check_extra=check_extra, run_check_acceptability=run_check_acceptability
         )
 
         # Define parameters that must be the same to add objects
-        compatibility_params = [
-            "_component_type",
-            "_spectral_type",
-        ]
+        compatibility_params = ["_component_type", "_spectral_type"]
 
         if this.spectral_type in ["subband", "full"]:
             compatibility_params.append("_freq_array")
@@ -2974,25 +2917,13 @@ class SkyModel(UVBase):
                 fill_shape = tuple(fill_shape)
                 if isinstance(this_param, Quantity):
                     fill_arr = Quantity(
-                        np.full(
-                            fill_shape,
-                            None,
-                            dtype=this_param.dtype,
-                        ),
+                        np.full(fill_shape, None, dtype=this_param.dtype),
                         unit=this_param.unit,
                     )
                 elif pdict["type"] == "numeric":
-                    fill_arr = np.full(
-                        fill_shape,
-                        None,
-                        dtype=this_param.dtype,
-                    )
+                    fill_arr = np.full(fill_shape, None, dtype=this_param.dtype)
                 else:
-                    fill_arr = np.full(
-                        fill_shape,
-                        "",
-                        dtype=this_param.dtype,
-                    )
+                    fill_arr = np.full(fill_shape, "", dtype=this_param.dtype)
                 new_param = np.concatenate((this_param, fill_arr), axis=pdict["axis"])
                 setattr(this, param, new_param)
             elif other_param is not None:
@@ -3005,25 +2936,13 @@ class SkyModel(UVBase):
                 fill_shape = tuple(fill_shape)
                 if isinstance(other_param, Quantity):
                     fill_arr = Quantity(
-                        np.full(
-                            fill_shape,
-                            None,
-                            dtype=other_param.dtype,
-                        ),
+                        np.full(fill_shape, None, dtype=other_param.dtype),
                         unit=other_param.unit,
                     )
                 elif pdict["type"] == "numeric":
-                    fill_arr = np.full(
-                        fill_shape,
-                        None,
-                        dtype=other_param.dtype,
-                    )
+                    fill_arr = np.full(fill_shape, None, dtype=other_param.dtype)
                 else:
-                    fill_arr = np.full(
-                        fill_shape,
-                        "",
-                        dtype=other_param.dtype,
-                    )
+                    fill_arr = np.full(fill_shape, "", dtype=other_param.dtype)
                 new_param = np.concatenate((fill_arr, other_param), axis=pdict["axis"])
                 setattr(this, param, new_param)
 
@@ -3057,8 +2976,7 @@ class SkyModel(UVBase):
         # Check final object is self-consistent
         if run_check:
             this.check(
-                check_extra=check_extra,
-                run_check_acceptability=run_check_acceptability,
+                check_extra=check_extra, run_check_acceptability=run_check_acceptability
             )
 
         if not inplace:
@@ -3143,10 +3061,7 @@ class SkyModel(UVBase):
                 # written this way to avoid multi-advanced indexing
                 stokes_use = self.stokes[0][freq_inds_use, :]
                 stokes_use = stokes_use[:, component_inds]
-                assert stokes_use.shape == (
-                    freq_inds_use.size,
-                    component_inds.size,
-                )
+                assert stokes_use.shape == (freq_inds_use.size, component_inds.size)
 
             component_inds = component_inds[
                 np.nonzero(np.min(stokes_use.value, axis=0) >= min_brightness.value)[0]
@@ -3169,15 +3084,10 @@ class SkyModel(UVBase):
                 # written this way to avoid multi-advanced indexing
                 stokes_use = self.stokes[0][freq_inds_use, :]
                 stokes_use = stokes_use[:, component_inds]
-                assert stokes_use.shape == (
-                    freq_inds_use.size,
-                    component_inds.size,
-                )
+                assert stokes_use.shape == (freq_inds_use.size, component_inds.size)
 
             component_inds = component_inds[
-                np.nonzero(
-                    np.max(stokes_use.value, axis=0) <= max_brightness.value,
-                )[0]
+                np.nonzero(np.max(stokes_use.value, axis=0) <= max_brightness.value)[0]
             ]
         return component_inds
 
@@ -3309,11 +3219,7 @@ class SkyModel(UVBase):
             return skyobj
 
     @units.quantity_input(telescope_latitude=units.rad)
-    def calculate_rise_set_lsts(
-        self,
-        telescope_latitude,
-        horizon_buffer=0.04364,
-    ):
+    def calculate_rise_set_lsts(self, telescope_latitude, horizon_buffer=0.04364):
         """
         Calculate the rise & set LSTs given a telescope latitude.
 
@@ -3347,9 +3253,7 @@ class SkyModel(UVBase):
 
         with warnings.catch_warnings():
             warnings.filterwarnings(
-                "ignore",
-                message="invalid value encountered",
-                category=RuntimeWarning,
+                "ignore", message="invalid value encountered", category=RuntimeWarning
             )
             rise_lst = lon.rad - np.arccos((-1) * tans) - buff
             set_lst = lon.rad + np.arccos((-1) * tans) + buff
@@ -3836,11 +3740,7 @@ class SkyModel(UVBase):
         return self
 
     def read_skyh5(
-        self,
-        filename,
-        run_check=True,
-        check_extra=True,
-        run_check_acceptability=True,
+        self, filename, run_check=True, check_extra=True, run_check_acceptability=True
     ):
         """
         Read a skyh5 file (our flavor of hdf5) into this object.
@@ -3916,9 +3816,7 @@ class SkyModel(UVBase):
                         else:
                             expected_type = None
                         skycoord_dict[key] = _get_value_hdf5_group(
-                            header["skycoord"],
-                            key,
-                            expected_type,
+                            header["skycoord"], key, expected_type
                         )
                     init_params["skycoord"] = SkyCoord(**skycoord_dict)
                 else:
@@ -3957,9 +3855,7 @@ class SkyModel(UVBase):
                             else:
                                 expected_type = None
                             skycoord_dict[key] = _get_value_hdf5_group(
-                                header["hpx_frame"],
-                                key,
-                                expected_type,
+                                header["hpx_frame"], key, expected_type
                             )
                         dummy_coord = SkyCoord(0, 0, unit="rad", **skycoord_dict)
                         init_params[
@@ -4058,11 +3954,7 @@ class SkyModel(UVBase):
 
     @classmethod
     def from_skyh5(
-        cls,
-        filename,
-        run_check=True,
-        check_extra=True,
-        run_check_acceptability=True,
+        cls, filename, run_check=True, check_extra=True, run_check_acceptability=True
     ):
         """
         Create a new :class:`SkyModel` from skyh5 file (our flavor of hdf5).
@@ -6278,9 +6170,7 @@ def read_gleam_catalog(
 
     skyobj = SkyModel()
     skyobj.read_gleam_catalog(
-        gleam_file,
-        spectral_type=spectral_type,
-        source_select_kwds=source_select_kwds,
+        gleam_file, spectral_type=spectral_type, source_select_kwds=source_select_kwds
     )
 
     if return_table:
@@ -6340,10 +6230,7 @@ def read_text_catalog(catalog_csv, source_select_kwds=None, return_table=False):
     )
 
     skyobj = SkyModel()
-    skyobj.read_text_catalog(
-        catalog_csv,
-        source_select_kwds=source_select_kwds,
-    )
+    skyobj.read_text_catalog(catalog_csv, source_select_kwds=source_select_kwds)
 
     if return_table:
         with warnings.catch_warnings():
@@ -6379,10 +6266,7 @@ def read_idl_catalog(filename_sav, expand_extended=True):
     )
 
     skyobj = SkyModel()
-    skyobj.read_fhd_catalog(
-        filename_sav,
-        expand_extended=expand_extended,
-    )
+    skyobj.read_fhd_catalog(filename_sav, expand_extended=expand_extended)
 
     return skyobj
 

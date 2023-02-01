@@ -3,10 +3,11 @@
 """Utility function for making noiselike EoR models."""
 
 
-import numpy as np
-from astropy.cosmology import Planck15
-from astropy import units
 import argparse
+
+import numpy as np
+from astropy import units
+from astropy.cosmology import Planck15
 
 from pyradiosky import SkyModel
 
@@ -145,25 +146,13 @@ if __name__ == "__main__":
         help="Frequency channel to set as reference, if using freqs.",
     )
     parser.add_argument(
-        "-s",
-        "--start_freq",
-        type=float,
-        required=True,
-        help="Start frequency (in Hz)",
+        "-s", "--start_freq", type=float, required=True, help="Start frequency (in Hz)"
     )
     parser.add_argument(
-        "-e",
-        "--end_freq",
-        type=float,
-        required=True,
-        help="End frequency (in Hz)",
+        "-e", "--end_freq", type=float, required=True, help="End frequency (in Hz)"
     )
     parser.add_argument(
-        "-N",
-        "--nfreqs",
-        type=int,
-        required=True,
-        help="Number of frequencies",
+        "-N", "--nfreqs", type=int, required=True, help="Number of frequencies"
     )
     parser.add_argument(
         "--fname", type=str, help="Output file name", default="noise_sky.hdf5"

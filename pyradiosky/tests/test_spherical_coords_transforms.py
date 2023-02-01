@@ -5,7 +5,7 @@
 import numpy as np
 import pytest
 from astropy import units
-from astropy.coordinates import SkyCoord, EarthLocation
+from astropy.coordinates import EarthLocation, SkyCoord
 from astropy.time import Time
 from scipy.linalg import orthogonal_procrustes as ortho_procr
 
