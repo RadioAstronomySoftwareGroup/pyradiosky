@@ -1861,13 +1861,6 @@ def test_healpix_import_err(zenith_skymodel):
         astropy_healpix.nside_to_npix(2**3)
     except ImportError:
         errstr = "The astropy-healpix module must be installed to use HEALPix methods"
-        Npix = 12
-        hpmap = np.arange(Npix)
-        inds = hpmap
-        freqs = np.zeros(1)
-
-        with pytest.raises(ImportError, match=errstr):
-            skymodel.healpix_to_sky(hpmap, inds, freqs)
 
         with pytest.raises(ImportError, match=errstr):
             sm = SkyModel(
@@ -1881,9 +1874,6 @@ def test_healpix_import_err(zenith_skymodel):
 
         with pytest.raises(ImportError, match=errstr):
             SkyModel.from_healpix_hdf5(os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5"))
-
-        with pytest.raises(ImportError, match=errstr):
-            skymodel.write_healpix_hdf5("filename.hdf5", hpmap, inds, freqs)
 
         zenith_skymodel.nside = 32
         zenith_skymodel.hpx_inds = 0
