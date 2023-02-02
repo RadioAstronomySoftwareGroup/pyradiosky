@@ -41,6 +41,7 @@ __all__ = ["hasmoon", "SkyModel"]
 
 try:
     from lunarsky import LunarTopo, MoonLocation
+    from lunarsky import SkyCoord as LunarSkyCoord
 
     hasmoon = True
 except ImportError:
@@ -1770,7 +1771,7 @@ class SkyModel(UVBase):
         sky.clear_time_position_specific_params()
 
         hpx_obj = astropy_healpix.HEALPix(nside, order=order, frame=frame_obj)
-        hpx_inds = hpx_obj.skycoord_to_healpix(sky.skycoord)
+        hpx_inds = hpx_obj.skycoord_to_healpix(self.skycoord)
 
         sky._set_component_type_params("healpix")
         sky.nside = nside
@@ -2269,7 +2270,10 @@ class SkyModel(UVBase):
                 "time must be an astropy Time object. value was: {t}".format(t=time)
             )
 
-        if not isinstance(telescope_location, self._telescope_location.expected_type):
+        if not (
+            isinstance(telescope_location, EarthLocation)
+            or (hasmoon and isinstance(telescope_location, MoonLocation))
+        ):
             errm = "telescope_location must be an :class:`astropy.EarthLocation` object"
             if hasmoon:
                 errm += " or a :class:`lunarsky.MoonLocation` object "
@@ -2290,14 +2294,16 @@ class SkyModel(UVBase):
         else:
             skycoord_use = self.skycoord
 
-        if hasmoon and isinstance(self.telescope_location, MoonLocation):
-            source_altaz = skycoord_use.transform_to(
-                LunarTopo(obstime=self.time, location=self.telescope_location)
-            )
-        else:
+        if isinstance(telescope_location, EarthLocation):
             source_altaz = skycoord_use.transform_to(
                 AltAz(obstime=self.time, location=self.telescope_location)
             )
+        else:
+            skycoord_use = LunarSkyCoord(skycoord_use)
+            if isinstance(self.telescope_location, MoonLocation):
+                source_altaz = skycoord_use.transform_to(
+                    LunarTopo(obstime=self.time, location=self.telescope_location)
+                )
 
         alt_az = np.array([source_altaz.alt.rad, source_altaz.az.rad])
 
@@ -2352,17 +2358,29 @@ class SkyModel(UVBase):
         y_c = np.array([0, 1.0, 0])
         z_c = np.array([0, 0, 1.0])
 
-        axes_frame = SkyCoord(
-            x=x_c,
-            y=y_c,
-            z=z_c,
-            obstime=self.time,
-            location=self.telescope_location,
-            frame=self._get_frame_obj(),
-            representation_type="cartesian",
-        )
+        if isinstance(self.telescope_location, EarthLocation):
+            axes_icrs = SkyCoord(
+                x=x_c,
+                y=y_c,
+                z=z_c,
+                obstime=self.time,
+                location=self.telescope_location,
+                frame="icrs",
+                representation_type="cartesian",
+            )
+            axes_altaz = axes_icrs.transform_to("altaz")
+        else:
+            axes_icrs = LunarSkyCoord(
+                x=x_c,
+                y=y_c,
+                z=z_c,
+                obstime=self.time,
+                location=self.telescope_location,
+                frame="icrs",
+                representation_type="cartesian",
+            )
+            axes_altaz = axes_icrs.transform_to("lunartopo")
 
-        axes_altaz = axes_frame.transform_to("altaz")
         axes_altaz.representation_type = "cartesian"
 
         """ This transformation matrix is generally not orthogonal
@@ -2498,12 +2516,13 @@ class SkyModel(UVBase):
         else:
             above_horizon = self.above_horizon
 
-        if not isinstance(
-            self.telescope_location, self._telescope_location.expected_type
+        if not (
+            isinstance(self.telescope_location, EarthLocation)
+            or (hasmoon and isinstance(self.telescope_location, MoonLocation))
         ):
-            errm = "telescope_location must be an astropy EarthLocation object"
+            errm = "telescope_location must be an :class:`astropy.EarthLocation` object"
             if hasmoon:
-                errm += " or a lunarsky MoonLocation object "
+                errm += " or a :class:`lunarsky.MoonLocation` object "
             errm += ". "
             raise ValueError(
                 errm + "value was: {al}".format(al=str(self.telescope_location))

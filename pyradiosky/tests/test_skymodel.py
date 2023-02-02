@@ -47,6 +47,20 @@ def time_location():
 
 
 @pytest.fixture
+def moon_time_location():
+    pytest.importorskip("lunarsky")
+
+    from lunarsky import MoonLocation
+    from lunarsky import Time as LTime
+
+    array_location = MoonLocation.from_selenodetic(0.6875, 24.433, 0)
+
+    time = LTime("2015-03-01 00:00:00", scale="utc", location=array_location)
+
+    return time, array_location
+
+
+@pytest.fixture
 def zenith_skycoord(time_location):
     time, array_location = time_location
 
@@ -76,13 +90,13 @@ def moonsky():
     pytest.importorskip("lunarsky")
 
     from lunarsky import MoonLocation
-    from lunarsky import SkyCoord as SkyC
+    from lunarsky import SkyCoord as LunarSkyCoord
 
     # Tranquility base
     array_location = MoonLocation(lat="00d41m15s", lon="23d26m00s", height=0.0)
 
     time = Time.now()
-    zen_coord = SkyC(
+    zen_coord = LunarSkyCoord(
         alt=Angle(90, unit=units.deg),
         az=Angle(0, unit=units.deg),
         obstime=time,
@@ -1061,13 +1075,17 @@ def test_coherency_calc_errors():
             source.coherency_calc().squeeze()
 
 
-def test_calc_basis_rotation_matrix(time_location):
+@pytest.mark.parametrize("telescope_frame", ["itrs", "mcmf"])
+def test_calc_basis_rotation_matrix(time_location, moon_time_location, telescope_frame):
     """
     This tests whether the 3-D rotation matrix from RA/Dec to Alt/Az is
     actually a rotation matrix (R R^T = R^T R = I)
     """
 
-    time, telescope_location = time_location
+    if telescope_frame == "itrs":
+        time, telescope_location = time_location
+    else:
+        time, telescope_location = moon_time_location
 
     source = SkyModel(
         name="Test",
@@ -1085,12 +1103,16 @@ def test_calc_basis_rotation_matrix(time_location):
     assert np.allclose(np.matmul(basis_rot_matrix.T, basis_rot_matrix), np.eye(3))
 
 
-def test_calc_vector_rotation(time_location):
+@pytest.mark.parametrize("telescope_frame", ["itrs", "mcmf"])
+def test_calc_vector_rotation(time_location, moon_time_location, telescope_frame):
     """
     This checks that the 2-D coherency rotation matrix is unit determinant.
     I suppose we could also have checked (R R^T = R^T R = I)
     """
-    time, telescope_location = time_location
+    if telescope_frame == "itrs":
+        time, telescope_location = time_location
+    else:
+        time, telescope_location = moon_time_location
 
     source = SkyModel(
         name="Test",
@@ -1297,10 +1319,22 @@ def test_polarized_source_visibilities(time_location):
     assert units.quantity.allclose(coherency_instr_local, expected_instr_local)
 
 
-def test_polarized_source_smooth_visibilities():
+@pytest.mark.parametrize("telescope_frame", ["itrs", "mcmf"])
+def test_polarized_source_smooth_visibilities(
+    time_location, moon_time_location, telescope_frame
+):
     """Test that visibilities change smoothly as a polarized source transits."""
-    array_location = EarthLocation(lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0)
-    time0 = Time("2015-03-01 18:00:00", scale="utc", location=array_location)
+    if telescope_frame == "itrs":
+        time0, array_location = time_location
+        altaz_frame = "altaz"
+        skycoordobj = SkyCoord
+    else:
+        pytest.importorskip("lunarsky")
+        from lunarsky import SkyCoord as LunarSkyCoord
+
+        time0, array_location = moon_time_location
+        altaz_frame = "lunartopo"
+        skycoordobj = LunarSkyCoord
 
     ha_off = 1
     ha_delta = 0.01
@@ -1311,19 +1345,19 @@ def test_polarized_source_smooth_visibilities():
     times = time0 + time_offsets * units.hr
     ntimes = times.size
 
-    zenith = SkyCoord(
+    zenith = skycoordobj(
         alt=90.0 * units.deg,
         az=0 * units.deg,
-        frame="altaz",
+        frame=altaz_frame,
         obstime=time0,
         location=array_location,
     )
     zenith_icrs = zenith.transform_to("icrs")
 
-    src_astropy = SkyCoord(
+    src_astropy = skycoordobj(
         ra=zenith_icrs.ra, dec=zenith_icrs.dec, obstime=times, location=array_location
     )
-    src_astropy_altaz = src_astropy.transform_to("altaz")
+    src_astropy_altaz = src_astropy.transform_to(altaz_frame)
     assert np.isclose(src_astropy_altaz.alt.rad[zero_indx], np.pi / 2)
 
     stokes_radec = [1, -0.2, 0.3, 0.1] * units.Jy
