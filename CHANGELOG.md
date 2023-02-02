@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+
+## [0.2.0] - 2023-01-01
+
 ### Added
 - Add support for all astropy coordinate frames with the new `skycoord` attribute (which
 contains an astropy SkyCoord object) on point objects and the new `hpx_frame` attribute
@@ -39,6 +42,22 @@ point objects and the `hpx_inds` and `hpx_frame` attributes for healpix objects.
 favor of the `lon_column` and `lat_column` as a part of supporting more frames in
 votable files.
 - The `to_recarray` and `from_recarray` methods.
+
+### Removed
+- Removed support for the older input parameter order to `SkyModel.__init__`.
+- Removed support for passing `freq_array`, `reference_freq` or `stokes` to
+`SkyModel.__init__` as anything other than appropriate Quantities.
+- `set_spectral_type_params` and `read_idl_catalog` methods have been
+removed from `SkyModel`
+- Removed the `read_healpix_hdf5`, `healpix_to_sky`, `write_healpix_hdf5`,
+`skymodel_to_array`, `array_to_skymodel`, `source_cuts`, `read_votable_catalog`,
+`read_gleam_catalog`, `read_text_catalog`, `read_idl_catalog`, `write_catalog_to_file`
+functions (many similar methods on `SkyModel` remain).
+- Removed support for passing telescope_location directly to the
+`SkyModel.coherency_calc` method.
+- Removed support for votable_files with tables with no name or ID.
+- Removed `frequency` column and alias like `flux_density_I` for flux columns in output
+of `SkyModel.to_recarray`,
 
 ## [0.1.3] - 2022-02-22
 

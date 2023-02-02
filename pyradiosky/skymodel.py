@@ -37,21 +37,7 @@ from . import __version__
 from . import spherical_coords_transforms as sct
 from . import utils as skyutils
 
-__all__ = [
-    "hasmoon",
-    "SkyModel",
-    "read_healpix_hdf5",
-    "healpix_to_sky",
-    "skymodel_to_array",
-    "array_to_skymodel",
-    "source_cuts",
-    "read_gleam_catalog",
-    "read_votable_catalog",
-    "read_text_catalog",
-    "read_idl_catalog",
-    "write_catalog_to_file",
-    "write_healpix_hdf5",
-]
+__all__ = ["hasmoon", "SkyModel"]
 
 try:
     from lunarsky import LunarTopo, MoonLocation
@@ -414,6 +400,7 @@ class SkyModel(UVBase):
             self._hpx_order.required = False
             self._hpx_frame.required = False
 
+    @units.quantity_input(freq_array=units.Hz, reference_frequency=units.Hz)
     def __init__(
         self,
         name=None,
@@ -441,8 +428,7 @@ class SkyModel(UVBase):
         filename=None,
     ):
         # standard angle tolerance: 1 mas in radians.
-        self.angle_tol = Angle(1, units.arcsec)
-        self.future_angle_tol = Angle(1e-3, units.arcsec)
+        self.angle_tol = Angle(1e-3, units.arcsec)
 
         # Frequency tolerance: 1 Hz
         self.freq_tol = 1 * units.Hz
@@ -691,24 +677,6 @@ class SkyModel(UVBase):
             "  Read/written with pyradiosky version: " + __version__ + "."
         )
 
-        # handle old parameter order
-        # (use to be: name, ra, dec, stokes, freq_array, spectral_type)
-        if isinstance(spectral_type, (np.ndarray, list, float, Quantity)):
-            warnings.warn(
-                "The input parameters to SkyModel.__init__ have changed. Please "
-                "update the call. This will become an error in version 0.2.0.",
-                category=DeprecationWarning,
-            )
-            freqs_use = spectral_type
-            spectral_type = freq_array
-
-            if spectral_type == "flat" and np.asarray(freqs_use).size == 1:
-                reference_frequency = np.zeros(self.Ncomponents) + freqs_use[0]
-                freq_array = None
-            else:
-                freq_array = freqs_use
-                reference_frequency = None
-
         if component_type is not None:
             if component_type not in self._component_type.acceptable_vals:
                 raise ValueError(
@@ -921,62 +889,12 @@ class SkyModel(UVBase):
             self._set_spectral_type_params(spectral_type)
 
             if freq_array is not None:
-                if isinstance(freq_array, (list)):
-                    # try just converting the list to a Quantity. This will work if all
-                    # the elements are Quantities with compatible units or if all the
-                    # elements are just numeric (in which case the units will be "").
-                    warnings.warn(
-                        "freq_array is a list. Attempting to convert to a Quantity."
-                    )
-                    try:
-                        freq_array = Quantity(freq_array)
-                    except TypeError as err:
-                        raise ValueError(
-                            "If freq_array is supplied as a list, all the elements must be "
-                            "Quantity objects with compatible units."
-                        ) from err
-                if not isinstance(freq_array, (Quantity,)) or freq_array.unit == "":
-                    # This catches arrays or lists that have all numeric types
-                    warnings.warn(
-                        "In version 0.2.0, the freq_array will be required to be an "
-                        "astropy Quantity with units that are convertable to Hz. "
-                        "Currently, floats are assumed to be in Hz.",
-                        category=DeprecationWarning,
-                    )
-                    freq_array = freq_array * units.Hz
                 self.freq_array = np.atleast_1d(freq_array)
                 self.Nfreqs = self.freq_array.size
             else:
                 self.Nfreqs = 1
 
             if reference_frequency is not None:
-                if isinstance(reference_frequency, (list)):
-                    # try just converting the list to a Quantity. This will work if all
-                    # the elements are Quantities with compatible units or if all the
-                    # elements are just numeric (in which case the units will be "").
-                    warnings.warn(
-                        "reference_frequency is a list. Attempting to convert to a "
-                        "Quantity."
-                    )
-                    try:
-                        reference_frequency = Quantity(reference_frequency)
-                    except TypeError as err:
-                        raise ValueError(
-                            "If reference_frequency is supplied as a list, all the "
-                            "elements must be Quantity objects with compatible units."
-                        ) from err
-                if (
-                    not isinstance(reference_frequency, (Quantity,))
-                    or reference_frequency.unit == ""
-                ):
-                    # This catches arrays or lists that have all numeric types
-                    warnings.warn(
-                        "In version 0.2.0, the reference_frequency will be required to "
-                        "be an astropy Quantity with units that are convertable to Hz. "
-                        "Currently, floats are assumed to be in Hz.",
-                        category=DeprecationWarning,
-                    )
-                    reference_frequency = reference_frequency * units.Hz
                 self.reference_frequency = np.atleast_1d(reference_frequency)
 
             if spectral_index is not None:
@@ -984,29 +902,10 @@ class SkyModel(UVBase):
 
             if isinstance(stokes, Quantity):
                 self.stokes = stokes
-            elif isinstance(stokes, list):
-                raise ValueError(
-                    "Stokes should be passed as an astropy Quantity array not a list"
-                )
-            elif isinstance(stokes, np.ndarray):
-                # this catches stokes supplied as a numpy array
-                if self.component_type == "point":
-                    allowed_units = ["Jy", "K sr"]
-                    default_unit = "Jy"
-                else:
-                    allowed_units = ["Jy/sr", "K"]
-                    default_unit = "K"
-
-                warnings.warn(
-                    "In version 0.2.0, stokes will be required to be an astropy "
-                    f"Quantity with units that are convertable to one of {allowed_units}. "
-                    f"Currently, floats are assumed to be in {default_unit}.",
-                    category=DeprecationWarning,
-                )
-                self.stokes = Quantity(stokes, default_unit)
             else:
                 raise ValueError(
-                    "Stokes should be passed as an astropy Quantity array."
+                    "Stokes should be passed as an astropy Quantity array (not a list "
+                    "or numpy array)."
                 )
 
             if self.Ncomponents == 1:
@@ -1152,20 +1051,6 @@ class SkyModel(UVBase):
             self._reference_frequency.required = False
             self._Nfreqs.acceptable_vals = [1]
 
-    def set_spectral_type_params(self, spectral_type):
-        """
-        Set parameters depending on spectral_type.
-
-        Deprecated, use _set_spectral_type_params
-        """
-        warnings.warn(
-            "This function is deprecated, use `_set_spectral_type_params` instead. "
-            "This funtion will be removed in 0.2.0.",
-            category=DeprecationWarning,
-        )
-
-        self._set_spectral_type_params(spectral_type)
-
     @property
     def ncomponent_length_params(self):
         """Iterate over ncomponent length paramters."""
@@ -1274,36 +1159,6 @@ class SkyModel(UVBase):
             except TypeError:
                 equal = super(SkyModel, self).__eq__(
                     other, check_extra=check_extra, allowed_failures=allowed_failures
-                )
-
-        if equal and not self.component_type == "healpix":
-            # Issue deprecation warning if skycoords aren't close to future_angle_tol levels
-            sky_separation = self.skycoord.separation(other.skycoord).rad
-            if np.any(sky_separation > self.future_angle_tol.rad):
-                warnings.warn(
-                    "The skycoord parameters are not within the future tolerance. "
-                    f"The sky separation between them is {sky_separation}, "
-                    "This will become an error in version 0.2.0",
-                    category=DeprecationWarning,
-                )
-
-        if not equal:
-            equal = super(SkyModel, self).__eq__(other, check_extra=False)
-
-            if equal:
-                # required params are equal, extras are not but check_extra is turned on.
-                # Issue future warning!
-                unequal_name_list = []
-                for param in self.extra():
-                    this_param = getattr(self, param)
-                    other_param = getattr(other, param)
-                    if this_param != other_param:
-                        unequal_name_list.append(this_param.name)
-
-                warnings.warn(
-                    f"Future equality does not pass, because parameters {unequal_name_list} "
-                    "are not equal. This will become an error in version 0.2.0",
-                    category=DeprecationWarning,
                 )
 
         return equal
@@ -2629,7 +2484,7 @@ class SkyModel(UVBase):
 
         return coherency_rot_matrix
 
-    def coherency_calc(self, deprecated_location=None, store_frame_coherency=True):
+    def coherency_calc(self, store_frame_coherency=True):
         """
         Calculate the local coherency in alt/az basis.
 
@@ -2641,9 +2496,6 @@ class SkyModel(UVBase):
 
         Parameters
         ----------
-        deprecated_location : :class:`astropy.coordinates.EarthLocation`
-            This keyword is deprecated. It is preserved to maintain backwards
-            compatibility and sets the EarthLocation on this SkyModel object.
         store_frame_coherency : bool
             Option to store the frame_coherency to the object. This saves time for
             repeated calls but adds memory.
@@ -2652,6 +2504,7 @@ class SkyModel(UVBase):
         -------
         array of float
             local coherency in alt/az basis, shape (2, 2, Nfreqs, Ncomponents)
+
         """
         if self.above_horizon is None:
             warnings.warn(
@@ -2661,15 +2514,6 @@ class SkyModel(UVBase):
             above_horizon = np.ones(self.Ncomponents).astype(bool)
         else:
             above_horizon = self.above_horizon
-
-        if deprecated_location is not None:
-            warnings.warn(
-                "Passing telescope_location to SkyModel.coherency_calc is "
-                "deprecated. Set the telescope_location via SkyModel.update_positions. "
-                "This will become an error in version 0.2.0",
-                category=DeprecationWarning,
-            )
-            self.update_positions(self.time, deprecated_location)
 
         if not isinstance(
             self.telescope_location, self._telescope_location.expected_type
@@ -3466,14 +3310,11 @@ class SkyModel(UVBase):
             # This will add e.g. ra_J2000 and dec_J2000 for FK5
             component_fieldnames.append(comp_name + "_" + frame_desc_str)
         fieldnames = ["source_id"] + component_fieldnames
-        # Alias "flux_density_" for "I", etc.
-        stokes_names = [(f"flux_density_{k}", k) for k in ["I", "Q", "U", "V"]]
+        stokes_names = ["I", "Q", "U", "V"]
         fieldshapes = [()] * 3
 
         if self.stokes_error is not None:
-            stokes_error_names = [
-                (f"flux_density_error_{k}", f"{k}_error") for k in ["I", "Q", "U", "V"]
-            ]
+            stokes_error_names = [(f"{k}_error") for k in ["I", "Q", "U", "V"]]
 
         n_stokes = 0
         stokes_keep = []
@@ -3499,17 +3340,9 @@ class SkyModel(UVBase):
             fieldtypes.append("f8")
             fieldshapes.extend([(self.Nfreqs,)])
         elif self.reference_frequency is not None:
-            # add frequency field (a copy of reference_frequency) for backwards
-            # compatibility.
-            warnings.warn(
-                "The reference_frequency is aliased as `frequency` in the recarray "
-                "for backwards compatibility. In version 0.2.0, "
-                "only `reference_frequency` will be an accepted column key.",
-                category=DeprecationWarning,
-            )
-            fieldnames.extend([("frequency", "reference_frequency")])
-            fieldtypes.extend(["f8"] * 2)
-            fieldshapes.extend([()] * n_stokes + [()] * 2)
+            fieldnames.extend([("reference_frequency")])
+            fieldtypes.extend(["f8"])
+            fieldshapes.extend([()] * n_stokes + [()])
             if self.spectral_index is not None:
                 fieldnames.append("spectral_index")
                 fieldtypes.append("f8")
@@ -3535,11 +3368,9 @@ class SkyModel(UVBase):
 
         for ii in range(4):
             if stokes_keep[ii]:
-                arr[stokes_names[ii][0]] = self.stokes[ii].T.to("Jy").value
+                arr[stokes_names[ii]] = self.stokes[ii].T.to("Jy").value
                 if self.stokes_error is not None:
-                    arr[stokes_error_names[ii][0]] = (
-                        self.stokes_error[ii].T.to("Jy").value
-                    )
+                    arr[stokes_error_names[ii]] = self.stokes_error[ii].T.to("Jy").value
 
         if self.freq_array is not None:
             if self.spectral_type == "subband":
@@ -3547,7 +3378,7 @@ class SkyModel(UVBase):
             else:
                 arr["frequency"] = self.freq_array.to("Hz").value
         elif self.reference_frequency is not None:
-            arr["frequency"] = self.reference_frequency.to("Hz").value
+            arr["reference_frequency"] = self.reference_frequency.to("Hz").value
             if self.spectral_index is not None:
                 arr["spectral_index"] = self.spectral_index
 
@@ -3555,12 +3386,6 @@ class SkyModel(UVBase):
             arr["rise_lst"] = self._rise_lst
         if hasattr(self, "_set_lst"):
             arr["set_lst"] = self._set_lst
-
-        warnings.warn(
-            "recarray flux columns will no longer be labeled"
-            " `flux_density_I` etc. in version 0.2.0. Use `I` instead.",
-            DeprecationWarning,
-        )
 
         if original_comp_type == "healpix":
             self._point_to_healpix()
@@ -4217,35 +4042,15 @@ class SkyModel(UVBase):
         table_ids = [table._ID for table in tables]
         table_names = [table.name for table in tables]
 
-        if None not in table_ids:
-            try:
-                table_name_use = _get_matching_fields(table_name, table_ids)
-                table_match = [
-                    table for table in tables if table._ID == table_name_use
-                ][0]
-            except ValueError:
-                table_name_use = _get_matching_fields(table_name, table_names)
-                table_match = [
-                    table for table in tables if table.name == table_name_use
-                ][0]
-        else:
-            warnings.warn(
-                f"File {votable_file} contains tables with no name or ID, Support for "
-                "such files is deprecated and will be removed in version 0.2.0.",
-                category=DeprecationWarning,
-            )
-            # Find correct table using the field names
-            tables_match = []
-            for table in tables:
-                id_col_use = _get_matching_fields(
-                    id_column, table.to_table().colnames, brittle=False
-                )
-                if id_col_use is not None:
-                    tables_match.append(table)
-            if len(tables_match) > 1:
-                raise ValueError("More than one matching table.")
-            else:
-                table_match = tables_match[0]
+        if None in table_ids:
+            raise ValueError(f"File {votable_file} contains tables with no name or ID.")
+
+        try:
+            table_name_use = _get_matching_fields(table_name, table_ids)
+            table_match = [table for table in tables if table._ID == table_name_use][0]
+        except ValueError:
+            table_name_use = _get_matching_fields(table_name, table_names)
+            table_match = [table for table in tables if table.name == table_name_use][0]
 
         # Convert to astropy Table
         astropy_table = table_match.to_table()
@@ -4995,68 +4800,6 @@ class SkyModel(UVBase):
         self.read_fhd_catalog(filename_sav, **kwargs)
         return self
 
-    def read_idl_catalog(
-        self,
-        filename_sav,
-        expand_extended=True,
-        source_select_kwds=None,
-        run_check=True,
-        check_extra=True,
-        run_check_acceptability=True,
-    ):
-        """
-        Read in an FHD style catalog file.
-
-        Deprecated. Use `read_fhd_catalog` instead.
-
-        Parameters
-        ----------
-        filename_sav: str
-            Path to IDL .sav file.
-
-        expand_extended: bool
-            If True, include extended source components.
-        source_select_kwds : dict, optional
-            This parameter is Deprecated, please use the `select` and/or the
-            :meth:`cut_nonrising` methods as appropriate.
-
-            Dictionary of keywords for source selection. Valid options:
-
-            * `latitude_deg`: Latitude of telescope in degrees. Used for declination coarse
-            *  horizon cut.
-            * `horizon_buffer`: Angle (float, in radians) of buffer for coarse horizon cut.
-              Default is about 10 minutes of sky rotation. (See caveats in
-              :func:`array_to_skymodel` docstring)
-            * `min_flux`: Minimum stokes I flux to select [Jy]
-            * `max_flux`: Maximum stokes I flux to select [Jy]
-        run_check : bool
-            Option to check for the existence and proper shapes of parameters
-            after downselecting data on this object (the default is True,
-            meaning the check will be run).
-        check_extra : bool
-            Option to check optional parameters as well as required ones (the
-            default is True, meaning the optional parameters will be checked).
-        run_check_acceptability : bool
-            Option to check acceptable range of the values of parameters after
-            downselecting data on this object (the default is True, meaning the
-            acceptable range check will be done).
-
-
-        """
-        warnings.warn(
-            "This method is deprecated, use `read_fhd_catalog` instead. "
-            "This method will be removed in version 0.2.0.",
-            category=DeprecationWarning,
-        )
-        self.read_fhd_catalog(
-            filename_sav,
-            expand_extended=expand_extended,
-            source_select_kwds=source_select_kwds,
-            run_check=run_check,
-            check_extra=check_extra,
-            run_check_acceptability=run_check_acceptability,
-        )
-
     def read(
         self,
         filename,
@@ -5710,584 +5453,3 @@ class SkyModel(UVBase):
                         )
                 else:
                     fo.write(format_str.format(srcid, lon, lat, *fluxes_write))
-
-
-def read_healpix_hdf5(hdf5_filename):
-    """
-    Read hdf5 healpix files using h5py and get a healpix map, indices and frequencies.
-
-    Deprecated. Use `read_skyh5` or `read_healpix_hdf5` instead.
-
-    Parameters
-    ----------
-    hdf5_filename : str
-        Path and name of the hdf5 file to read.
-
-    Returns
-    -------
-    hpmap : array_like of float
-        Stokes-I surface brightness in K, for a set of pixels
-        Shape (Ncomponents, Nfreqs)
-    indices : array_like, int
-        Corresponding HEALPix indices for hpmap.
-    freqs : array_like, float
-        Frequencies in Hz. Shape (Nfreqs)
-    """
-    warnings.warn(
-        "This function is deprecated, use `SkyModel.read_skyh5` or "
-        "`SkyModel.read_healpix_hdf5` instead. "
-        "This function will be removed in version 0.2.0.",
-        category=DeprecationWarning,
-    )
-
-    with h5py.File(hdf5_filename, "r") as fileobj:
-        hpmap = fileobj["data"][0, ...]  # Remove Nskies axis.
-        indices = fileobj["indices"][()]
-        freqs = fileobj["freqs"][()]
-
-    return hpmap, indices, freqs
-
-
-def write_healpix_hdf5(filename, hpmap, indices, freqs, nside=None, history=None):
-    """
-    Write a set of HEALPix maps to an HDF5 file.
-
-    Deprecated. Use `SkyModel.write_skyh5` instead.
-
-    Parameters
-    ----------
-    filename : str
-        Name of file to write to.
-    hpmap : array_like of float
-        Pixel values in Kelvin. Shape (Nfreqs, Npix)
-    indices : array_like of int
-        HEALPix pixel indices corresponding with axis 1 of hpmap.
-    freqs : array_like of floats
-        Frequencies in Hz corresponding with axis 0 of hpmap.
-    nside : int
-        nside parameter of the map. Optional if the hpmap covers
-        the full sphere (i.e., has no missing pixels), since the nside
-        can be inferred from the map size.
-    history : str
-        Optional history string to include in the file.
-
-    """
-    try:
-        import astropy_healpix
-    except ImportError as e:
-        raise ImportError(
-            "The astropy-healpix module must be installed to use HEALPix methods"
-        ) from e
-
-    warnings.warn(
-        "This function is deprecated, use `SkyModel.write_skyh5` instead. "
-        "This function will be removed in version 0.2.0.",
-        category=DeprecationWarning,
-    )
-
-    Nfreqs = freqs.size
-    Npix = len(indices)
-    if nside is None:
-        try:
-            nside = astropy_healpix.npix_to_nside(Npix)
-        except ValueError:
-            raise ValueError(  # noqa: B904
-                "Need to provide nside if giving a subset of the map."
-            )
-
-    try:
-        assert hpmap.shape == (Nfreqs, Npix)
-    except AssertionError:
-        raise ValueError("Invalid map shape {}".format(str(hpmap.shape)))  # noqa: B904
-
-    if history is None:
-        history = ""
-
-    valid_params = {
-        "Npix": Npix,
-        "nside": nside,
-        "Nskies": 1,
-        "Nfreqs": Nfreqs,
-        "data": hpmap[None, ...],
-        "indices": indices,
-        "freqs": freqs,
-        "units": "K",
-        "history": history,
-    }
-    dsets = {
-        "data": np.float64,
-        "indices": np.int32,
-        "freqs": np.float64,
-        "history": h5py.special_dtype(vlen=str),
-    }
-
-    with h5py.File(filename, "w") as fileobj:
-        for k in valid_params:
-            d = valid_params[k]
-            if k in dsets:
-                if np.isscalar(d):
-                    fileobj.create_dataset(k, data=d, dtype=dsets[k])
-                else:
-                    fileobj.create_dataset(
-                        k,
-                        data=d,
-                        dtype=dsets[k],
-                        compression="gzip",
-                        compression_opts=9,
-                    )
-            else:
-                fileobj.attrs[k] = d
-
-
-def healpix_to_sky(hpmap, indices, freqs, hpx_order="ring"):
-    """
-    Convert a healpix map in K to a set of point source components in Jy.
-
-    Deprecated. Use `read_skyh5` or `read_healpix_hdf5` instead.
-
-    Parameters
-    ----------
-    hpmap : array_like of float
-        Stokes-I surface brightness in K, for a set of pixels
-        Shape (Nfreqs, Ncomponents)
-    indices : array_like, int
-        Corresponding HEALPix indices for hpmap.
-    freqs : array_like, float
-        Frequencies in Hz. Shape (Nfreqs)
-    hpx_order : str
-        HEALPix map ordering parameter: ring or nested.
-        Defaults to ring.
-
-    Returns
-    -------
-    sky : :class:`SkyModel`
-        The sky model created from the healpix map.
-
-    Notes
-    -----
-    Currently, this function only converts a HEALPix map with a frequency axis.
-    """
-    try:
-        import astropy_healpix
-    except ImportError as e:
-        raise ImportError(
-            "The astropy-healpix module must be installed to use HEALPix methods"
-        ) from e
-
-    warnings.warn(
-        "This function is deprecated, use `SkyModel.read_skyh5` or "
-        "`SkyModel.read_healpix_hdf5` instead. "
-        "This function will be removed in version 0.2.0.",
-        category=DeprecationWarning,
-    )
-    hpx_order = str(hpx_order).casefold()
-    if hpx_order not in ["ring", "nested"]:
-        raise ValueError("order must be 'nested' or 'ring'")
-
-    nside = int(astropy_healpix.npix_to_nside(hpmap.shape[-1]))
-
-    freq = Quantity(freqs, "hertz")
-
-    stokes = Quantity(np.zeros((4, len(freq), len(indices))), "K")
-    stokes[0] = hpmap * units.K
-
-    sky = SkyModel(
-        stokes=stokes,
-        spectral_type="full",
-        freq_array=freq,
-        nside=nside,
-        hpx_inds=indices,
-        hpx_order=hpx_order,
-    )
-    return sky
-
-
-def skymodel_to_array(sky):
-    """
-    Make a recarray of source components from a SkyModel object.
-
-    Deprecated, will be removed in v0.2.0.
-
-    Parameters
-    ----------
-    sky : :class:`pyradiosky.SkyModel`
-        SkyModel object to convert to a recarray.
-
-    Returns
-    -------
-    catalog_table : recarray
-        recarray equivalent to SkyModel data.
-
-    Notes
-    -----
-    This stores all SkyModel data in a contiguous array
-    that can be more easily handled with numpy.
-    This is used by pyuvsim for sharing catalog data via MPI.
-    """
-    warnings.warn(
-        "This function is deprecated, and will be removed in version 0.2.0.",
-        category=DeprecationWarning,
-    )
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        return sky.to_recarray()
-
-
-def array_to_skymodel(catalog_table):
-    """
-    Make a SkyModel object from a recarray.
-
-    Deprecated, will be removed in v0.2.0.
-
-    Parameters
-    ----------
-    catalog_table : recarray
-        recarray to turn into a SkyModel object.
-
-    Returns
-    -------
-    :class:`pyradiosky.SkyModel`
-
-    """
-    warnings.warn(
-        "This function is deprecated, and will be removed in version 0.2.0.",
-        category=DeprecationWarning,
-    )
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        return SkyModel.from_recarray(catalog_table)
-
-
-def source_cuts(
-    catalog_table,
-    latitude_deg=None,
-    horizon_buffer=0.04364,
-    min_flux=None,
-    max_flux=None,
-    freq_range=None,
-):
-    """
-    Perform flux and horizon selections on recarray of source components.
-
-    Deprecated. Use the `SkyModel.select` and/or `SkyModel.cut_nonrising` methods
-    instead.
-
-    Parameters
-    ----------
-    catalog_table : recarray
-        recarray of source catalog information. Must have the columns:
-        'source_id', 'ra_j2000', 'dec_j2000', 'flux_density'
-        may also have the colums:
-        'frequency' or 'reference_frequency'
-    latitude_deg : float
-        Latitude of telescope in degrees. Used to estimate rise/set lst.
-    horizon_buffer : float
-        Angle buffer for coarse horizon cut in radians.
-        Default is about 10 minutes of sky rotation. `SkyModel`
-        components whose calculated altitude is less than `horizon_buffer` are excluded.
-        Caution! The altitude calculation does not account for precession/nutation of the Earth.
-        The buffer angle is needed to ensure that the horizon cut doesn't exclude sources near
-        but above the horizon. Since the cutoff is done using lst, and the lsts are calculated
-        with astropy, the required buffer should _not_ drift with time since the J2000 epoch.
-        The default buffer has been tested around julian date 2457458.0.
-    min_flux : float
-        Minimum stokes I flux to select [Jy]
-    max_flux : float
-        Maximum stokes I flux to select [Jy]
-    freq_range : :class:`astropy.units.Quantity`
-        Frequency range over which the min and max flux tests should be performed.
-        Must be length 2. If None, use the range over which the object is defined.
-
-    Returns
-    -------
-    recarray
-        A new recarray of source components, with additional columns for rise and set lst.
-
-    """
-    warnings.warn(
-        "This function is deprecated, use the `SkyModel.select` and/or"
-        "`SkyModel.cut_nonrising` methods instead. "
-        "This function will be removed in version 0.2.0.",
-        category=DeprecationWarning,
-    )
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        skyobj = SkyModel.from_recarray(catalog_table)
-
-    if min_flux is not None and max_flux is not None:
-        if min_flux is not None:
-            min_flux = min_flux * units.Jy
-        if max_flux is not None:
-            max_flux = max_flux * units.Jy
-
-        skyobj.select(
-            min_brightness=min_flux,
-            max_brightness=max_flux,
-            brightness_freq_range=freq_range,
-        )
-
-    if latitude_deg is not None:
-        lat_use = Latitude(latitude_deg, units.deg)
-        skyobj.cut_nonrising(lat_use)
-        skyobj.calculate_rise_set_lsts(lat_use, horizon_buffer=horizon_buffer)
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        return skyobj.to_recarray()
-
-
-def read_votable_catalog(
-    votable_file,
-    table_name="GLEAM",
-    id_column="GLEAM",
-    ra_column="RAJ2000",
-    dec_column="DEJ2000",
-    flux_columns="Fintwide",
-    reference_frequency=200e6 * units.Hz,
-    freq_array=None,
-    spectral_index_column=None,
-    source_select_kwds=None,
-    return_table=False,
-):
-    """
-    Create a SkyModel object from a VOTable catalog.
-
-    Deprecated. Use `SkyModel.read_votable_catalog` instead.
-
-    Parameters
-    ----------
-    votable_file : str
-        Path to votable catalog file.
-    table_name : str
-        Part of expected table name. Should match only one table name in votable_file.
-    id_column : str
-        Part of expected ID column. Should match only one column in the table.
-    ra_column : str
-        Part of expected RA column. Should match only one column in the table.
-    dec_column : str
-        Part of expected Dec column. Should match only one column in the table.
-    flux_columns : str or list of str
-        Part of expected Flux column(s). Each one should match only one column in the table.
-    reference_frequency : :class:`astropy.units.Quantity`
-        Reference frequency for flux values, assumed to be the same value for all rows.
-    freq_array : :class:`astropy.units.Quantity`
-        Frequencies corresponding to flux_columns (should be same length).
-        Required for multiple flux columns.
-    return_table : bool, optional
-        Whether to return the astropy table instead of a list of Source objects.
-    source_select_kwds : dict, optional
-        Dictionary of keywords for source selection Valid options:
-
-        * `latitude_deg`: Latitude of telescope in degrees. Used for declination coarse
-           horizon cut.
-        * `horizon_buffer`: Angle (float, in radians) of buffer for coarse horizon cut.
-          Default is about 10 minutes of sky rotation. (See caveats in
-          :func:`array_to_skymodel` docstring)
-        * `min_flux`: Minimum stokes I flux to select [Jy]
-        * `max_flux`: Maximum stokes I flux to select [Jy]
-
-    Returns
-    -------
-    recarray or :class:`pyradiosky.SkyModel`
-        if return_table, recarray of source parameters, otherwise
-        :class:`pyradiosky.SkyModel` instance
-
-    """
-    warnings.warn(
-        "This function is deprecated, use `SkyModel.read_votable_catalog` instead. "
-        "This function will be removed in version 0.2.0.",
-        category=DeprecationWarning,
-    )
-
-    skyobj = SkyModel()
-    skyobj.read_votable_catalog(
-        votable_file,
-        table_name,
-        id_column,
-        ra_column,
-        dec_column,
-        flux_columns,
-        frame="icrs",
-        reference_frequency=reference_frequency,
-        freq_array=freq_array,
-        spectral_index_column=spectral_index_column,
-        source_select_kwds=source_select_kwds,
-    )
-
-    if return_table:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            return skyobj.to_recarray()
-
-    return skyobj
-
-
-def read_gleam_catalog(
-    gleam_file, spectral_type="subband", source_select_kwds=None, return_table=False
-):
-    """
-    Create a SkyModel object from the GLEAM votable catalog.
-
-    Deprecated. Use `SkyModel.read_gleam_catalog` instead.
-
-    Tested on: GLEAM EGC catalog, version 2
-
-    Parameters
-    ----------
-    gleam_file : str
-        Path to GLEAM votable catalog file.
-    spectral_type : str
-        One of 'flat', 'subband' or 'spectral_index'. If set to 'flat', the
-        wide band integrated flux will be used, if set to 'spectral_index' the
-        fitted flux at 200 MHz will be used for the flux column.
-    return_table : bool, optional
-        Whether to return the astropy table instead of a SkyModel object.
-    source_select_kwds : dict, optional
-        Dictionary of keywords for source selection Valid options:
-
-        * `latitude_deg`: Latitude of telescope in degrees. Used for declination coarse
-           horizon cut.
-        * `horizon_buffer`: Angle (float, in radians) of buffer for coarse horizon cut.
-          Default is about 10 minutes of sky rotation. (See caveats in
-          :func:`array_to_skymodel` docstring)
-        * `min_flux`: Minimum stokes I flux to select [Jy]
-        * `max_flux`: Maximum stokes I flux to select [Jy]
-
-    Returns
-    -------
-    recarray or :class:`pyradiosky.SkyModel`
-        if return_table, recarray of source parameters,
-        otherwise :class:`pyradiosky.SkyModel` instance
-    """
-    warnings.warn(
-        "This function is deprecated, use `SkyModel.read_gleam_catalog` instead. "
-        "This function will be removed in version 0.2.0.",
-        category=DeprecationWarning,
-    )
-
-    skyobj = SkyModel()
-    skyobj.read_gleam_catalog(
-        gleam_file, spectral_type=spectral_type, source_select_kwds=source_select_kwds
-    )
-
-    if return_table:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            return skyobj.to_recarray()
-
-    return skyobj
-
-
-def read_text_catalog(catalog_csv, source_select_kwds=None, return_table=False):
-    """
-    Read in a text file of sources.
-
-    Deprecated. Use `SkyModel.read_text_catalog` instead.
-
-    Parameters
-    ----------
-    catalog_csv: str
-        Path to tab separated value file with the following required columns:
-        *  `Source_ID`: source name as a string of maximum 10 characters
-        *  `ra_j2000`: right ascension at J2000 epoch, in decimal degrees
-        *  `dec_j2000`: declination at J2000 epoch, in decimal degrees
-        *  `Flux [Jy]`: Stokes I flux density in Janskys
-
-        If flux is specified at multiple frequencies (must be the same set for all
-        components), the frequencies must be included in each column name,
-        e.g. `Flux at 150 MHz [Jy]`. Recognized units are ('Hz', 'kHz', 'MHz' or 'GHz'):
-
-        If flux is only specified at one reference frequency (can be different per
-        component), a frequency column should be added (note: assumed to be in Hz):
-        *  `Frequency`: reference frequency [Hz]
-
-        Optionally a spectral index can be specified per component with:
-        *  `Spectral_Index`: spectral index
-
-    source_select_kwds : dict, optional
-        Dictionary of keywords for source selection. Valid options:
-
-        * `latitude_deg`: Latitude of telescope in degrees. Used for declination coarse
-        *  horizon cut.
-        * `horizon_buffer`: Angle (float, in radians) of buffer for coarse horizon cut.
-          Default is about 10 minutes of sky rotation. (See caveats in
-          :func:`array_to_skymodel` docstring)
-        * `min_flux`: Minimum stokes I flux to select [Jy]
-        * `max_flux`: Maximum stokes I flux to select [Jy]
-
-    Returns
-    -------
-    sky_model : :class:`SkyModel`
-        A sky model created from the text catalog.
-    """
-    warnings.warn(
-        "This function is deprecated, use `SkyModel.read_text_catalog` instead. "
-        "This function will be removed in version 0.2.0.",
-        category=DeprecationWarning,
-    )
-
-    skyobj = SkyModel()
-    skyobj.read_text_catalog(catalog_csv, source_select_kwds=source_select_kwds)
-
-    if return_table:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            return skyobj.to_recarray()
-
-    return skyobj
-
-
-def read_idl_catalog(filename_sav, expand_extended=True):
-    """
-    Read in an FHD-readable IDL .sav file catalog.
-
-    Deprecated. Use `SkyModel.read_fhd_catalog` instead.
-
-    Parameters
-    ----------
-    filename_sav: str
-        Path to IDL .sav file.
-
-    expand_extended: bool
-        If True, return extended source components.
-        Default: True
-
-    Returns
-    -------
-    :class:`pyradiosky.SkyModel`
-    """
-    warnings.warn(
-        "This function is deprecated, use `SkyModel.read_fhd_catalog` instead. "
-        "This function will be removed in version 0.2.0.",
-        category=DeprecationWarning,
-    )
-
-    skyobj = SkyModel()
-    skyobj.read_fhd_catalog(filename_sav, expand_extended=expand_extended)
-
-    return skyobj
-
-
-def write_catalog_to_file(filename, skymodel):
-    """
-    Write out a catalog to a text file.
-
-    Readable with :meth:`read_text_catalog()`.
-
-    Parameters
-    ----------
-    filename : str
-        Path to output file (string)
-    skymodel : :class:`SkyModel`
-        The sky model to write to file.
-    """
-    warnings.warn(
-        "This function is deprecated, use `SkyModel.write_text_catalog` instead. "
-        "This function will be removed in version 0.2.0.",
-        category=DeprecationWarning,
-    )
-
-    skymodel.write_text_catalog(filename)

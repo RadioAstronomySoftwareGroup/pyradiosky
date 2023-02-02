@@ -3,7 +3,6 @@
 # Licensed under the 3-clause BSD License
 """Utility methods."""
 import os
-import warnings
 
 import astropy.units as units
 import erfa
@@ -90,12 +89,7 @@ def stokes_to_coherency(stokes_arr):
         Array of coherencies, shape (2, 2) or (2, 2, Nfreqs, Ncomponents)
     """
     if not isinstance(stokes_arr, Quantity):
-        warnings.warn(
-            "In version 0.2.0, stokes_arr will be required to be an astropy "
-            "Quantity. Currently, floats are assumed to be in Jy.",
-            category=DeprecationWarning,
-        )
-        stokes_arr = stokes_arr * units.Jy
+        raise ValueError("stokes_arr must be an astropy Quantity.")
 
     initial_shape = stokes_arr.shape
     if initial_shape[0] != 4:
@@ -141,12 +135,7 @@ def coherency_to_stokes(coherency_matrix):
         Array of stokes parameters, shape(4,) or (4, Ncomponents)
     """
     if not isinstance(coherency_matrix, Quantity):
-        warnings.warn(
-            "In version 0.2.0, coherency_matrix will be required to be an astropy "
-            "Quantity. Currently, floats are assumed to be in Jy.",
-            category=DeprecationWarning,
-        )
-        coherency_matrix = coherency_matrix * units.Jy
+        raise ValueError("coherency_matrix must be an astropy Quantity.")
 
     initial_shape = coherency_matrix.shape
     if len(initial_shape) < 2 or initial_shape[0] != 2 or initial_shape[1] != 2:
