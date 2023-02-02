@@ -20,17 +20,4 @@ except (LookupError, ImportError):
         # package is not installed
         pass
 
-from .skymodel import (
-    SkyModel,
-    array_to_skymodel,
-    healpix_to_sky,
-    read_gleam_catalog,
-    read_healpix_hdf5,
-    read_idl_catalog,
-    read_text_catalog,
-    read_votable_catalog,
-    skymodel_to_array,
-    source_cuts,
-    write_catalog_to_file,
-    write_healpix_hdf5,
-)
+from .skymodel import SkyModel

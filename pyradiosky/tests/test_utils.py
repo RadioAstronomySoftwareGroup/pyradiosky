@@ -33,21 +33,17 @@ def test_stokes_tofrom_coherency():
         0.5 * np.array([[4.2, 1.2 + 0.15j], [1.2 - 0.15j, 4.8]]) * units.Jy
     )
 
-    with pytest.warns(
-        DeprecationWarning,
-        match="In version 0.2.0, stokes_arr will be required to be an astropy "
-        "Quantity. Currently, floats are assumed to be in Jy.",
-    ):
-        coherency = skyutils.stokes_to_coherency(stokes)
+    with pytest.raises(ValueError, match="stokes_arr must be an astropy Quantity."):
+        skyutils.stokes_to_coherency(stokes)
 
-    assert np.allclose(expected_coherency, coherency)
+    coherency = skyutils.stokes_to_coherency(stokes * units.Jy)
 
-    with pytest.warns(
-        DeprecationWarning,
-        match="In version 0.2.0, coherency_matrix will be required to be an astropy "
-        "Quantity. Currently, floats are assumed to be in Jy.",
+    with pytest.raises(
+        ValueError, match="coherency_matrix must be an astropy Quantity."
     ):
-        back_to_stokes = skyutils.coherency_to_stokes(coherency.value)
+        skyutils.coherency_to_stokes(coherency.value)
+
+    back_to_stokes = skyutils.coherency_to_stokes(coherency)
 
     assert np.allclose(stokes * units.Jy, back_to_stokes)
 
