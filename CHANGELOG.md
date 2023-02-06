@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- Increase the minimum compatible version for lunarsky to 0.2.1 to fix astropy
+deprecation warnings.
 
 ## [0.2.0] - 2023-01-01
 

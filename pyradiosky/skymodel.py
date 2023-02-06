@@ -1275,11 +1275,7 @@ class SkyModel(UVBase):
         # we will need the starting frame object for some interpolation later
         old_frame = coords.frame.replicate_without_data(copy=True)
 
-        # This filter can be removed when lunarsky is updated to not trigger this
-        # astropy deprecation warning.
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message="The get_frame_attr_names")
-            coords = coords.transform_to(frame)
+        coords = coords.transform_to(frame)
 
         frame = coords.frame.replicate_without_data(copy=True)
 
@@ -1774,11 +1770,7 @@ class SkyModel(UVBase):
         sky.clear_time_position_specific_params()
 
         hpx_obj = astropy_healpix.HEALPix(nside, order=order, frame=frame_obj)
-        # This filter can be removed when lunarsky is updated to not trigger this
-        # astropy deprecation warning.
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message="The get_frame_attr_names")
-            hpx_inds = hpx_obj.skycoord_to_healpix(sky.skycoord)
+        hpx_inds = hpx_obj.skycoord_to_healpix(sky.skycoord)
 
         sky._set_component_type_params("healpix")
         sky.nside = nside
@@ -2298,18 +2290,14 @@ class SkyModel(UVBase):
         else:
             skycoord_use = self.skycoord
 
-        # This filter can be removed when lunarsky is updated to not trigger this
-        # astropy deprecation warning.
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message="The get_frame_attr_names")
-            if hasmoon and isinstance(self.telescope_location, MoonLocation):
-                source_altaz = skycoord_use.transform_to(
-                    LunarTopo(obstime=self.time, location=self.telescope_location)
-                )
-            else:
-                source_altaz = skycoord_use.transform_to(
-                    AltAz(obstime=self.time, location=self.telescope_location)
-                )
+        if hasmoon and isinstance(self.telescope_location, MoonLocation):
+            source_altaz = skycoord_use.transform_to(
+                LunarTopo(obstime=self.time, location=self.telescope_location)
+            )
+        else:
+            source_altaz = skycoord_use.transform_to(
+                AltAz(obstime=self.time, location=self.telescope_location)
+            )
 
         alt_az = np.array([source_altaz.alt.rad, source_altaz.az.rad])
 
@@ -2374,11 +2362,7 @@ class SkyModel(UVBase):
             representation_type="cartesian",
         )
 
-        # This filter can be removed when lunarsky is updated to not trigger this
-        # astropy deprecation warning.
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message="The get_frame_attr_names")
-            axes_altaz = axes_frame.transform_to("altaz")
+        axes_altaz = axes_frame.transform_to("altaz")
         axes_altaz.representation_type = "cartesian"
 
         """ This transformation matrix is generally not orthogonal
