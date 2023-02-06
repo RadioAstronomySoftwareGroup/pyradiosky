@@ -274,6 +274,7 @@ def assign_hpx_data():
         stokes=stokes,
         spectral_type="subband",
         freq_array=Quantity([150], unit=units.MHz),
+        freq_edge_array=Quantity([140, 160], unit=units.MHz)[:, np.newaxis],
         stokes_error=stokes_error,
         beam_amp=beam_amp,
         extended_model_group=extended_group,
@@ -860,6 +861,7 @@ def test_assign_to_healpix_fullsky(assign_hpx_data, spectral_type, frame):
         )
         sky.spectral_index = np.array([-0.8, -0.8])
         sky.freq_array = None
+        sky.freq_edge_array = None
         sky.stokes_error = None
         sky.beam_amp = None
         sky.extended_model_group = None

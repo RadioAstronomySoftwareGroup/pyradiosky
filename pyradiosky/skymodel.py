@@ -296,6 +296,33 @@ def _get_value_hdf5_group(group, name, expected_type):
     return value
 
 
+def _get_freq_edges_from_centers(freq_array, tols):
+    tols_use = []
+    for tol in tols:
+        if isinstance(tol, Quantity):
+            tols_use.append(tol.to(freq_array.unit).value)
+        else:
+            tols_use.append(tol)
+    tols_use = tuple(tols_use)
+    if not uvutils._test_array_constant_spacing(freq_array.value, tols=tols_use):
+        raise ValueError(
+            "Cannot calculate frequency edges from frequency center array because "
+            "frequency center spacing is not constant."
+        )
+    freq_delta = np.mean(np.diff(freq_array.value)) * freq_array.unit
+
+    freq_edge_array = (
+        np.zeros((2, freq_array.size), dtype=freq_array.dtype) * freq_array.unit
+    )
+    freq_edge_array[0, :] = freq_array - freq_delta / 2.0
+    freq_edge_array[1, :] = freq_array + freq_delta / 2.0
+    return freq_edge_array
+
+
+def _get_freq_centers_from_edges(freq_edge_array):
+    return np.mean(freq_edge_array, axis=0)
+
+
 class SkyModel(UVBase):
     """
     Object to hold point source and diffuse models.
@@ -346,12 +373,22 @@ class SkyModel(UVBase):
         Options:
 
             - 'flat' : Flat spectrum.
-            - 'full' : Flux is defined by a saved value at each frequency.
+            - 'full' : Flux is defined by a value at each frequency.
             - 'subband' : Flux is given at a set of band centers.
             - 'spectral_index' : Flux is given at a reference frequency.
 
     freq_array : :class:`astropy.units.Quantity`
-        Array of frequencies that fluxes are provided for, shape (Nfreqs,).
+        Array of frequencies that fluxes are provided for, shape (Nfreqs,). If
+        freq_edge_array is passed and freq_array is not set, freq_array will be
+        calculated as the mean of the frequency edges per channel.
+    freq_edge_array : :class:`astropy.units.Quantity`
+        Array of frequencies giving the edges of the frequency bands, shape (2, Nfreqs).
+        The zeroth index in the first dimension is for the lower edge of the band, the
+        first index is for the upper edge. Only required for the `subband`
+        spectral_type. If freq_array is a regularly spaced array and freq_edge_array
+        is not set, freq_edge_array will be calculated from the freq_array assuming the
+        band edges are directly between the band centers. An error will be raised if
+        freq_array is not regularly spaced and freq_edge_array is not set.
     reference_frequency : :class:`astropy.units.Quantity`
         Reference frequencies of flux values, shape (Ncomponents,).
     spectral_index : array_like of float
@@ -410,6 +447,7 @@ class SkyModel(UVBase):
         stokes=None,
         spectral_type=None,
         freq_array=None,
+        freq_edge_array=None,
         lon=None,
         lat=None,
         gl=None,
@@ -511,11 +549,28 @@ class SkyModel(UVBase):
             required=False,
         )
 
-        desc = "Frequency array in Hz, only required if spectral_type is 'full' or 'subband'."
+        desc = (
+            "Frequency array giving the center frequency in Hz, only required if "
+            "spectral_type is 'full' or 'subband'."
+        )
         self._freq_array = UVParameter(
             "freq_array",
             description=desc,
             form=("Nfreqs",),
+            expected_type=Quantity,
+            required=False,
+            tols=self.freq_tol,
+        )
+
+        desc = (
+            "Array giving the frequency  band edges in Hz, only required if "
+            "spectral_type is 'subband'. The zeroth index in the first dimension holds "
+            "the lower band edge and the first index holds the upper band edge."
+        )
+        self._freq_edge_array = UVParameter(
+            "freq_edge_array",
+            description=desc,
+            form=(2, "Nfreqs"),
             expected_type=Quantity,
             required=False,
             tols=self.freq_tol,
@@ -825,14 +880,26 @@ class SkyModel(UVBase):
             args_set_req.extend(
                 [spectral_index is not None, reference_frequency is not None]
             )
-        elif spectral_type in ["full", "subband"]:
+        elif spectral_type == "subband":
+            if freq_edge_array is not None:
+                req_args.append("freq_edge_array")
+                args_set_req.append(freq_edge_array is not None)
+            else:
+                req_args.append("freq_array")
+                args_set_req.append(freq_array is not None)
+        elif spectral_type == "full":
             req_args.append("freq_array")
             args_set_req.append(freq_array is not None)
 
         args_set_req = np.array(args_set_req, dtype=bool)
 
         arg_set_opt = np.array(
-            [freq_array is not None, reference_frequency is not None], dtype=bool
+            [
+                freq_array is not None,
+                reference_frequency is not None,
+                freq_edge_array is not None,
+            ],
+            dtype=bool,
         )
 
         if np.any(np.concatenate((args_set_req, arg_set_opt))):
@@ -892,8 +959,23 @@ class SkyModel(UVBase):
             if freq_array is not None:
                 self.freq_array = np.atleast_1d(freq_array)
                 self.Nfreqs = self.freq_array.size
+
+                if freq_edge_array is not None:
+                    self.freq_edge_array = freq_edge_array
+                elif self.spectral_type == "subband":
+                    warnings.warn(
+                        "freq_edge_array not set, calculating it from the freq_array."
+                    )
+                    self.freq_edge_array = _get_freq_edges_from_centers(
+                        freq_array=self.freq_array, tols=self._freq_array.tols
+                    )
             else:
-                self.Nfreqs = 1
+                if freq_edge_array is not None:
+                    self.freq_edge_array = freq_edge_array
+                    self.freq_array = _get_freq_centers_from_edges(freq_edge_array)
+                    self.Nfreqs = self.freq_array.size
+                else:
+                    self.Nfreqs = 1
 
             if reference_frequency is not None:
                 self.reference_frequency = np.atleast_1d(reference_frequency)
@@ -1041,13 +1123,23 @@ class SkyModel(UVBase):
             self._reference_frequency.required = True
             self._Nfreqs.acceptable_vals = [1]
             self._freq_array.required = False
-        elif spectral_type in ["full", "subband"]:
+            self._freq_edge_array.required = False
+        elif spectral_type == "subband":
             self._freq_array.required = True
+            # TODO: do we want to make it required now? or wait?
+            self._freq_edge_array.required = True
+            self._spectral_index.required = False
+            self._reference_frequency.required = False
+            self._Nfreqs.acceptable_vals = None
+        elif spectral_type == "full":
+            self._freq_array.required = True
+            self._freq_edge_array.required = False
             self._spectral_index.required = False
             self._reference_frequency.required = False
             self._Nfreqs.acceptable_vals = None
         elif spectral_type == "flat":
             self._freq_array.required = False
+            self._freq_edge_array.required = False
             self._spectral_index.required = False
             self._reference_frequency.required = False
             self._Nfreqs.acceptable_vals = [1]
@@ -1095,6 +1187,17 @@ class SkyModel(UVBase):
         if self.freq_array is not None and self.reference_frequency is not None:
             raise ValueError(
                 "Only one of freq_array and reference_frequency can be specified, not both."
+            )
+
+        # TODO add handling for non-regular spaced arrays -- should warn not error.
+        if self.freq_edge_array is None and self.spectral_type == "subband":
+            warnings.warn(
+                "freq_edge_array is not set. Calculating it from the freq_array. This "
+                "will become an error in version 2.4",
+                DeprecationWarning,
+            )
+            self.freq_edge_array = _get_freq_edges_from_centers(
+                freq_array=self.freq_array, tols=self._freq_array.tols
             )
 
         # Run the basic check from UVBase
@@ -1924,6 +2027,7 @@ class SkyModel(UVBase):
                 hpx_order=sky.hpx_order,
                 spectral_type=sky.spectral_type,
                 freq_array=sky.freq_array,
+                freq_edge_array=sky.freq_edge_array,
                 hpx_inds=new_inds,
                 stokes=new_stokes,
                 stokes_error=new_stokes_error,
@@ -2046,6 +2150,8 @@ class SkyModel(UVBase):
                     "Some requested frequencies are not present in the current SkyModel."
                 )
             sky.stokes = self.stokes[:, matches, :]
+            if sky.freq_edge_array is not None:
+                sky.freq_edge_array = sky.freq_edge_array[:, matches]
         elif self.spectral_type == "subband":
             if np.max(freqs.to("Hz")) > np.max(self.freq_array.to("Hz")):
                 raise ValueError(
@@ -2237,6 +2343,8 @@ class SkyModel(UVBase):
         sky.Nfreqs = freqs.size
         sky.spectral_type = "full"
         sky.freq_array = freqs
+        if sky.spectral_type == "subband" and sky.freq_edge_array is not None:
+            sky.freq_edge_array = None
         if sky.frame_coherency is not None:
             sky.coherency_radec = sky.calc_frame_coherency()
 
@@ -2640,6 +2748,8 @@ class SkyModel(UVBase):
 
         if this.spectral_type in ["subband", "full"]:
             compatibility_params.append("_freq_array")
+        if this.spectral_type == "subband":
+            compatibility_params.append("_freq_edge_array")
 
         if this.component_type == "healpix":
             compatibility_params.extend(["_nside", "_hpx_order"])
@@ -3611,6 +3721,7 @@ class SkyModel(UVBase):
                 "_hpx_order",
                 "_hpx_inds",
                 "_freq_array",
+                "_freq_edge_array",
                 "_reference_frequency",
                 "_spectral_index",
                 "_stokes_error",
@@ -3621,6 +3732,7 @@ class SkyModel(UVBase):
             optional_params = [
                 "_hpx_order",
                 "_freq_array",
+                "_freq_edge_array",
                 "_reference_frequency",
                 "_spectral_index",
                 "_stokes_error",
@@ -3961,6 +4073,7 @@ class SkyModel(UVBase):
         frame=None,
         reference_frequency=None,
         freq_array=None,
+        freq_edge_array=None,
         spectral_index_column=None,
         flux_error_columns=None,
         source_select_kwds=None,
@@ -3999,8 +4112,14 @@ class SkyModel(UVBase):
         reference_frequency : :class:`astropy.units.Quantity`
             Reference frequency for flux values, assumed to be the same value for all rows.
         freq_array : :class:`astropy.units.Quantity`
-            Frequencies corresponding to flux_columns (should be same length).
+            Frequency band centers corresponding to flux_columns (should be same length).
             Required for multiple flux columns.
+        freq_edge_array : :class:`astropy.units.Quantity`
+            Frequency sub-band edges for each flux_columns, shape (2, len(flux_columns)).
+            Required for multiple flux columns if `freq_array` is not regularly spaced.
+            If `freq_array` is regularly spaced and `freq_edge_array` is not passed,
+            `freq_edge_array` will be calculated from the freq_array assuming the
+            band edges are directly between the band centers.
         spectral_index_column : str
             Part of expected spectral index column. Should match only one column in the table.
         flux_error_columns : str or list of str
@@ -4082,6 +4201,20 @@ class SkyModel(UVBase):
 
         if len(flux_columns) > 1 and freq_array is None:
             raise ValueError("freq_array must be provided for multiple flux columns.")
+
+        if len(flux_columns) > 1 and freq_edge_array is None:
+            try:
+                freq_edge_array = _get_freq_edges_from_centers(
+                    freq_array=freq_array, tols=self._freq_array.tols
+                )
+                warnings.warn(
+                    "freq_edge_array not set, calculating it from the freq_array."
+                )
+            except ValueError as ve:
+                raise ValueError(
+                    "freq_edge_array must be provided for multiple flux columns if "
+                    "freq_array is not regularly spaced."
+                ) from ve
 
         if reference_frequency is not None or len(flux_cols_use) == 1:
             if reference_frequency is not None:
@@ -4169,6 +4302,7 @@ class SkyModel(UVBase):
             stokes=stokes,
             spectral_type=spectral_type,
             freq_array=freq_array,
+            freq_edge_array=freq_edge_array,
             reference_frequency=reference_frequency,
             spectral_index=spectral_index,
             stokes_error=stokes_error,
@@ -4281,6 +4415,7 @@ class SkyModel(UVBase):
             flux_error_columns = "e_Fintwide"
             reference_frequency = 200e6 * units.Hz
             freq_array = None
+            freq_edge_array = None
             spectral_index_column = None
         elif spectral_type == "spectral_index":
             flux_columns = "Fintfit200"
@@ -4288,6 +4423,7 @@ class SkyModel(UVBase):
             reference_frequency = 200e6 * units.Hz
             spectral_index_column = "alpha"
             freq_array = None
+            freq_edge_array = None
         else:
             # fmt: off
             flux_columns = [
@@ -4305,6 +4441,22 @@ class SkyModel(UVBase):
             freq_array = [76, 84, 92, 99, 107, 115, 122, 130, 143, 151, 158, 166,
                           174, 181, 189, 197, 204, 212, 220, 227]
             freq_array = np.array(freq_array) * 1e6 * units.Hz
+
+            # GLEAM paper specifies that the 30.72 MHz bandwidth is subdivided into
+            # four 7.68 MHz sub-channels
+            # But that clashes with the frequencies and edges listed in the catalog
+            # documentation. Going with the catalog docs for now, but deeply uncertain.
+            freq_lower = np.asarray(
+                [72, 80, 88, 95, 103, 111, 118, 126, 139, 147, 154, 162,
+                 170, 177, 185, 193, 200, 208, 216, 223]
+            ) * 1e6 * units.Hz
+            freq_upper = np.asarray(
+                [80, 88, 95, 103, 111, 118, 126, 134, 147, 154, 162, 170,
+                 177, 185, 193, 200, 208, 216, 223, 231]
+            ) * 1e6 * units.Hz
+            freq_edge_array = np.concatenate(
+                (freq_lower[np.newaxis, :], freq_upper[np.newaxis, :]), axis=0,
+            )
             reference_frequency = None
             spectral_index_column = None
             # fmt: on
@@ -4321,6 +4473,7 @@ class SkyModel(UVBase):
             frame="fk5",
             flux_columns=flux_columns,
             freq_array=freq_array,
+            freq_edge_array=freq_edge_array,
             reference_frequency=reference_frequency,
             spectral_index_column=spectral_index_column,
             flux_error_columns=flux_error_columns,
@@ -5209,6 +5362,7 @@ class SkyModel(UVBase):
                 "_hpx_order",
                 "_hpx_inds",
                 "_freq_array",
+                "_freq_edge_array",
                 "_reference_frequency",
                 "_spectral_index",
                 "_stokes_error",
