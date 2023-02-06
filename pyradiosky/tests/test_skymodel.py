@@ -90,11 +90,7 @@ def moonsky():
         location=array_location,
     )
 
-    # This filter can be removed when lunarsky is updated to not trigger this
-    # astropy deprecation warning.
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", message="The get_frame_attr_names")
-        icrs_coord = zen_coord.transform_to("icrs")
+    icrs_coord = zen_coord.transform_to("icrs")
 
     names = "zen_source"
     stokes = [1.0, 0, 0, 0] * units.Jy
@@ -3975,9 +3971,6 @@ def test_skymodel_init_with_frame(coord_kwds, err_msg, exp_frame):
                 assert lat == sky.dec
 
 
-# This filter can be removed when lunarsky is updated to not trigger this
-# astropy deprecation warning.
-@pytest.mark.filterwarnings("ignore:The get_frame_attr_names")
 def test_skymodel_tranform_frame(zenith_skymodel, zenith_skycoord):
     zenith_skymodel.transform_to("galactic")
     zenith_skycoord = zenith_skycoord.transform_to("galactic")
@@ -3994,9 +3987,6 @@ def test_skymodel_tranform_frame(zenith_skymodel, zenith_skycoord):
     assert units.allclose(zenith_skymodel.b, zenith_skycoord.b)
 
 
-# This filter can be removed when lunarsky is updated to not trigger this
-# astropy deprecation warning.
-@pytest.mark.filterwarnings("ignore:The get_frame_attr_names")
 def test_skymodel_tranform_frame_roundtrip(zenith_skymodel, zenith_skycoord):
     original_sky = copy.deepcopy(zenith_skymodel)
 

@@ -19,4 +19,4 @@ dependencies:
   - setuptools_scm>=7.0.3
   - sphinx
   - pip:
-      - lunarsky>=0.1.2
+      - lunarsky>=0.2.1
