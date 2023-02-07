@@ -22,7 +22,6 @@ def test_tee_ra_loop():
 
 
 def test_stokes_tofrom_coherency():
-
     stokesI = 4.5
     stokesQ = -0.3
     stokesU = 1.2

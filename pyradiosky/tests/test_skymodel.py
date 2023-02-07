@@ -174,7 +174,6 @@ def mock_point_skies():
     spectrum = ((freq_arr / freq_arr[0]) ** (alpha))[None, :, None] * units.Jy
 
     def _func(stype):
-
         stokes = spectrum.repeat(4, 0).repeat(Ncomp, 2)
         filename_use = ["mock_point_" + stype]
         if stype in ["full", "subband"]:
@@ -296,7 +295,6 @@ def healpix_gsm_icrs():
 
 
 def test_init_error(zenith_skycoord):
-
     with pytest.raises(ValueError, match="If initializing with values, all of"):
         SkyModel(
             skycoord=zenith_skycoord,
@@ -675,7 +673,6 @@ def test_skymodel_init_errors(zenith_skycoord):
 
 @pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index"])
 def test_jansky_to_kelvin_loop(spec_type):
-
     skyobj = SkyModel.from_file(
         GLEAM_vot, spectral_type=spec_type, with_error=True, filetype="gleam"
     )
@@ -1719,7 +1716,6 @@ def test_concat_compatibility_errors(healpix_disk_new, time_location):
 
 @pytest.mark.filterwarnings("ignore:This method reads an old 'healvis' style healpix")
 def test_units_healpix_to_sky(healpix_data, healpix_disk_old):
-
     healpix_filename = os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
     with h5py.File(healpix_filename, "r") as fileobj:
         hpmap = fileobj["data"][0, ...]  # Remove Nskies axis.
@@ -1738,7 +1734,6 @@ def test_units_healpix_to_sky(healpix_data, healpix_disk_old):
 
 
 def test_healpix_recarray_loop(healpix_disk_new):
-
     skyobj = healpix_disk_new
     with uvtest.check_warnings(
         DeprecationWarning,
@@ -1761,7 +1756,6 @@ def test_healpix_recarray_loop(healpix_disk_new):
 @pytest.mark.filterwarnings("ignore:This method writes an old 'healvis' style healpix")
 @pytest.mark.parametrize("change_history", [True, False, "error"])
 def test_read_write_healpix_old(tmp_path, healpix_disk_old, change_history):
-
     test_filename = os.path.join(tmp_path, "tempfile.hdf5")
 
     sky = healpix_disk_old
@@ -1796,7 +1790,6 @@ def test_read_write_healpix_old(tmp_path, healpix_disk_old, change_history):
 
 @pytest.mark.filterwarnings("ignore:This method reads an old 'healvis' style healpix")
 def test_read_write_healpix_old_cut_sky(tmp_path, healpix_disk_old):
-
     test_filename = os.path.join(tmp_path, "tempfile.hdf5")
 
     sky = healpix_disk_old
@@ -2771,7 +2764,6 @@ def test_read_deprecated_votable():
 
 
 def test_read_votable_errors():
-
     # fmt: off
     flux_columns = [
         "Fint076", "Fint084", "Fint092", "Fint099", "Fint107",
@@ -3173,7 +3165,6 @@ def test_read_text_catalog_error(tmp_path, time_location, old_str, new_str, err_
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 @pytest.mark.parametrize("spec_type", ["flat", "subband"])
 def test_read_text_source_cuts(tmp_path, spec_type):
-
     skyobj = SkyModel.from_file(GLEAM_vot, spectral_type=spec_type, with_error=True)
     fname = os.path.join(tmp_path, "temp_cat.txt")
     skyobj.write_text_catalog(fname)
@@ -3292,7 +3283,6 @@ def test_source_motion(moonsky):
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("stype", ["full", "subband", "spectral_index", "flat"])
 def test_at_frequencies(mock_point_skies, inplace, stype):
-
     sind = mock_point_skies("spectral_index")
     alpha = sind.spectral_index[0]
 
@@ -3327,7 +3317,6 @@ def test_at_frequencies(mock_point_skies, inplace, stype):
 
 
 def test_at_frequencies_interp_errors(mock_point_skies):
-
     sky = mock_point_skies("subband")
 
     # Check for error if interpolating outside the defined range.

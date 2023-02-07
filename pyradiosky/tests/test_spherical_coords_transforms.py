@@ -14,7 +14,6 @@ from pyradiosky import spherical_coords_transforms as sct
 
 @pytest.mark.parametrize("func_name", ["r_hat", "theta_hat", "phi_hat"])
 def test_hat_errors(func_name):
-
     with pytest.raises(ValueError) as cm:
         getattr(sct, func_name)([0, 0], [0])
     assert str(cm.value).startswith("theta and phi must have the same shape")

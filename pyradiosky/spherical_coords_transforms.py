@@ -204,7 +204,6 @@ def axis_angle_rotation_matrix(axis, angle):
         3x3 rotation matrix to rotate vectors by `angle` around `axis`.
     """
     if axis.shape != (3,):
-
         raise ValueError("axis must be a must be length 3 vector")
     if not is_unit_vector(axis):
         raise ValueError("axis must be a unit vector")
@@ -292,7 +291,6 @@ def vecs2rot(r1=None, r2=None, theta1=None, phi1=None, theta2=None, phi2=None):
         r1 = np.array(r1)
         r2 = np.array(r2)
         if r1.shape != (3,) or r2.shape != (3,):
-
             raise ValueError("r1 and r2 must be length 3 vectors")
         if not is_unit_vector(r1) or not is_unit_vector(r2):
             raise ValueError("r1 and r2 must be unit vectors")
