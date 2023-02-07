@@ -2278,7 +2278,6 @@ class SkyModel(UVBase):
             )
 
         if not isinstance(telescope_location, self._telescope_location.expected_type):
-
             errm = "telescope_location must be an :class:`astropy.EarthLocation` object"
             if hasmoon:
                 errm += " or a :class:`lunarsky.MoonLocation` object "
@@ -2518,7 +2517,6 @@ class SkyModel(UVBase):
         if not isinstance(
             self.telescope_location, self._telescope_location.expected_type
         ):
-
             errm = "telescope_location must be an astropy EarthLocation object"
             if hasmoon:
                 errm += " or a lunarsky MoonLocation object "
@@ -2548,7 +2546,6 @@ class SkyModel(UVBase):
             full_pol_over_hor = [pi for pi in self._polarized if above_horizon[pi]]
 
             if len(pol_over_hor) > 0:
-
                 rotation_matrix = self._calc_coherency_rotation(full_pol_over_hor)
 
                 rotation_matrix_T = np.swapaxes(rotation_matrix, 0, 1)
@@ -3598,7 +3595,6 @@ class SkyModel(UVBase):
         init_params = {"filename": os.path.basename(filename)}
 
         with h5py.File(filename, "r") as fileobj:
-
             # extract header information
             header = fileobj["/Header"]
             header_params = [
