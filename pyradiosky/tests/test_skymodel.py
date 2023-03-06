@@ -189,12 +189,18 @@ def mock_point_skies():
         if stype in ["full", "subband"]:
             stokes = spectrum.repeat(4, 0).repeat(Ncomp, 2)
             stokes[1:, :, :] = 0.0  # Set unpolarized
+            freq_edge_arr = None
+            if stype == "subband":
+                freq_edge_arr = skymodel._get_freq_edges_from_centers(
+                    freq_arr, (0 * units.Hz, 10 * units.Hz)
+                )
             return SkyModel(
                 name=names,
                 skycoord=skycoord,
                 stokes=stokes,
                 spectral_type=stype,
                 freq_array=freq_arr,
+                freq_edge_array=freq_edge_arr,
                 filename=filename_use,
             )
         elif stype == "spectral_index":
@@ -220,12 +226,6 @@ def mock_point_skies():
             )
 
     yield _func
-
-
-@pytest.fixture(scope="function")
-def healpix_disk_old():
-    pytest.importorskip("astropy_healpix")
-    return SkyModel.from_healpix_hdf5(os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5"))
 
 
 @pytest.fixture(scope="function")
@@ -776,8 +776,7 @@ def test_jansky_to_kelvin_errors(zenith_skymodel):
 @pytest.mark.parametrize("order", ["ring", "nested"])
 @pytest.mark.parametrize("to_jy", [True, False])
 @pytest.mark.parametrize("to_k", [True, False])
-@pytest.mark.parametrize("undo_method", ["point_to_healpix", "assign_to_healpix"])
-def test_healpix_to_point_loop(healpix_disk_new, order, to_jy, to_k, undo_method):
+def test_healpix_to_point_loop(healpix_disk_new, order, to_jy, to_k):
     skyobj = healpix_disk_new
     skyobj.calc_frame_coherency()
 
@@ -787,14 +786,7 @@ def test_healpix_to_point_loop(healpix_disk_new, order, to_jy, to_k, undo_method
     skyobj2 = skyobj.copy()
     skyobj2.healpix_to_point(to_jy=to_jy)
 
-    if undo_method == "point_to_healpix":
-        with uvtest.check_warnings(
-            DeprecationWarning,
-            match="This method is deprecated and will be removed in version 0.3.0.",
-        ):
-            skyobj2.point_to_healpix(to_k=to_k)
-    else:
-        skyobj2.assign_to_healpix(skyobj.nside, order=order, inplace=True, to_k=to_k)
+    skyobj2.assign_to_healpix(skyobj.nside, order=order, inplace=True, to_k=to_k)
 
     if to_jy and not to_k:
         skyobj.kelvin_to_jansky()
@@ -903,27 +895,6 @@ def test_assign_to_healpix_frame_inst_none(assign_hpx_data):
     assert sky.skycoord.frame.name == "icrs"
     assert sky.frame == "icrs"
     sky.assign_to_healpix(nside, inplace=True)
-    assert sky.hpx_frame.name == "icrs"
-    assert sky.frame == "icrs"
-
-
-def test_assign_healpix_frame_override_attribute(assign_hpx_data):
-    nside, _, sky = assign_hpx_data
-    sky.skycoord = sky.skycoord.transform_to("fk5")
-    assert sky.skycoord.frame.name == "fk5"
-    assert sky.frame == "fk5"
-    with uvtest.check_warnings(
-        [DeprecationWarning, UserWarning],
-        match=[
-            "The frame keyword is deprecated, in version 0.3.0 this method will use "
-            "the frame of this object's skycoord attribute.",
-            re.escape(
-                "Input parameter frame (value: icrs) differs from the skycoord "
-                "frame on this object (value: fk5)"
-            ),
-        ],
-    ):
-        sky.assign_to_healpix(nside, frame="icrs", inplace=True)
     assert sky.hpx_frame.name == "icrs"
     assert sky.frame == "icrs"
 
@@ -1249,14 +1220,6 @@ def test_polarized_source_visibilities(time_location):
         stokes=stokes_radec,
         spectral_type="flat",
     )
-
-    frame_coherency = source.calc_frame_coherency(store=False)
-
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match="coherency_radec is a deprecated parameter, use frame_coherency",
-    ):
-        assert np.array_equal(source.coherency_radec, frame_coherency)
 
     coherency_matrix_local = np.zeros([2, 2, ntimes], dtype="complex128") * units.Jy
     alts = np.zeros(ntimes)
@@ -1746,139 +1709,6 @@ def test_concat_compatibility_errors(healpix_disk_new, time_location):
     assert skyobj1 == skyobj_hpx_disk
 
 
-@pytest.mark.filterwarnings("ignore:This method reads an old 'healvis' style healpix")
-def test_units_healpix_to_sky(healpix_data, healpix_disk_old):
-    healpix_filename = os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5")
-    with h5py.File(healpix_filename, "r") as fileobj:
-        hpmap = fileobj["data"][0, ...]  # Remove Nskies axis.
-        freqs = fileobj["freqs"][()]
-
-    freqs = freqs * units.Hz
-
-    brightness_temperature_conv = units.brightness_temperature(
-        freqs, beam_area=healpix_data["pixel_area"]
-    )
-    stokes = (hpmap.T * units.K).to(units.Jy, brightness_temperature_conv).T
-    sky = healpix_disk_old
-    sky.healpix_to_point()
-
-    assert units.quantity.allclose(sky.stokes[0, 0], stokes[0])
-
-
-def test_healpix_recarray_loop(healpix_disk_new):
-    skyobj = healpix_disk_new
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match="The to_recarray method is deprecated and will be removed in 0.3.0.",
-    ):
-        skyarr = skyobj.to_recarray()
-
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match="The from_recarray method is deprecated and will be removed in 0.3.0.",
-    ):
-        skyobj2 = SkyModel.from_recarray(skyarr, history=skyobj.history)
-    assert skyobj.component_type == "healpix"
-    assert skyobj2.component_type == "healpix"
-
-    assert skyobj == skyobj2
-
-
-@pytest.mark.filterwarnings("ignore:This method reads an old 'healvis' style healpix")
-@pytest.mark.filterwarnings("ignore:This method writes an old 'healvis' style healpix")
-@pytest.mark.parametrize("change_history", [True, False, "error"])
-def test_read_write_healpix_old(tmp_path, healpix_disk_old, change_history):
-    test_filename = os.path.join(tmp_path, "tempfile.hdf5")
-
-    sky = healpix_disk_old
-
-    if change_history is True:
-        sky.history = ""
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match="This method writes an old 'healvis' style healpix HDF5 file. Support for "
-        "this file format is deprecated and will be removed in version 0.3.0.",
-    ):
-        sky.write_healpix_hdf5(test_filename)
-
-    if change_history == "error":
-        with h5py.File(test_filename, "a") as h5f:
-            del h5f["/history"]
-            h5f["/history"] = sky.history.encode("ibm039")
-
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match="This method reads an old 'healvis' style healpix HDF5 file. Support for "
-        "this file format is deprecated and will be removed in version 0.3.0.",
-    ):
-        sky2 = SkyModel.from_healpix_hdf5(test_filename)
-
-    if change_history:
-        assert uvutils._check_histories(sky.pyradiosky_version_str, sky2.history)
-        sky.history = sky2.history
-
-    assert sky == sky2
-
-
-@pytest.mark.filterwarnings("ignore:This method reads an old 'healvis' style healpix")
-def test_read_write_healpix_old_cut_sky(tmp_path, healpix_disk_old):
-    test_filename = os.path.join(tmp_path, "tempfile.hdf5")
-
-    sky = healpix_disk_old
-    sky.select(component_inds=np.arange(10))
-    sky.check()
-
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match="This method writes an old 'healvis' style healpix HDF5 file. Support for "
-        "this file format is deprecated and will be removed in version 0.3.0.",
-    ):
-        sky.write_healpix_hdf5(test_filename)
-
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match="This method reads an old 'healvis' style healpix HDF5 file. Support for "
-        "this file format is deprecated and will be removed in version 0.3.0.",
-    ):
-        sky2 = SkyModel.from_healpix_hdf5(test_filename)
-
-    assert sky == sky2
-
-
-@pytest.mark.filterwarnings("ignore:This method reads an old 'healvis' style healpix")
-def test_read_write_healpix_old_nover_history(tmp_path, healpix_disk_old):
-    test_filename = os.path.join(tmp_path, "tempfile.hdf5")
-
-    sky = healpix_disk_old
-    sky.history = sky.pyradiosky_version_str
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match="This method writes an old 'healvis' style healpix HDF5 file. Support for "
-        "this file format is deprecated and will be removed in version 0.3.0.",
-    ):
-        sky.write_healpix_hdf5(test_filename)
-
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match="This method reads an old 'healvis' style healpix HDF5 file. Support for "
-        "this file format is deprecated and will be removed in version 0.3.0.",
-    ):
-        sky2 = SkyModel.from_healpix_hdf5(test_filename)
-
-    assert sky == sky2
-
-
-@pytest.mark.filterwarnings("ignore:This method writes an old 'healvis' style healpix")
-def test_write_healpix_error(tmp_path):
-    skyobj = SkyModel.from_file(GLEAM_vot, with_error=True)
-    test_filename = os.path.join(tmp_path, "tempfile.hdf5")
-
-    with pytest.raises(
-        ValueError, match="component_type must be 'healpix' to use this method."
-    ):
-        skyobj.write_healpix_hdf5(test_filename)
-
-
 def test_healpix_import_err(zenith_skymodel):
     try:
         import astropy_healpix
@@ -1897,9 +1727,6 @@ def test_healpix_import_err(zenith_skymodel):
             )
             sm.get_lon_lat()
 
-        with pytest.raises(ImportError, match=errstr):
-            SkyModel.from_healpix_hdf5(os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5"))
-
         zenith_skymodel.nside = 32
         zenith_skymodel.hpx_inds = 0
         zenith_skymodel.hpx_order = "ring"
@@ -1908,10 +1735,6 @@ def test_healpix_import_err(zenith_skymodel):
 
         with pytest.raises(ImportError, match=errstr):
             zenith_skymodel.assign_to_healpix(32)
-
-        zenith_skymodel._set_component_type_params("healpix")
-        with pytest.raises(ImportError, match=errstr):
-            zenith_skymodel.healpix_to_point()
 
 
 def test_healpix_positions(tmp_path, time_location):
@@ -1970,13 +1793,8 @@ def test_healpix_positions(tmp_path, time_location):
         frame="icrs",
     )
 
-    filename = os.path.join(tmp_path, "healpix_single.hdf5")
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match="This method writes an old 'healvis' style healpix HDF5 file. Support "
-        "for this file format is deprecated and will be removed in version 0.3.0.",
-    ):
-        skyobj.write_healpix_hdf5(filename)
+    filename = os.path.join(tmp_path, "healpix_single.skyh5")
+    skyobj.write_skyh5(filename)
 
     time, array_location = time_location
 
@@ -1995,12 +1813,7 @@ def test_healpix_positions(tmp_path, time_location):
     src_m = np.cos(src_az.rad) * np.sin(src_za.rad)
     src_n = np.cos(src_za.rad)
 
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match="This method reads an old 'healvis' style healpix HDF5 file. Support for "
-        "this file format is deprecated and will be removed in version 0.3.0.",
-    ):
-        sky2 = SkyModel.from_healpix_hdf5(filename)
+    sky2 = SkyModel.from_file(filename)
 
     time.location = array_location
 
@@ -2015,63 +1828,14 @@ def test_healpix_positions(tmp_path, time_location):
     assert np.isclose(src_lmn[2][ipix], src_n)
 
 
-@pytest.mark.filterwarnings("ignore:The to_recarray method is deprecated")
-@pytest.mark.filterwarnings("ignore:The from_recarray method is deprecated")
-@pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
-@pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index", "full"])
-@pytest.mark.parametrize("with_error", [False, True])
-@pytest.mark.parametrize("rise_set_lsts", [False, True])
-def test_array_to_skymodel_loop(spec_type, with_error, rise_set_lsts, time_location):
-    _, array_location = time_location
-    spectral_type = "subband" if spec_type == "full" else spec_type
-
-    sky = SkyModel.from_file(
-        GLEAM_vot, spectral_type=spectral_type, with_error=with_error
-    )
-    if spec_type == "full":
-        sky.spectral_type = "full"
-
-    if rise_set_lsts:
-        sky.calculate_rise_set_lsts(array_location.lat)
-
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match="The to_recarray method is deprecated and will be removed in 0.3.0.",
-    ):
-        arr = sky.to_recarray()
-
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match="The from_recarray method is deprecated and will be removed in 0.3.0.",
-    ):
-        sky2 = SkyModel.from_recarray(arr)
-
-    assert sky == sky2
-
-    if spec_type == "flat":
-        # again with no reference_frequency field
-        reference_frequency = sky.reference_frequency
-        sky.reference_frequency = None
-        arr = sky.to_recarray()
-        sky2 = SkyModel.from_recarray(arr)
-
-        assert sky == sky2
-
-        # again with flat & freq_array
-        sky.freq_array = np.atleast_1d(np.unique(reference_frequency))
-        sky2 = SkyModel.from_recarray(sky.to_recarray())
-
-        assert sky == sky2
-
-
 @pytest.mark.filterwarnings("ignore:The `source_cuts` method is deprecated")
 def test_flux_source_cuts():
     # Check that min/max flux limits in test params work.
 
     skyobj = SkyModel.from_file(GLEAM_vot, with_error=True)
 
-    skyobj2 = skyobj.source_cuts(
-        min_flux=0.2 * units.Jy, max_flux=1.5 * units.Jy, inplace=False
+    skyobj2 = skyobj.select(
+        min_brightness=0.2 * units.Jy, max_brightness=1.5 * units.Jy, inplace=False
     )
 
     for sI in skyobj2.stokes[0, 0, :]:
@@ -2125,22 +1889,7 @@ def test_select_none():
     assert skyobj2 == skyobj
 
 
-def test_source_cut_healpix(healpix_disk_new, time_location):
-    skyobj = healpix_disk_new
-
-    _, array_location = time_location
-
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match=r"The `source_cuts` method is deprecated and will be removed in version "
-        r"0.3.0. Please use the `select` method and/or the `cut_nonrising` "
-        r"method as appropriate.",
-    ):
-        skyobj.source_cuts(latitude_deg=array_location.lat.deg)
-
-
-@pytest.mark.filterwarnings("ignore:The `source_cuts` method is deprecated")
-@pytest.mark.parametrize("function", ["select", "source_cuts"])
+@pytest.mark.filterwarnings("ignore:freq_edge_array not set, calculating it from")
 @pytest.mark.parametrize(
     "spec_type, init_kwargs, cut_kwargs",
     [
@@ -2164,7 +1913,7 @@ def test_source_cut_healpix(healpix_disk_new, time_location):
         ),
     ],
 )
-def test_flux_cuts(function, spec_type, init_kwargs, cut_kwargs):
+def test_flux_cuts(spec_type, init_kwargs, cut_kwargs):
     Nsrcs = 20
 
     minflux = 0.5
@@ -2197,26 +1946,17 @@ def test_flux_cuts(function, spec_type, init_kwargs, cut_kwargs):
 
     minI_cut = 1.0
     maxI_cut = 2.3
-    if function == "select":
-        minI_cut *= units.Jy
-        maxI_cut *= units.Jy
-        if "freq_range" in cut_kwargs:
-            freq_range = cut_kwargs["freq_range"]
-        else:
-            freq_range = None
-        skyobj.select(
-            min_brightness=minI_cut,
-            max_brightness=maxI_cut,
-            brightness_freq_range=freq_range,
-        )
+    minI_cut *= units.Jy
+    maxI_cut *= units.Jy
+    if "freq_range" in cut_kwargs:
+        freq_range = cut_kwargs["freq_range"]
     else:
-        skyobj.source_cuts(
-            latitude_deg=30.0, min_flux=minI_cut, max_flux=maxI_cut, **cut_kwargs
-        )
-
-    if function != "select":
-        minI_cut *= units.Jy
-        maxI_cut *= units.Jy
+        freq_range = None
+    skyobj.select(
+        min_brightness=minI_cut,
+        max_brightness=maxI_cut,
+        brightness_freq_range=freq_range,
+    )
 
     if "freq_range" in cut_kwargs and np.min(
         cut_kwargs["freq_range"] > np.min(init_kwargs["freq_array"])
@@ -2228,8 +1968,7 @@ def test_flux_cuts(function, spec_type, init_kwargs, cut_kwargs):
     assert np.all(skyobj.stokes[2] == Ucomp * units.Jy)
 
 
-@pytest.mark.filterwarnings("ignore:The `source_cuts` method is deprecated")
-@pytest.mark.parametrize("function", ["select", "source_cuts"])
+@pytest.mark.filterwarnings("ignore:freq_edge_array not set, calculating it from")
 @pytest.mark.parametrize(
     "spec_type, init_kwargs, cut_kwargs, error_category, error_message",
     [
@@ -2267,7 +2006,7 @@ def test_flux_cuts(function, spec_type, init_kwargs, cut_kwargs):
     ],
 )
 def test_flux_cut_error(
-    function, spec_type, init_kwargs, cut_kwargs, error_category, error_message
+    spec_type, init_kwargs, cut_kwargs, error_category, error_message
 ):
     Nsrcs = 20
 
@@ -2295,10 +2034,8 @@ def test_flux_cut_error(
         **init_kwargs,
     )
 
-    if (
-        function == "select"
-        and "freq_range" in cut_kwargs
-        and not isinstance(cut_kwargs["freq_range"], Quantity)
+    if "freq_range" in cut_kwargs and not isinstance(
+        cut_kwargs["freq_range"], Quantity
     ):
         error_category = TypeError
         error_message = (
@@ -2310,22 +2047,17 @@ def test_flux_cut_error(
         minI_cut = 1.0
         maxI_cut = 2.3
 
-        if function == "select":
-            minI_cut *= units.Jy
-            maxI_cut *= units.Jy
-            if "freq_range" in cut_kwargs:
-                freq_range = cut_kwargs["freq_range"]
-            else:
-                freq_range = None
-            skyobj.select(
-                min_brightness=minI_cut,
-                max_brightness=maxI_cut,
-                brightness_freq_range=freq_range,
-            )
+        minI_cut *= units.Jy
+        maxI_cut *= units.Jy
+        if "freq_range" in cut_kwargs:
+            freq_range = cut_kwargs["freq_range"]
         else:
-            skyobj.source_cuts(
-                latitude_deg=30.0, min_flux=minI_cut, max_flux=maxI_cut, **cut_kwargs
-            )
+            freq_range = None
+        skyobj.select(
+            min_brightness=minI_cut,
+            max_brightness=maxI_cut,
+            brightness_freq_range=freq_range,
+        )
 
 
 def test_select_flux_error():
@@ -2359,6 +2091,7 @@ def test_select_flux_error():
         skyobj.select(max_brightness=maxI_cut)
 
 
+@pytest.mark.filterwarnings("ignore:freq_edge_array not set, calculating it from")
 @pytest.mark.parametrize(
     "spec_type, init_kwargs",
     [
@@ -2409,13 +2142,6 @@ def test_select_field(spec_type, init_kwargs):
     assert np.all(skyobj2.ra >= lon_range[0])
     assert np.all(skyobj2.ra <= lon_range[1])
 
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match=["lon is no longer a parameter on SkyModel objects."] * 2,
-    ):
-        assert np.all(skyobj2.lon >= lon_range[0])
-        assert np.all(skyobj2.lon <= lon_range[1])
-
     lat_range = Latitude([-45, 45], units.deg)
     skyobj2 = skyobj.copy()
     skyobj2.select(lat_range=lat_range)
@@ -2424,13 +2150,6 @@ def test_select_field(spec_type, init_kwargs):
 
     assert np.all(skyobj2.dec >= lat_range[0])
     assert np.all(skyobj2.dec <= lat_range[1])
-
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match=["lat is no longer a parameter on SkyModel objects."] * 2,
-    ):
-        assert np.all(skyobj2.lat >= lat_range[0])
-        assert np.all(skyobj2.lat <= lat_range[1])
 
     skyobj2 = skyobj.copy()
     skyobj2.select(lon_range=lon_range, lat_range=lat_range)
@@ -2686,21 +2405,6 @@ def test_read_gleam(spec_type):
     if spec_type == "subband":
         assert skyobj.Nfreqs == 20
 
-    # Check cuts
-    source_select_kwds = {"min_flux": 0.5}
-
-    msg_expected = [
-        "The source_select_kwds parameter is deprecated",
-        "The `source_cuts` method is deprecated and will be removed",
-    ]
-    with uvtest.check_warnings(DeprecationWarning, match=msg_expected):
-        cut_sky = SkyModel()
-        cut_sky.read_gleam_catalog(
-            GLEAM_vot, spectral_type=spec_type, source_select_kwds=source_select_kwds
-        )
-
-    assert cut_sky.Ncomponents < skyobj.Ncomponents
-
 
 def test_read_errors(tmpdir):
     skyobj = SkyModel()
@@ -2747,39 +2451,16 @@ def test_read_votable():
     )
     assert skyobj2 == skyobj
 
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match=[
-            "The `ra_column` keyword is deprecated and will be removed",
-            "The `dec_column` keyword is deprecated and will be removed",
-        ],
-    ):
-        skyobj3 = SkyModel.from_file(
-            votable_file,
-            table_name="VIII_1000_single",
-            id_column="source_id",
-            ra_column="RAJ2000",
-            dec_column="DEJ2000",
-            flux_columns="Si",
-            frame="fk5",
-        )
-    assert skyobj == skyobj3
-
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match="frame parameter was not set. Defaulting to 'icrs'. This will become "
-        "an error in version 0.3",
-    ):
-        skyobj4 = SkyModel.from_votable_catalog(
-            votable_file, "VIII_1000_single", "source_id", "RAJ2000", "DEJ2000", "Si"
-        )
-    assert skyobj != skyobj4
-
-    new_skycoord = SkyCoord(
-        ra=skyobj4.skycoord.ra, dec=skyobj4.skycoord.dec, frame="fk5"
+    skyobj3 = SkyModel.from_file(
+        votable_file,
+        table_name="VIII_1000_single",
+        id_column="source_id",
+        lon_column="RAJ2000",
+        lat_column="DEJ2000",
+        flux_columns="Si",
+        frame="fk5",
     )
-    skyobj4.skycoord = new_skycoord
-    assert skyobj == skyobj4
+    assert skyobj == skyobj3
 
 
 def test_read_deprecated_votable():
@@ -2791,10 +2472,18 @@ def test_read_deprecated_votable():
         match=re.escape(f"File {votable_file} contains tables with no name or ID."),
     ):
         skyobj.read_votable_catalog(
-            votable_file, "GLEAM", "GLEAM", "RAJ2000", "DEJ2000", "Fintwide"
+            votable_file,
+            "GLEAM",
+            "GLEAM",
+            "RAJ2000",
+            "DEJ2000",
+            "Fintwide",
+            frame="fk5",
         )
 
 
+@pytest.mark.filterwarnings("ignore:freq_edge_array not set, calculating it from")
+@pytest.mark.filterwarnings("ignore:freq_array not set, calculating it from")
 def test_read_votable_errors():
     # fmt: off
     flux_columns = [
@@ -2809,11 +2498,25 @@ def test_read_votable_errors():
         "e_Fint158", "e_Fint166", "e_Fint174", "e_Fint181", "e_Fint189",
         "e_Fint197", "e_Fint204", "e_Fint212", "e_Fint220", "e_Fint227"
     ]
-    freq_array = [76, 84, 92, 99, 107, 115, 122, 130, 143, 151, 158, 166,
-                  174, 181, 189, 197, 204, 212, 220, 227]
+    freq_array = np.asarray(
+        [76, 84, 92, 99, 107, 115, 122, 130, 143, 151, 158, 166,
+         174, 181, 189, 197, 204, 212, 220, 227]
+    ) * 1e6 * units.Hz
+    freq_lower = np.asarray(
+        [72, 80, 88, 95, 103, 111, 118, 126, 139, 147, 154, 162,
+         170, 177, 185, 193, 200, 208, 216, 223]
+    ) * 1e6 * units.Hz
+    freq_upper = np.asarray(
+        [80, 88, 95, 103, 111, 118, 126, 134, 147, 154, 162, 170,
+         177, 185, 193, 200, 208, 216, 223, 231]
+    ) * 1e6 * units.Hz
+    freq_edge_array = np.concatenate(
+        (freq_lower[np.newaxis, :], freq_upper[np.newaxis, :]), axis=0,
+    )
     # fmt: on
     with pytest.raises(
-        ValueError, match="freq_array must be provided for multiple flux columns."
+        ValueError,
+        match="Frequency information must be provided with multiple flux columns.",
     ):
         SkyModel.from_file(
             GLEAM_vot,
@@ -2828,22 +2531,6 @@ def test_read_votable_errors():
             flux_error_columns=flux_error_columns,
         )
 
-    with pytest.raises(
-        ValueError, match="reference_frequency must be an astropy Quantity."
-    ):
-        SkyModel.from_file(
-            GLEAM_vot,
-            filetype="vot",
-            table_name="GLEAM",
-            id_column="GLEAM",
-            lon_column="RAJ2000",
-            lat_column="DEJ2000",
-            frame="fk5",
-            flux_columns="Fintwide",
-            reference_frequency=200e6,
-            flux_error_columns="e_Fintwide",
-        )
-
     with pytest.raises(ValueError, match="All flux columns must have compatible units"):
         SkyModel.from_file(
             GLEAM_vot,
@@ -2855,6 +2542,24 @@ def test_read_votable_errors():
             frame="fk5",
             flux_columns=["Fintwide", "Fpwide"],
             freq_array=[150e6, 200e6] * units.Hz,
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="freq_edge_array must be provided for multiple flux columns if "
+        "freq_array is not regularly spaced.",
+    ):
+        SkyModel.from_file(
+            GLEAM_vot,
+            filetype="vot",
+            table_name="GLEAM",
+            id_column="GLEAM",
+            lon_column="RAJ2000",
+            lat_column="DEJ2000",
+            frame="fk5",
+            flux_columns=flux_columns,
+            flux_error_columns=flux_error_columns,
+            freq_array=freq_array,
         )
 
     flux_error_columns[0] = "e_Fp076"
@@ -2871,7 +2576,7 @@ def test_read_votable_errors():
             frame="fk5",
             flux_columns=flux_columns,
             flux_error_columns=flux_error_columns,
-            freq_array=freq_array,
+            freq_edge_array=freq_edge_array,
         )
 
 
@@ -2886,35 +2591,6 @@ def test_fhd_catalog_reader():
     assert skyobj.filename == ["fhd_catalog.sav"]
     catalog = scipy.io.readsav(catfile)["catalog"]
     assert skyobj.Ncomponents == len(catalog)
-
-
-def test_fhd_catalog_reader_source_cuts():
-    catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
-
-    with uvtest.check_warnings(
-        UserWarning, match="Source IDs are not unique. Defining unique IDs."
-    ):
-        skyobj = SkyModel.from_file(catfile, expand_extended=False, filetype="fhd")
-
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match="The `source_cuts` method is deprecated and will be removed",
-    ):
-        skyobj.source_cuts(latitude_deg=30.0)
-
-    with uvtest.check_warnings(
-        [UserWarning, DeprecationWarning, DeprecationWarning],
-        match=[
-            "Source IDs are not unique. Defining unique IDs.",
-            "The source_select_kwds parameter is deprecated",
-            "The `source_cuts` method is deprecated",
-        ],
-    ):
-        skyobj2 = SkyModel.from_fhd_catalog(
-            catfile, expand_extended=False, source_select_kwds={"latitude_deg": 30.0}
-        )
-
-    assert skyobj == skyobj2
 
 
 def test_fhd_catalog_reader_extended_sources():
@@ -3019,20 +2695,6 @@ def test_point_catalog_reader():
         skyobj.stokes[0, :].to("Jy").value, catalog_table["flux_density"]
     )
 
-    # Check cuts
-    source_select_kwds = {"min_flux": 1.0}
-
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match=[
-            "The source_select_kwds parameter is deprecated",
-            "The `source_cuts` method is deprecated and will be removed",
-        ],
-    ):
-        skyobj2 = SkyModel()
-        skyobj2.read_text_catalog(catfile, source_select_kwds=source_select_kwds)
-    assert skyobj2.Ncomponents == 2
-
 
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 @pytest.mark.parametrize(
@@ -3093,15 +2755,30 @@ def test_text_catalog_loop(
         GLEAM_vot, spectral_type=spectral_type, with_error=with_error
     )
     if spec_type == "full":
-        skyobj.spectral_type = "full"
+        skyobj.at_frequencies(skyobj.freq_array)
+        skyobj.freq_edge_array = None
 
     if rise_set_lsts:
         skyobj.calculate_rise_set_lsts(array_location.lat)
 
     fname = os.path.join(tmp_path, "temp_cat.txt")
 
-    skyobj.write_text_catalog(fname)
+    if spec_type == "subband":
+        msg = (
+            "Text files do not support subband types, this will be written as a "
+            "'full' spectral type (losing the frequency edge array information)."
+        )
+        warn_type = UserWarning
+    else:
+        warn_type = None
+        msg = ""
+
+    with uvtest.check_warnings(warn_type, match=msg):
+        skyobj.write_text_catalog(fname)
     skyobj2 = SkyModel.from_file(fname)
+    if spec_type == "subband":
+        assert skyobj2.spectral_type == "full"
+        skyobj.at_frequencies(skyobj.freq_array)
 
     assert skyobj == skyobj2
 
@@ -3193,29 +2870,6 @@ def test_read_text_catalog_error(tmp_path, time_location, old_str, new_str, err_
         SkyModel.from_text_catalog(fname)
 
 
-@pytest.mark.filterwarnings("ignore:The reference_frequency is aliased as `frequency`")
-@pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
-@pytest.mark.parametrize("spec_type", ["flat", "subband"])
-def test_read_text_source_cuts(tmp_path, spec_type):
-    skyobj = SkyModel.from_file(GLEAM_vot, spectral_type=spec_type, with_error=True)
-    fname = os.path.join(tmp_path, "temp_cat.txt")
-    skyobj.write_text_catalog(fname)
-
-    source_select_kwds = {"min_flux": 0.5}
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match=[
-            "The source_select_kwds parameter is deprecated",
-            "The `source_cuts` method is deprecated",
-        ],
-    ):
-        skyobj2 = SkyModel.from_text_catalog(
-            fname, source_select_kwds=source_select_kwds
-        )
-
-    assert skyobj2.Ncomponents < skyobj.Ncomponents
-
-
 def test_pyuvsim_mock_catalog_read():
     mock_cat_file = os.path.join(SKY_DATA_PATH, "mock_hera_text_2458098.27471.txt")
 
@@ -3224,15 +2878,15 @@ def test_pyuvsim_mock_catalog_read():
     assert mock_sky.name.tolist() == expected_names
 
 
-@pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 def test_read_text_errors(tmp_path):
     skyobj = SkyModel.from_file(GLEAM_vot, spectral_type="subband", with_error=True)
+    skyobj.at_frequencies(skyobj.freq_array)
 
     fname = os.path.join(tmp_path, "temp_cat.txt")
     skyobj.write_text_catalog(fname)
     with fileinput.input(files=fname, inplace=True) as infile:
         for line in infile:
-            line = line.replace("Flux_subband_76_MHz [Jy]", "Frequency [Hz]")
+            line = line.replace("Flux_76_MHz [Jy]", "Frequency [Hz]")
             print(line, end="")
 
     with pytest.raises(
@@ -3246,7 +2900,7 @@ def test_read_text_errors(tmp_path):
     skyobj2.write_text_catalog(fname)
     with fileinput.input(files=fname, inplace=True) as infile:
         for line in infile:
-            line = line.replace("Flux_subband_76_MHz [Jy]", "Frequency [Hz]")
+            line = line.replace("Flux_76_MHz [Jy]", "Frequency [Hz]")
             print(line, end="")
 
     with pytest.raises(
@@ -3258,7 +2912,7 @@ def test_read_text_errors(tmp_path):
     skyobj.write_text_catalog(fname)
     with fileinput.input(files=fname, inplace=True) as infile:
         for line in infile:
-            line = line.replace("Flux_subband_76_MHz [Jy]", "Flux [Jy]")
+            line = line.replace("Flux_76_MHz [Jy]", "Flux [Jy]")
             print(line, end="")
 
     with pytest.raises(
@@ -3823,20 +3477,6 @@ def test_skyh5_read_errors_healpix(healpix_disk_new, param, value, errormsg, tmp
         SkyModel.from_file(testfile)
 
 
-def test_skyh5_read_errors_oldstyle_healpix():
-    with pytest.raises(
-        ValueError, match="This is an old 'healvis' style healpix HDF5 file"
-    ):
-        SkyModel.from_file(
-            os.path.join(SKY_DATA_PATH, "healpix_disk.hdf5"), filetype="skyh5"
-        )
-
-
-def test_healpix_hdf5_read_errors_newstyle_healpix():
-    with pytest.raises(ValueError, match="This is a skyh5 file"):
-        SkyModel.from_healpix_hdf5(os.path.join(SKY_DATA_PATH, "healpix_disk.skyh5"))
-
-
 def test_hpx_ordering():
     # Setting the hpx_order parameter
     pytest.importorskip("astropy_healpix")
@@ -3906,12 +3546,25 @@ def test_write_clobber(mock_point_skies, tmpdir):
     assert sky3 != sky2
 
 
-# TODO -- Also check with healpix init
 @pytest.mark.parametrize(
     ("coord_kwds", "err_msg", "exp_frame"),
     [
-        ({"ra": Longitude("1d"), "dec": Latitude("1d")}, None, "icrs"),
-        ({"gl": Longitude("1d"), "gb": Latitude("1d")}, None, "galactic"),
+        (
+            {"ra": Longitude("1d"), "dec": Latitude("1d")},
+            "The 'frame' keyword must be set to initialize from coordinates.",
+            "icrs",
+        ),
+        (
+            {"gl": Longitude("1d"), "gb": Latitude("1d")},
+            "The 'frame' keyword must be set to initialize from coordinates.",
+            "galactic",
+        ),
+        ({"ra": Longitude("1d"), "dec": Latitude("1d"), "frame": "icrs"}, None, "icrs"),
+        (
+            {"gl": Longitude("1d"), "gb": Latitude("1d"), "frame": "galactic"},
+            None,
+            "galactic",
+        ),
         (
             {"ra": Longitude("1d"), "dec": Latitude("1d"), "frame": "galactic"},
             "ra or dec supplied but specified frame galactic does "
@@ -3950,7 +3603,14 @@ def test_write_clobber(mock_point_skies, tmpdir):
             "The 'frame' keyword must",
             None,
         ),
-        ({"nside": 4, "hpx_inds": np.arange(1)}, None, "icrs"),
+        (
+            {"nside": 4, "hpx_inds": np.arange(1)},
+            "If initializing with values, all of ['nside', 'frame', 'hpx_inds', 'stokes', "
+            "'spectral_type'] must be set. Received: ['nside', 'hpx_inds', 'stokes', "
+            "'spectral_type']",
+            "icrs",
+        ),
+        ({"nside": 4, "hpx_inds": np.arange(1), "frame": "icrs"}, None, "icrs"),
     ],
 )
 def test_skymodel_init_with_frame(coord_kwds, err_msg, exp_frame):
@@ -3965,7 +3625,7 @@ def test_skymodel_init_with_frame(coord_kwds, err_msg, exp_frame):
     coord_kwds["spectral_type"] = "flat"
 
     if err_msg is not None:
-        with pytest.raises(ValueError, match=err_msg):
+        with pytest.raises(ValueError, match=re.escape(err_msg)):
             SkyModel(**coord_kwds)
     else:
         msg = ""
@@ -3978,11 +3638,7 @@ def test_skymodel_init_with_frame(coord_kwds, err_msg, exp_frame):
                 "No frame was specified for RA and Dec. Defaulting to ICRS, but "
                 "this will become an error in version 0.3 and later."
             )
-        elif "gl" in coord_kwds.keys():
-            msg = (
-                "No frame was specified for gl and gb. Defaulting to galactic, but "
-                "this will become an error in version 0.3 and later."
-            )
+
         with uvtest.check_warnings(exp_warning, match=msg):
             sky = SkyModel(**coord_kwds)
         assert sky.frame == exp_frame
@@ -4012,13 +3668,7 @@ def test_skymodel_tranform_frame(zenith_skymodel, zenith_skycoord):
     zenith_skycoord = zenith_skycoord.transform_to("galactic")
 
     assert zenith_skymodel.skycoord.frame.name == "galactic"
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match="gl and gb are no longer parameters on SkyModel objects in the "
-        "galactic frame. Use the standard astropy labels l and b instead. Starting in "
-        "version 0.3.0 this call will error.",
-    ):
-        assert units.allclose(zenith_skymodel.gl, zenith_skycoord.l)
+    assert units.allclose(zenith_skymodel.l, zenith_skycoord.l)
 
     assert units.allclose(zenith_skymodel.b, zenith_skycoord.b)
 
@@ -4031,13 +3681,7 @@ def test_skymodel_tranform_frame_roundtrip(zenith_skymodel, zenith_skycoord):
 
     assert zenith_skymodel.skycoord.frame.name == "galactic"
     assert units.allclose(zenith_skymodel.l, zenith_skycoord.l)
-    with uvtest.check_warnings(
-        DeprecationWarning,
-        match="gl and gb are no longer parameters on SkyModel objects in the "
-        "galactic frame. Use the standard astropy labels l and b instead. Starting in "
-        "version 0.3.0 this call will error.",
-    ):
-        assert units.allclose(zenith_skymodel.gb, zenith_skycoord.b)
+    assert units.allclose(zenith_skymodel.b, zenith_skycoord.b)
     zenith_skymodel.transform_to("icrs")
 
     assert zenith_skymodel == original_sky
@@ -4172,7 +3816,13 @@ def test_healpix_transform_full_sky(healpix_disk_new):
 def test_old_skyh5_reading_ra_dec():
     testfile = os.path.join(SKY_DATA_PATH, "old_skyh5_point_sources.skyh5")
     with uvtest.check_warnings(
-        UserWarning, match="Parameter skycoord not found in skyh5 file."
+        UserWarning,
+        match=[
+            "Parameter skycoord not found in skyh5 file.",
+            "No freq_edge_array in this file and frequencies are not evenly spaced",
+        ],
     ):
         sky = SkyModel.from_file(testfile)
-    assert sky.check()
+
+    sky.check()
+    assert sky.spectral_type == "full"
