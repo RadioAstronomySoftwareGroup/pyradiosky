@@ -2,11 +2,44 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2023-03-06
+
+### Added
+- A `freq_edge_array` parameter to store the top and bottom of the sub-bands with shape
+(2, Nfreqs). This will become required for objects with "subband" spectral types in
+version 0.5. A `freq_edge_array` parameter was also added to the `read_votable_file`,
+`read` and `from_file` methods.
+
 ### Changed
+- When writing to text files, "subband" spectral types are represented in the same
+way as "full" spectral types (losing the frequency edge array information).
 - Increase the minimum compatible version for lunarsky to 0.2.1 to fix astropy
 deprecation warnings.
 
-## [0.2.0] - 2023-01-01
+### Deprecated
+- Not setting the `freq_edge_array` parameter for subband spectral types.
+
+### Removed
+- Defaulting for the coordinate frame, `frame` is now required to be passed to
+the `__init__` method for Healpix maps and point-like components when passing individual
+components rather than a SkyCoord object. It is also required to be passed to the `read_votable_file` method.
+- Handling for accessing the deprecated `ra_dec_coherency`, `lon`, `lat` attributes.
+- Handling for accessing galactic `l` and `b` coordinates as `gl` and `gb`.
+- The `point_to_healpix` method, use the `assign_to_healpix` instead.
+- The `frame` parameter to the `assign_to_healpix` method. The frame from the object's
+skycoord parameter is now always used for the Healpix frame, use `transform_to` to
+convert to the desired frame before calling `assign_to_healpix`.
+- The `source_cuts` method and the associated `source_select_keywords` parameters from
+the various `read` methods.
+- The `to_recarray` and `from_recarray` methods.
+- Support for reading old `healvis` style Healpix hdf5 files (via the associated
+`read_healpix_hdf5`, `from_healpix_hdf5` and `write_healpix_hdf5` methods). skyh5
+files are now the only supported hdf5 file format.
+- The `ra_column` and `dec_column` parameters to the `read` and `from_file` methods. Use
+the more generic `lon_column` and `lat_column` parameters instead.
+
+
+## [0.2.0] - 2023-02-01
 
 ### Added
 - Add support for all astropy coordinate frames with the new `skycoord` attribute (which
