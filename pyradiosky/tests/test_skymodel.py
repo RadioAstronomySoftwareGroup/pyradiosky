@@ -11,8 +11,16 @@ import warnings
 import h5py
 import numpy as np
 import pytest
-import pyuvdata.tests as uvtest
-import pyuvdata.utils as uvutils
+
+with warnings.catch_warnings():
+    # This filter can be removed when pyuvdata
+    # is updated to use importlib.metadata rather than pkg_resources
+    warnings.filterwarnings(
+        "ignore", "Deprecated call to `pkg_resources.declare_namespace"
+    )
+    warnings.filterwarnings("ignore", "pkg_resources is deprecated as an API")
+    import pyuvdata.tests as uvtest
+    import pyuvdata.utils as uvutils
 import scipy.io
 from astropy import units
 from astropy.coordinates import (

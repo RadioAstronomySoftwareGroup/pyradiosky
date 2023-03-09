@@ -10,7 +10,6 @@ import warnings
 import astropy.units as units
 import h5py
 import numpy as np
-import pyuvdata.utils as uvutils
 import scipy.io
 from astropy.coordinates import (
     AltAz,
@@ -26,10 +25,19 @@ from astropy.coordinates import frame_transform_graph
 from astropy.io import votable
 from astropy.time import Time
 from astropy.units import Quantity
-from pyuvdata.parameter import SkyCoordParameter, UVParameter
-from pyuvdata.uvbase import UVBase
-from pyuvdata.uvbeam.cst_beam import CSTBeam
 from scipy.linalg import orthogonal_procrustes as ortho_procr
+
+with warnings.catch_warnings():
+    # This filter can be removed when pyuvdata
+    # is updated to use importlib.metadata rather than pkg_resources
+    warnings.filterwarnings(
+        "ignore", "Deprecated call to `pkg_resources.declare_namespace"
+    )
+    warnings.filterwarnings("ignore", "pkg_resources is deprecated as an API")
+    import pyuvdata.utils as uvutils
+    from pyuvdata.parameter import SkyCoordParameter, UVParameter
+    from pyuvdata.uvbase import UVBase
+    from pyuvdata.uvbeam.cst_beam import CSTBeam
 
 from . import __version__
 from . import spherical_coords_transforms as sct
