@@ -313,6 +313,48 @@ def healpix_gsm_icrs():
     del sky
 
 
+@pytest.mark.filterwarnings("ignore:freq_edge_array not set, calculating it from")
+def test_init_subband(zenith_skycoord):
+    n_freqs = 5
+    freq_bottom_array = np.arange(1, (1 + n_freqs), dtype=float) * 1e8 * units.Hz
+    freq_top_array = np.arange(2, (2 + n_freqs), dtype=float) * 1e8 * units.Hz
+    freq_array = (freq_bottom_array + freq_top_array) / 2.0
+
+    stokes = np.zeros((4, n_freqs, 1), dtype=np.float64) * units.Jy
+    stokes[0, :, :] = 1 * units.Jy
+
+    refsky = SkyModel(
+        skycoord=zenith_skycoord,
+        name=["zen"],
+        stokes=stokes,
+        spectral_type="subband",
+        freq_array=freq_array,
+        freq_edge_array=np.concatenate(
+            (freq_bottom_array[np.newaxis, :], freq_top_array[np.newaxis, :]), axis=0
+        ),
+    )
+
+    sky1 = SkyModel(
+        skycoord=zenith_skycoord,
+        name=["zen"],
+        stokes=stokes,
+        spectral_type="subband",
+        freq_array=freq_array,
+    )
+    assert sky1 == refsky
+
+    sky2 = SkyModel(
+        skycoord=zenith_skycoord,
+        name=["zen"],
+        stokes=stokes,
+        spectral_type="subband",
+        freq_edge_array=np.concatenate(
+            (freq_bottom_array[np.newaxis, :], freq_top_array[np.newaxis, :]), axis=0
+        ),
+    )
+    assert sky2 == refsky
+
+
 def test_init_error(zenith_skycoord):
     with pytest.raises(ValueError, match="If initializing with values, all of"):
         SkyModel(
@@ -320,6 +362,22 @@ def test_init_error(zenith_skycoord):
             stokes=[1.0, 0, 0, 0] * units.Jy,
             spectral_type="flat",
         )
+    with pytest.raises(
+        ValueError,
+        match="Cannot calculate frequency edges from frequency center array because "
+        "there is only one frequency center.",
+    ):
+        with uvtest.check_warnings(
+            UserWarning,
+            match="freq_edge_array not set, calculating it from the freq_array.",
+        ):
+            SkyModel(
+                skycoord=zenith_skycoord,
+                name=["zen"],
+                stokes=[1.0, 0, 0, 0] * units.Jy,
+                spectral_type="subband",
+                freq_array=100e6 * units.Hz,
+            )
 
     with pytest.raises(ValueError, match="component_type must be one of:"):
         SkyModel(
@@ -380,6 +438,25 @@ def test_check_errors():
     skyobj2.freq_array = skyobj2.freq_array / units.sr
     with pytest.raises(
         ValueError, match="freq_array must have a unit that can be converted to Hz."
+    ):
+        skyobj2.check()
+
+    skyobj2 = skyobj.copy()
+    skyobj2.freq_edge_array = None
+    with uvtest.check_warnings(
+        DeprecationWarning,
+        match="freq_edge_array is not set. Cannot calculate it from the freq_array "
+        "because freq_array spacing is not constant. This will become an error in "
+        "version 0.5",
+    ):
+        skyobj2.check()
+
+    skyobj2.freq_array = (np.arange(skyobj2.Nfreqs) * 1e7 + 1e8) * units.Hz
+    skyobj2.freq_edge_array = None
+    with uvtest.check_warnings(
+        DeprecationWarning,
+        match="freq_edge_array is not set. Calculating it from the freq_array. This "
+        "will become an error in version 0.5",
     ):
         skyobj2.check()
 
@@ -444,12 +521,7 @@ def test_init_lists(spec_type, param, zenith_skycoord):
     decs = Latitude(np.zeros(5, dtype=np.float64) + icrs_coord.dec.value * units.deg)
     names = ["src_" + str(ind) for ind in range(5)]
 
-    if spec_type in ["subband", "full"]:
-        n_freqs = 3
-        freq_array = [100e6, 120e6, 140e6] * units.Hz
-    else:
-        n_freqs = 1
-        freq_array = None
+    n_freqs = 1
 
     stokes = np.zeros((4, n_freqs, 5), dtype=np.float64) * units.Jy
     stokes[0, :, :] = 1 * units.Jy
@@ -469,7 +541,6 @@ def test_init_lists(spec_type, param, zenith_skycoord):
         stokes=stokes,
         reference_frequency=ref_freqs,
         spectral_index=spec_index,
-        freq_array=freq_array,
         spectral_type=spec_type,
     )
 
@@ -486,7 +557,6 @@ def test_init_lists(spec_type, param, zenith_skycoord):
         stokes=stokes,
         reference_frequency=ref_freqs,
         spectral_index=spec_index,
-        freq_array=freq_array,
         spectral_type=spec_type,
     )
 
@@ -788,6 +858,11 @@ def test_healpix_to_point_loop(healpix_disk_new, order, to_jy, to_k):
     skyobj = healpix_disk_new
     skyobj.calc_frame_coherency()
 
+    frame_coherency = copy.deepcopy(skyobj.frame_coherency)
+    # check strore=False
+    new_frame_coherency = skyobj.calc_frame_coherency(store=False)
+    assert np.array_equal(frame_coherency, new_frame_coherency)
+
     if order == "nested":
         skyobj.hpx_order = "nested"
 
@@ -804,6 +879,9 @@ def test_healpix_to_point_loop(healpix_disk_new, order, to_jy, to_k):
 
 def test_healpix_to_point_loop_ordering(healpix_disk_new):
     skyobj = healpix_disk_new
+
+    # add frame_coherency
+    skyobj.calc_frame_coherency()
 
     skyobj2 = skyobj.copy()
     skyobj2.hpx_order = "nested"
@@ -1744,6 +1822,10 @@ def test_healpix_import_err(zenith_skymodel):
         with pytest.raises(ImportError, match=errstr):
             zenith_skymodel.assign_to_healpix(32)
 
+        zenith_skymodel.component_type = "healpix"
+        with pytest.raises(ImportError, match=errstr):
+            zenith_skymodel.healpix_to_point()
+
 
 def test_healpix_positions(tmp_path, time_location):
     astropy_healpix = pytest.importorskip("astropy_healpix")
@@ -2267,6 +2349,10 @@ def test_circumpolar_nonrising(time_location):
     )
 
     sky2 = sky.cut_nonrising(location.lat, inplace=False)
+    sky3 = sky.copy()
+    sky3.cut_nonrising(location.lat)
+
+    assert sky3 == sky2
 
     # Boolean array identifying nonrising sources that were removed
     nonrising = np.array([sky.name[ind] not in sky2.name for ind in range(Nsrcs)])
@@ -2822,13 +2908,21 @@ def test_text_catalog_loop_other_freqs(tmp_path, freq_mult):
     assert skyobj == skyobj2
 
 
-def test_write_text_catalog_healpix_error(tmp_path, healpix_disk_new):
+def test_write_text_catalog_errors(tmp_path, healpix_disk_new):
     fname = os.path.join(tmp_path, "temp_cat.txt")
 
     with pytest.raises(
         ValueError, match="component_type must be 'point' to use this method."
     ):
         healpix_disk_new.write_text_catalog(fname)
+
+    skyobj = SkyModel.from_file(GLEAM_vot)
+    skyobj.jansky_to_kelvin()
+
+    with pytest.raises(
+        ValueError, match="Stokes units must be equivalent to Jy to use this method."
+    ):
+        skyobj.write_text_catalog(fname)
 
 
 @pytest.mark.parametrize(
@@ -2993,6 +3087,10 @@ def test_at_frequencies(mock_point_skies, inplace, stype):
         new = sky.at_frequencies(old_freqs, inplace=inplace)
         if inplace:
             new = sky
+            new.freq_edge_array = skymodel._get_freq_edges_from_centers(
+                new.freq_array, new._freq_array.tols
+            )
+
         assert units.quantity.allclose(new.freq_array, old_freqs)
         new = sky.at_frequencies(old_freqs[5:10], inplace=inplace)
         if inplace:
@@ -3439,6 +3537,7 @@ def test_skyh5_backwards_compatibility_healpix(healpix_disk_new, tmpdir):
         ("Ncomponents", 5, "Ncomponents is not equal to the size of 'name'."),
         ("Nfreqs", 10, "Nfreqs is not equal to the size of 'freq_array'."),
         ("skycoord", None, "No component location information found in file."),
+        ("Header", None, "This is not a proper skyh5 file."),
     ],
 )
 def test_skyh5_read_errors(mock_point_skies, param, value, errormsg, tmpdir):
@@ -3448,12 +3547,15 @@ def test_skyh5_read_errors(mock_point_skies, param, value, errormsg, tmpdir):
     sky.write_skyh5(testfile)
 
     with h5py.File(testfile, "r+") as fileobj:
-        param_loc = "/Header/" + param
-        if value is None:
-            del fileobj[param_loc]
+        if param == "Header":
+            del fileobj["Header"]
         else:
-            data = fileobj[param_loc]
-            data[...] = value
+            param_loc = "/Header/" + param
+            if value is None:
+                del fileobj[param_loc]
+            else:
+                data = fileobj[param_loc]
+                data[...] = value
 
     with pytest.raises(ValueError, match=errormsg):
         SkyModel.from_file(testfile)
