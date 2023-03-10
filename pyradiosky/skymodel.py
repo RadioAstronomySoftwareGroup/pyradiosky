@@ -303,10 +303,7 @@ def _get_value_hdf5_group(group, name, expected_type):
 
 
 def _get_freq_edges_from_centers(freq_array, tols, raise_error=True):
-    if isinstance(freq_array, Quantity):
-        freq_unit = freq_array.unit
-    else:
-        freq_unit = 1.0
+    freq_unit = freq_array.unit
     tols_use = []
     for tol in tols:
         if isinstance(tol, Quantity):
@@ -314,6 +311,11 @@ def _get_freq_edges_from_centers(freq_array, tols, raise_error=True):
         else:
             tols_use.append(tol)
     tols_use = tuple(tols_use)
+    if freq_array.size == 1:
+        raise ValueError(
+            "Cannot calculate frequency edges from frequency center array because "
+            "there is only one frequency center."
+        )
     if not uvutils._test_array_constant_spacing(freq_array.value, tols=tols_use):
         raise ValueError(
             "Cannot calculate frequency edges from frequency center array because "
@@ -1124,12 +1126,13 @@ class SkyModel(UVBase):
                 )
                 msg += "Calculating it from the freq_array. "
             except ValueError:
-                msg += "Cannot calculate it from the freq_array because freq_array "
-                "spacing is not constant. "
-
-                warnings.warn(
-                    msg + "This will become an error in version 0.5", DeprecationWarning
+                msg += (
+                    "Cannot calculate it from the freq_array because freq_array "
+                    "spacing is not constant. "
                 )
+            warnings.warn(
+                msg + "This will become an error in version 0.5", DeprecationWarning
+            )
 
         # Run the basic check from UVBase
         super(SkyModel, self).check(
@@ -3151,17 +3154,6 @@ class SkyModel(UVBase):
 
         """
         self.check()
-        original_comp_type = self.component_type
-        if isinstance(self.stokes, Quantity):
-            original_units_k = self.stokes.unit.is_equivalent(
-                "K"
-            ) or self.stokes.unit.is_equivalent("K sr")
-
-        if self.component_type == "healpix":
-            self.healpix_to_point(to_jy=True)
-        else:
-            # make sure we're in Jy units
-            self.kelvin_to_jansky()
 
         max_name_len = np.max([len(name) for name in self.name])
         fieldtypes = ["U" + str(max_name_len), "f8", "f8"]
@@ -3250,11 +3242,6 @@ class SkyModel(UVBase):
             arr["rise_lst"] = self._rise_lst
         if hasattr(self, "_set_lst"):
             arr["set_lst"] = self._set_lst
-
-        if original_comp_type == "healpix":
-            self._point_to_healpix()
-        if original_units_k:
-            self.jansky_to_kelvin()
 
         return arr
 
@@ -4798,6 +4785,11 @@ class SkyModel(UVBase):
         """
         if self.component_type != "point":
             raise ValueError("component_type must be 'point' to use this method.")
+
+        if not self.stokes.unit.is_equivalent("Jy"):
+            raise ValueError(
+                "Stokes units must be equivalent to Jy to use this method."
+            )
 
         if self.spectral_type == "subband":
             warnings.warn(
