@@ -2383,8 +2383,8 @@ class SkyModel(UVBase):
 
         axes_altaz.representation_type = "cartesian"
 
-        """ This transformation matrix is generally not orthogonal
-            to better than 10^-7, so let's fix that. """
+        # This transformation matrix is generally not orthogonal to better than 10^-7,
+        # so let's fix that.
 
         R_screwy = axes_altaz.cartesian.xyz
         R_really_orthogonal, _ = ortho_procr(R_screwy, np.eye(3))
