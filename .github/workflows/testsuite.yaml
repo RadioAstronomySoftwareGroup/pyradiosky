@@ -56,7 +56,13 @@ jobs:
           mkdir -p empty
           cd empty
           python -m pytest --pyargs pyradiosky --cov=../pyradiosky --cov-config="../.coveragerc" --cov-report xml:".././coverage.xml" --junitxml="../test-reports/xunit.xml"
+          ls
           cd ..
+
+      - name: check coverage report
+        run: |
+          ls
+          cat coverage.xml
 
       - uses: codecov/codecov-action@v3
         if: success()
@@ -108,6 +114,11 @@ jobs:
         run: |
           python -m pytest --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml --junitxml=test-reports/xunit.xml
 
+      - name: check coverage report
+        run: |
+          ls
+          cat coverage.xml
+
       - uses: codecov/codecov-action@v3
         if: success()
         with:
@@ -157,6 +168,11 @@ jobs:
       - name: Run Tests
         run: |
           python -m pytest --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml --junitxml=test-reports/xunit.xml
+
+      - name: check coverage report
+        run: |
+          ls
+          cat coverage.xml
 
       - uses: codecov/codecov-action@v3
         if: success()
@@ -208,7 +224,13 @@ jobs:
           mkdir -p empty
           cd empty
           python -m pytest -W error --pyargs pyradiosky --cov=../pyradiosky --cov-config="../.coveragerc" --cov-report xml:".././coverage.xml" --junitxml="../test-reports/xunit.xml"
+          ls
           cd ..
+
+      - name: check coverage report
+        run: |
+          ls
+          cat coverage.xml
 
       - uses: codecov/codecov-action@v3
         if: success()
