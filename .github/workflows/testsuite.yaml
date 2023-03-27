@@ -52,17 +52,17 @@ jobs:
 
       - name: Run Tests
         run: |
-          python -m pytest --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml --junitxml=test-reports/xunit.xml
-          # mkdir -p empty
-          # cd empty
-          # pytest --pyargs pyradiosky --cov=pyradiosky --cov-config=../.coveragerc --cov-report xml:../coverage.xml --junitxml=../test-reports/xunit.xml
-          # cd ..
+          mkdir test-reports
+          mkdir -p empty
+          cd empty
+          python -m pytest --pyargs pyradiosky --cov=../pyradiosky --cov-config="../.coveragerc" --cov-report xml:".././coverage.xml" --junitxml="../test-reports/xunit.xml"
+          cd ..
 
-      - uses: codecov/codecov-action@v2.0.2
+      - uses: codecov/codecov-action@v3
         if: success()
         with:
           token: ${{secrets.CODECOV_TOKEN}} #required
-          file: ./coverage.xml #optional
+          files: ./coverage.xml #optional
 
   min_deps:
     env:
@@ -108,22 +108,18 @@ jobs:
         run: |
           python -m pytest --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml --junitxml=test-reports/xunit.xml
 
-      - uses: codecov/codecov-action@v2.0.2
+      - uses: codecov/codecov-action@v3
         if: success()
         with:
           token: ${{secrets.CODECOV_TOKEN}} #required
-          file: ./coverage.xml #optional
+          files: ./coverage.xml #optional
 
   min_versions:
     env:
       ENV_NAME: min_versions
       PYTHON: 3.8
     name: Min Versions Testing
-    runs-on: macos-latest
-      # should go to ubuntu instead when we require at least pyuvdata 2.2.4
-      # there are no linux packages on conda forge between 2.1.15 and 2.2.4 for some
-      # reason
-    # runs-on: ubuntu-latest
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
     defaults:
@@ -162,11 +158,11 @@ jobs:
         run: |
           python -m pytest --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml --junitxml=test-reports/xunit.xml
 
-      - uses: codecov/codecov-action@v2.0.2
+      - uses: codecov/codecov-action@v3
         if: success()
         with:
           token: ${{secrets.CODECOV_TOKEN}} #required
-          file: ./coverage.xml #optional
+          files: ./coverage.xml #optional
 
   warning_test:
     env:
@@ -211,14 +207,14 @@ jobs:
           mkdir test-reports
           mkdir -p empty
           cd empty
-          python -m pytest -W error --pyargs pyradiosky --cov=pyradiosky --cov-config="../.coveragerc" --cov-report xml:".././coverage.xml" --junitxml="../test-reports/xunit.xml"
+          python -m pytest -W error --pyargs pyradiosky --cov=../pyradiosky --cov-config="../.coveragerc" --cov-report xml:".././coverage.xml" --junitxml="../test-reports/xunit.xml"
           cd ..
 
-      - uses: codecov/codecov-action@v2.0.2
+      - uses: codecov/codecov-action@v3
         if: success()
         with:
           token: ${{secrets.CODECOV_TOKEN}} #required
-          file: ./coverage.xml #optional
+          files: ./coverage.xml #optional
 
   docs_test:
       env:
