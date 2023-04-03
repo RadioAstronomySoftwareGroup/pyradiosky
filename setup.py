@@ -47,7 +47,7 @@ setup_args = {
         "dev": [
             "astropy-healpix",
             "astroquery",
-            "lunarsky",
+            "lunarsky>=0.2.1",
             "pytest",
             "pre-commit",
             "sphinx",
