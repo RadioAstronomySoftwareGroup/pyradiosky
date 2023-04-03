@@ -28,7 +28,7 @@ from astropy.units import Quantity
 from scipy.linalg import orthogonal_procrustes as ortho_procr
 
 with warnings.catch_warnings():
-    # This filter can be removed when pyuvdata
+    # This filter can be removed when we require pyuvdata>=2.3
     # is updated to use importlib.metadata rather than pkg_resources
     warnings.filterwarnings(
         "ignore", "Deprecated call to `pkg_resources.declare_namespace"
@@ -1183,12 +1183,10 @@ class SkyModel(UVBase):
     ):
         """Check for equality, check for future equality."""
         # Run the basic __eq__ from UVBase
-        # the filters below should be removed in version 0.3.0
-        # TODO should we remove these filters or not?
+        # the filters below should be removed when we require pyuvdata>=2.3
         with warnings.catch_warnings():
             try:
-                # The `silent` parameter was added in the version *after* pyuvdata
-                # version 2.2.12
+                # The `silent` parameter was added in pyuvdata between 2.2.12 and 2.3
                 equal = super(SkyModel, self).__eq__(
                     other,
                     check_extra=check_extra,
