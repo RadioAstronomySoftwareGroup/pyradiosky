@@ -3769,12 +3769,21 @@ class SkyModel(UVBase):
         gleam_file,
         spectral_type="subband",
         with_error=False,
+        use_paper_freqs=False,
         run_check=True,
         check_extra=True,
         run_check_acceptability=True,
     ):
         """
         Read the GLEAM votable catalog file into this object.
+
+        Note that the GLEAM paper specifies that the 30.72 MHz bandwidth is subdivided
+        into four 7.68 MHz sub-channels. But that clashes with the frequencies and
+        edges listed in the catalog documentation which are spaced by exactly 8MHz.
+        By default, this method uses the catalog frequency values. To use our best guess
+        of the real values (which are not specified in the paper), set
+        `use_paper_freqs=True`. This option only has an effect if
+        spectral_type="subband".
 
         Tested on: GLEAM EGC catalog, version 2
 
@@ -3796,6 +3805,14 @@ class SkyModel(UVBase):
             Between GLEAM sub-bands, the flux scale error is 2-3% of the component flux
             (depending on declination), while flux scale errors between GLEAM and other
             catalogs is 8-80% of the component flux (depending on declination).
+        use_paper_freqs : bool
+            Use our best guess of the frequencies based on the GLEAM paper and what we
+            know about the MWA. This option exists because the GLEAM paper specifies
+            that the 30.72 MHz bandwidth is subdivided into four 7.68 MHz sub-channels.
+            But the frequencies and edges listed in the catalog documentation are spaced
+            by exactly 8MHz rather than 7.68 MHz. Our calculated band centers are
+            different from the catalog values by at most 0.6 MHz, the band edges are
+            different by at most 1.08 MHz. Only used if spectral_type="subband".
         run_check : bool
             Option to check for the existence and proper shapes of parameters
             after downselecting data on this object (the default is True,
@@ -3844,24 +3861,38 @@ class SkyModel(UVBase):
                 "e_Fint158", "e_Fint166", "e_Fint174", "e_Fint181", "e_Fint189",
                 "e_Fint197", "e_Fint204", "e_Fint212", "e_Fint220", "e_Fint227"
             ]
-            freq_array = [76, 84, 92, 99, 107, 115, 122, 130, 143, 151, 158, 166,
-                          174, 181, 189, 197, 204, 212, 220, 227]
-            freq_array = np.array(freq_array) * 1e6 * units.Hz
+            # fmt: on
+            if use_paper_freqs:
+                # use the frequencies we *think* are the true ones, spaced by 7.68 MHz
+                # these are at most 0.6 MHz off of the catalog values. The edges are
+                # more different -- they differ by as much as 1.08 MHz.
+                coarse_channel_starts = np.array([57, 81, 109, 133, 157])
+                coarse_channels = np.repeat(
+                    (np.arange(24))[np.newaxis, :], 5, axis=0
+                ) + np.repeat(coarse_channel_starts[:, np.newaxis], 24, axis=1)
+                temp = np.reshape(coarse_channels, (5, 4, 6)) * 1.28 * 1e6 * units.Hz
+                freq_array = np.reshape(np.mean(temp, axis=2), 20)
+                freq_lower = np.reshape(np.min(temp, axis=2), 20)
+                freq_upper = np.reshape(np.max(temp, axis=2), 20)
+            else:
+                # use the frequencies from the catalog (default)
+                # fmt: off
+                freq_array = np.array(
+                    [76, 84, 92, 99, 107, 115, 122, 130, 143, 151, 158, 166,
+                     174, 181, 189, 197, 204, 212, 220, 227]
+                ) * 1e6 * units.Hz
+                freq_lower = np.asarray(
+                    [72, 80, 88, 95, 103, 111, 118, 126, 139, 147, 154, 162,
+                     170, 177, 185, 193, 200, 208, 216, 223]
+                ) * 1e6 * units.Hz
+                freq_upper = np.asarray(
+                    [80, 88, 95, 103, 111, 118, 126, 134, 147, 154, 162, 170,
+                     177, 185, 193, 200, 208, 216, 223, 231]
+                ) * 1e6 * units.Hz
+                # fmt: on
 
-            # GLEAM paper specifies that the 30.72 MHz bandwidth is subdivided into
-            # four 7.68 MHz sub-channels
-            # But that clashes with the frequencies and edges listed in the catalog
-            # documentation. Going with the catalog docs for now, but deeply uncertain.
-            freq_lower = np.asarray(
-                [72, 80, 88, 95, 103, 111, 118, 126, 139, 147, 154, 162,
-                 170, 177, 185, 193, 200, 208, 216, 223]
-            ) * 1e6 * units.Hz
-            freq_upper = np.asarray(
-                [80, 88, 95, 103, 111, 118, 126, 134, 147, 154, 162, 170,
-                 177, 185, 193, 200, 208, 216, 223, 231]
-            ) * 1e6 * units.Hz
             freq_edge_array = np.concatenate(
-                (freq_lower[np.newaxis, :], freq_upper[np.newaxis, :]), axis=0,
+                (freq_lower[np.newaxis, :], freq_upper[np.newaxis, :]), axis=0
             )
             reference_frequency = None
             spectral_index_column = None
@@ -4321,6 +4352,7 @@ class SkyModel(UVBase):
         # Gleam vot
         spectral_type=None,
         with_error=False,
+        use_paper_freqs=False,
         # fhd
         expand_extended=True,
         # VOTable
@@ -4377,6 +4409,14 @@ class SkyModel(UVBase):
             Between GLEAM sub-bands, the flux scale error is 2-3% of the component flux
             (depending on declination), while flux scale errors between GLEAM and other
             catalogs is 8-80% of the component flux (depending on declination).
+        use_paper_freqs : bool
+            Use our best guess of the frequencies based on the GLEAM paper and what we
+            know about the MWA. This option exists because the GLEAM paper specifies
+            that the 30.72 MHz bandwidth is subdivided into four 7.68 MHz sub-channels.
+            But the frequencies and edges listed in the catalog documentation are spaced
+            by exactly 8MHz rather than 7.68 MHz. Our calculated band centers are
+            different from the catalog values by at most 0.6 MHz, the band edges are
+            different by at most 1.08 MHz. Only used if spectral_type="subband".
 
         FHD
         ---
@@ -4451,7 +4491,10 @@ class SkyModel(UVBase):
             if spectral_type is None:
                 spectral_type = "subband"
             self.read_gleam_catalog(
-                filename, spectral_type=spectral_type, with_error=with_error
+                filename,
+                spectral_type=spectral_type,
+                with_error=with_error,
+                use_paper_freqs=use_paper_freqs,
             )
         elif filetype == "vot":
             self.read_votable_catalog(
@@ -4506,6 +4549,7 @@ class SkyModel(UVBase):
         # Gleam vot
         spectral_type=None,
         with_error=False,
+        use_paper_freqs=False,
         # fhd
         expand_extended=True,
         # VOTable
@@ -4562,6 +4606,14 @@ class SkyModel(UVBase):
             Between GLEAM sub-bands, the flux scale error is 2-3% of the component flux
             (depending on declination), while flux scale errors between GLEAM and other
             catalogs is 8-80% of the component flux (depending on declination).
+        use_paper_freqs : bool
+            Use our best guess of the frequencies based on the GLEAM paper and what we
+            know about the MWA. This option exists because the GLEAM paper specifies
+            that the 30.72 MHz bandwidth is subdivided into four 7.68 MHz sub-channels.
+            But the frequencies and edges listed in the catalog documentation are spaced
+            by exactly 8MHz rather than 7.68 MHz. Our calculated band centers are
+            different from the catalog values by at most 0.6 MHz, the band edges are
+            different by at most 1.08 MHz. Only used if spectral_type="subband".
 
         FHD
         ---
@@ -4620,6 +4672,7 @@ class SkyModel(UVBase):
             # Gleam vot
             spectral_type=spectral_type,
             with_error=with_error,
+            use_paper_freqs=use_paper_freqs,
             # fhd
             expand_extended=expand_extended,
             # vot

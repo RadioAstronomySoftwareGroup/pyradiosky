@@ -2499,6 +2499,20 @@ def test_read_gleam(spec_type):
     if spec_type == "subband":
         assert skyobj.Nfreqs == 20
 
+    if spec_type == "subband":
+        skyobj2 = SkyModel.from_file(
+            GLEAM_vot, spectral_type=spec_type, with_error=True, use_paper_freqs=True
+        )
+
+        assert skyobj2 != skyobj
+        assert skyobj2._freq_array != skyobj._freq_array
+
+        assert np.max(np.abs(skyobj2.freq_array - skyobj.freq_array)) <= 0.6 * units.MHz
+        assert (
+            np.max(np.abs(skyobj2.freq_edge_array - skyobj.freq_edge_array))
+            <= 1.08 * units.MHz
+        )
+
 
 def test_read_errors(tmpdir):
     skyobj = SkyModel()
