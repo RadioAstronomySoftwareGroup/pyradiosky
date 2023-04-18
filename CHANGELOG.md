@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-## [0.3.0] - 2023-03-06
+## [0.3.0] - 2023-04-10
 
 ### Added
 - A `freq_edge_array` parameter to store the top and bottom of the sub-bands with shape
