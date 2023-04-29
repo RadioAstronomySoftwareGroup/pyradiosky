@@ -1,7 +1,6 @@
 name: tests
 channels:
   - conda-forge
-  - defaults
 dependencies:
   - astropy>=5.2
   - astropy-healpix>=0.6
