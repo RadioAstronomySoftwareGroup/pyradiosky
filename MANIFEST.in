@@ -1,0 +1,14 @@
+include *.md
+include LICENSE
+include *.bib
+
+recursive-include src/pyradiosky/data *
+
+recursive-include tests *.py
+
+recursive-include docs *
+exclude docs/.DS_Store
+prune docs/_static
+prune docs/_templates
+prune docs/build
+prune docs/__pycache__
