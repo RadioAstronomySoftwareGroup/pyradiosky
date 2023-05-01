@@ -1,10 +1,10 @@
 # Copyright (c) 2019 Radio Astronomy Software Group
 # Licensed under the 2-clause BSD License
 
-import glob
-import io
+import glob  # pragma: nocover
+import io  # pragma: nocover
 
-from setuptools import find_packages, setup
+from setuptools import find_packages, setup  # pragma: nocover
 
 
 # define the branch scheme. Have to do it here so we don't have to modify the path
@@ -23,10 +23,10 @@ def branch_scheme(version):  # pragma: nocover
             return version.format_choice("+{node}.{branch}", "+{node}.{branch}.dirty")
 
 
-with io.open("README.md", "r", encoding="utf-8") as readme_file:
+with io.open("README.md", "r", encoding="utf-8") as readme_file:  # pragma: nocover
     readme = readme_file.read()
 
-setup_args = {
+setup_args = {  # pragma: nocover
     "name": "pyradiosky",
     "author": "Radio Astronomy Software Group",
     "url": "https://github.com/RadioAstronomySoftwareGroup/pyradiosky",
@@ -78,5 +78,5 @@ setup_args = {
     "keywords": "radio astronomy",
 }
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: nocover
     setup(**setup_args)
