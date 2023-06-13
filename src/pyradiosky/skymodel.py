@@ -4351,7 +4351,13 @@ class SkyModel(UVBase):
 
 
         """
-        catalog = scipy.io.readsav(filename_sav)["catalog"]
+        catalog = scipy.io.readsav(filename_sav)
+        if "catalog" in catalog.keys():
+            catalog = catalog["catalog"]
+        elif "source_array" in catalog.keys():
+            catalog = catalog["source_array"]
+        else:
+            raise KeyError(f"File {filename_sav} does not contain a known catalog name")
         ids = catalog["id"].astype(str)
         ra = catalog["ra"]
         dec = catalog["dec"]
