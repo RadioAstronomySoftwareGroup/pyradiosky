@@ -745,18 +745,18 @@ def test_skymodel_init_errors(zenith_skycoord):
             freq_array=[1e8] * units.Hz,
         )
 
+    sky = SkyModel(
+        name="icrs_zen",
+        skycoord=icrs_coord,
+        stokes=[1.0, 0, 0, 0] * units.Jy,
+        spectral_type="flat",
+        freq_array=[1e8] * units.Hz,
+    )
+    sky.calc_frame_coherency()
+    sky.frame_coherency = sky.frame_coherency.value * units.m
     with pytest.raises(
         ValueError, match=("For point component types, the frame_coherency")
     ):
-        sky = SkyModel(
-            name="icrs_zen",
-            skycoord=icrs_coord,
-            stokes=[1.0, 0, 0, 0] * units.Jy,
-            spectral_type="flat",
-            freq_array=[1e8] * units.Hz,
-        )
-        sky.calc_frame_coherency()
-        sky.frame_coherency = sky.frame_coherency.value * units.m
         sky.check()
 
 
@@ -843,11 +843,11 @@ def test_jansky_to_kelvin_errors(zenith_skymodel):
     ):
         zenith_skymodel.jansky_to_kelvin()
 
+    zenith_skymodel.stokes = zenith_skymodel.stokes.value * units.K * units.sr
     with pytest.raises(
         ValueError,
         match="Either reference_frequency or freq_array must be set to convert to Jy.",
     ):
-        zenith_skymodel.stokes = zenith_skymodel.stokes.value * units.K * units.sr
         zenith_skymodel.kelvin_to_jansky()
 
 
@@ -1803,14 +1803,14 @@ def test_healpix_import_err(zenith_skymodel):
     except ImportError:
         errstr = "The astropy-healpix module must be installed to use HEALPix methods"
 
+        sm = SkyModel(
+            nside=8,
+            hpx_inds=[0],
+            frame="icrs",
+            stokes=Quantity([1.0, 0.0, 0.0, 0.0], unit=units.K),
+            spectral_type="flat",
+        )
         with pytest.raises(ImportError, match=errstr):
-            sm = SkyModel(
-                nside=8,
-                hpx_inds=[0],
-                frame="icrs",
-                stokes=Quantity([1.0, 0.0, 0.0, 0.0], unit=units.K),
-                spectral_type="flat",
-            )
             sm.get_lon_lat()
 
         zenith_skymodel.nside = 32
@@ -1857,21 +1857,21 @@ def test_healpix_positions(tmp_path, time_location):
             frame="icrs",
         )
 
+    skyobj = SkyModel(
+        nside=nside,
+        hpx_inds=range(Npix),
+        stokes=stokes * units.K,
+        freq_array=freqs * units.Hz,
+        spectral_type="full",
+        frame="icrs",
+    )
+    skyobj.calc_frame_coherency()
+    skyobj.frame_coherency = skyobj.frame_coherency.value * units.m
     with pytest.raises(
         ValueError,
         match="For healpix component types, the frame_coherency parameter must have a "
         "unit that can be converted to",
     ):
-        skyobj = SkyModel(
-            nside=nside,
-            hpx_inds=range(Npix),
-            stokes=stokes * units.K,
-            freq_array=freqs * units.Hz,
-            spectral_type="full",
-            frame="icrs",
-        )
-        skyobj.calc_frame_coherency()
-        skyobj.frame_coherency = skyobj.frame_coherency.value * units.m
         skyobj.check()
 
     skyobj = SkyModel(
@@ -2133,16 +2133,16 @@ def test_flux_cut_error(
             "'unit' attribute. You should pass in an astropy Quantity instead."
         )
 
-    with pytest.raises(error_category, match=error_message):
-        minI_cut = 1.0
-        maxI_cut = 2.3
+    minI_cut = 1.0
+    maxI_cut = 2.3
 
-        minI_cut *= units.Jy
-        maxI_cut *= units.Jy
-        if "freq_range" in cut_kwargs:
-            freq_range = cut_kwargs["freq_range"]
-        else:
-            freq_range = None
+    minI_cut *= units.Jy
+    maxI_cut *= units.Jy
+    if "freq_range" in cut_kwargs:
+        freq_range = cut_kwargs["freq_range"]
+    else:
+        freq_range = None
+    with pytest.raises(error_category, match=error_message):
         skyobj.select(
             min_brightness=minI_cut,
             max_brightness=maxI_cut,
