@@ -9,8 +9,8 @@ import pytest
 from astropy.coordinates import Angle
 from astropy.time import Time
 
-import pyradiosky.utils as skyutils
 from pyradiosky import SkyModel
+from pyradiosky import utils as skyutils
 
 
 def test_tee_ra_loop():
