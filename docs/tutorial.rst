@@ -453,10 +453,10 @@ b) creating and writing out point catalog, using calculate_rise_set_lsts and cle
   >>> sm.update_positions(time, array_location)
 
   >>> sm.calculate_rise_set_lsts(array_location.lat)
-  >>> print(sm._rise_lst)
-  [1.16240067]
-  >>> print(sm._set_lst)
-  [5.11057854]
+  >>> print(np.array_str(sm._rise_lst, precision=7))
+  [1.1624007]
+  >>> print(np.array_str(sm._set_lst, precision=7))
+  [5.1105785]
 
   >>> # coherency in local alt/az basis can be different from coherency in ra/dec basis
   >>> print(sm.coherency_calc()[:,:,0,0])
@@ -467,13 +467,12 @@ b) creating and writing out point catalog, using calculate_rise_set_lsts and cle
   2015-03-01 00:00:00.000
   >>> print(sm.telescope_location)
   (5109342.76037543, 2005241.90402741, -3239939.46926403) m
-  >>> print(sm.alt_az)
-  [[1.57079633]
-   [1.72876609]]
-  >>> print(sm.pos_lmn)
-  [[ 2.12981215e-13]
-   [-3.39272742e-14]
-   [ 1.00000000e+00]]
+  >>> # only print the altitude, since it's close to zenith the azimuth is ill defined
+  >>> print(np.array_str(sm.alt_az[0], precision=7))
+  [1.5707963]
+  >>> # only print the n part, since it's close to zenith the l & m are ill defined
+  >>> print(np.array_str(sm.pos_lmn[2], precision=7))
+  [1.]
   >>> print(sm.above_horizon)
   [ True]
   >>> sm.clear_time_position_specific_params()
