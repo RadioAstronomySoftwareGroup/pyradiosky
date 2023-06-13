@@ -2942,16 +2942,20 @@ def test_read_votable_errors():
 
 
 def test_fhd_catalog_reader():
-    catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
+    for fname in ["catalog", "source_array"]:
+        catfile = os.path.join(SKY_DATA_PATH, f"fhd_{fname}.sav")
 
-    with uvtest.check_warnings(
-        UserWarning, match="Source IDs are not unique. Defining unique IDs."
-    ):
-        skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
+        if fname == "catalog":
+            with uvtest.check_warnings(
+                UserWarning, match="Source IDs are not unique. Defining unique IDs."
+            ):
+                skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
+        else:
+            skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
 
-    assert skyobj.filename == ["fhd_catalog.sav"]
-    catalog = scipy.io.readsav(catfile)["catalog"]
-    assert skyobj.Ncomponents == len(catalog)
+        assert skyobj.filename == [f"fhd_{fname}.sav"]
+        catalog = scipy.io.readsav(catfile)[fname]
+        assert skyobj.Ncomponents == len(catalog)
 
     assert np.all(skyobj.reference_frequency > 50 * units.MHz)
 
