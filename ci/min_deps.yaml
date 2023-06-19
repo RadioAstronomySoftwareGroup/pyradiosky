@@ -11,3 +11,4 @@ dependencies:
   - pyuvdata>=2.2.10
   - scipy>=1.3
   - setuptools_scm>=7.0.3
+  - pip
