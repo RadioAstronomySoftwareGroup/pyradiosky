@@ -62,7 +62,7 @@ jobs:
       - uses: codecov/codecov-action@v3
         if: success()
         with:
-          token: ${{secrets.CODECOV_TOKEN}} #required
+          token: ${{ secrets.CODECOV_TOKEN }} #required
           files: ./coverage.xml #optional
 
   min_deps:
