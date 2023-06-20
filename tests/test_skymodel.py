@@ -19,6 +19,14 @@ with warnings.catch_warnings():
         "ignore", "Deprecated call to `pkg_resources.declare_namespace"
     )
     warnings.filterwarnings("ignore", "pkg_resources is deprecated as an API")
+    warnings.filterwarnings(
+        "ignore", 
+        (
+            "`product` is deprecated as of NumPy 1.25.0, and will be removed in NumPy "
+            "2.0. Please use `prod` instead."
+        )
+    )
+
     import pyuvdata.tests as uvtest
     import pyuvdata.utils as uvutils
 import scipy.io
