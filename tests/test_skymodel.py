@@ -19,14 +19,7 @@ with warnings.catch_warnings():
         "ignore", "Deprecated call to `pkg_resources.declare_namespace"
     )
     warnings.filterwarnings("ignore", "pkg_resources is deprecated as an API")
-    warnings.filterwarnings(
-        "ignore", 
-        (
-            "`product` is deprecated as of NumPy 1.25.0, and will be removed in NumPy "
-            "2.0. Please use `prod` instead."
-        )
-    )
-
+    
     import pyuvdata.tests as uvtest
     import pyuvdata.utils as uvutils
 import scipy.io
@@ -3947,6 +3940,7 @@ def test_healpix_transform_full_sky(healpix_disk_new):
 
 def test_old_skyh5_reading_ra_dec():
     testfile = os.path.join(SKY_DATA_PATH, "old_skyh5_point_sources.skyh5")
+
     with uvtest.check_warnings(
         UserWarning,
         match=[
