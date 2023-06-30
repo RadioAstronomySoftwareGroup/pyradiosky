@@ -8,7 +8,7 @@ from setuptools import find_packages, setup
 
 
 # define the branch scheme. Have to do it here so we don't have to modify the path
-def branch_scheme(version):  # pragma: nocover
+def branch_scheme(version):
     """
     Local version scheme that adds the branch name for absolute reproducibility.
 
