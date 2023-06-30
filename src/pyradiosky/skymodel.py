@@ -158,20 +158,27 @@ def _get_frame_comp_cols(colnames):
         default_skycoord = SkyCoord(0, 0, unit="deg", frame=frame_use)
         lon_name, lat_name = _get_lon_lat_component_names(default_skycoord)
         for name in colnames:
-            if lon_name in name.casefold():
+            casefold_name = name.casefold()
+            if casefold_name.startswith(lon_name + "_" + frame_use):
                 lon_col = name
-            if lat_name in name.casefold():
+            if casefold_name.startswith(lat_name + "_" + frame_use):
                 lat_col = name
             if lon_col is not None and lat_col is not None:
                 break
-        if lon_col is not None:
-            frame_str = lon_col.casefold().split(lon_name + "_", 1)[1]
-        elif lat_col is not None:
-            frame_str = lat_col.casefold().split(lat_name + "_", 1)[1]
+        if lon_col is not None and lat_col is not None:
+            lon_frame_str = lon_col.casefold().split(lon_name + "_", 1)[1]
+            lat_frame_str = lat_col.casefold().split(lat_name + "_", 1)[1]
+            assert lon_frame_str == lat_frame_str, (
+                "Longitudinal and Latitudinal columns have different frame indicators. "
+                f"Columns are: [{lon_col}, {lat_col}]."
+            )
+            frame_str = lon_frame_str
+        else:
+            raise ValueError(
+                "Longitudinal and Latidudinal component columns not identified."
+            )
 
-        if frame_str == frame_use:
-            frame_use = default_skycoord.frame
-        elif frame_use in ["fk4", "fk5"]:
+        if frame_use in ["fk4", "fk5"]:
             if frame_use == "fk4":
                 equinox = Time("b" + frame_str.split("_b", 1)[1])
             else:
@@ -179,23 +186,24 @@ def _get_frame_comp_cols(colnames):
             frame_use = SkyCoord(
                 0, 0, unit="deg", frame=frame_use, equinox=equinox
             ).frame
+        else:
+            frame_use = default_skycoord.frame
+
     elif frame_use is not None:
         if frame_use.name == "fk5":
-            for name in colnames:
-                if ra_fk5_pattern.match(name.casefold()):
-                    lon_col = name
-                if dec_fk5_pattern.match(name.casefold()):
-                    lat_col = name
-                if lon_col is not None and lat_col is not None:
-                    break
+            ra_pattern_use = ra_fk5_pattern
+            dec_pattern_use = dec_fk5_pattern
         else:
-            for name in colnames:
-                if ra_fk4_pattern.match(name.casefold()):
-                    lon_col = name
-                if dec_fk4_pattern.match(name.casefold()):
-                    lat_col = name
-                if lon_col is not None and lat_col is not None:
-                    break
+            ra_pattern_use = ra_fk4_pattern
+            dec_pattern_use = dec_fk4_pattern
+        comp_names_found = False
+        for name in colnames:
+            if ra_pattern_use.match(name.casefold()) and not comp_names_found:
+                lon_col = name
+            if dec_pattern_use.match(name.casefold()) and not comp_names_found:
+                lat_col = name
+            if lon_col is not None and lat_col is not None:
+                break
 
     if not isinstance(frame_use, BaseCoordinateFrame):
         raise ValueError("frame not recognized from coordinate column")
@@ -937,6 +945,11 @@ class SkyModel(UVBase):
             else:
                 self.Ncomponents = self.name.size
 
+            if spectral_type not in self._spectral_type.acceptable_vals:
+                raise ValueError(
+                    "spectral_type must be one of "
+                    f"{self._spectral_type.acceptable_vals}"
+                )
             self._set_spectral_type_params(spectral_type)
 
             if freq_array is not None:
@@ -1050,6 +1063,9 @@ class SkyModel(UVBase):
         """Set parameters depending on spectral_type."""
         self.spectral_type = spectral_type
 
+        assert (
+            spectral_type in self._spectral_type.acceptable_vals
+        ), f"spectral_type must be one of: {self._spectral_type.acceptable_vals}"
         if spectral_type == "spectral_index":
             self._spectral_index.required = True
             self._reference_frequency.required = True
@@ -1067,7 +1083,7 @@ class SkyModel(UVBase):
             self._spectral_index.required = False
             self._reference_frequency.required = False
             self._Nfreqs.acceptable_vals = None
-        elif spectral_type == "flat":
+        else:
             self._freq_array.required = False
             self._spectral_index.required = False
             self._reference_frequency.required = False
@@ -1376,6 +1392,7 @@ class SkyModel(UVBase):
             this.check(
                 check_extra=check_extra, run_check_acceptability=run_check_acceptability
             )
+
         if not inplace:
             return this
 
@@ -1635,6 +1652,7 @@ class SkyModel(UVBase):
             self.frame_coherency = (
                 self.frame_coherency / astropy_healpix.nside_to_pixel_area(self.nside)
             )
+
         self.hpx_frame = self.skycoord.frame.replicate_without_data(copy=True)
         self.name = None
         self.skycoord = None
@@ -1928,6 +1946,8 @@ class SkyModel(UVBase):
         freq_interp_kind="cubic",
         nan_handling="clip",
         run_check=True,
+        check_extra=True,
+        run_check_acceptability=True,
         atol=None,
     ):
         """
@@ -1970,7 +1990,11 @@ class SkyModel(UVBase):
             the interpolation of all the polarizations on that source).
         run_check: bool
             Run check on new SkyModel.
-            Default True.
+        check_extra : bool
+            Option to check optional parameters as well as required ones.
+        run_check_acceptability : bool
+            Option to check acceptable range of the values of parameters after
+            combining objects.
         atol: Quantity
             Tolerance for frequency comparison. Defaults to 1 Hz.
 
@@ -2138,6 +2162,8 @@ class SkyModel(UVBase):
                             new_stokes[:, at_freq_inds_use, comp] = finterp(
                                 at_freq_arr[at_freq_inds_use]
                             )
+                        else:
+                            continue
                     if len(wh_all_nan) > 0:
                         warnings.warn(
                             f"{len(wh_all_nan)} components had all NaN stokes values. "
@@ -2206,7 +2232,9 @@ class SkyModel(UVBase):
             sky.coherency_radec = sky.calc_frame_coherency()
 
         if run_check:
-            sky.check()
+            sky.check(
+                check_extra=check_extra, run_check_acceptability=run_check_acceptability
+            )
 
         if not inplace:
             return sky
@@ -2265,10 +2293,9 @@ class SkyModel(UVBase):
             )
         else:
             skycoord_use = LunarSkyCoord(skycoord_use)
-            if isinstance(self.telescope_location, MoonLocation):
-                source_altaz = skycoord_use.transform_to(
-                    LunarTopo(obstime=self.time, location=self.telescope_location)
-                )
+            source_altaz = skycoord_use.transform_to(
+                LunarTopo(obstime=self.time, location=self.telescope_location)
+            )
 
         alt_az = np.array([source_altaz.alt.rad, source_altaz.az.rad])
 
@@ -2590,12 +2617,13 @@ class SkyModel(UVBase):
         this.check(
             check_extra=check_extra, run_check_acceptability=run_check_acceptability
         )
-        if not issubclass(other.__class__, this.__class__):
-            if not issubclass(this.__class__, other.__class__):
-                raise ValueError(
-                    "Only SkyModel (or subclass) objects can be "
-                    "added to a SkyModel (or subclass) object"
-                )
+        if not issubclass(other.__class__, this.__class__) and not issubclass(
+            this.__class__, other.__class__
+        ):
+            raise ValueError(
+                "Only SkyModel (or subclass) objects can be "
+                "added to a SkyModel (or subclass) object"
+            )
         other.check(
             check_extra=check_extra, run_check_acceptability=run_check_acceptability
         )
@@ -2774,15 +2802,13 @@ class SkyModel(UVBase):
             if verbose_history:
                 this.history += " Next object history follows. " + other.history
             else:
-                if "_combine_history_addition" in dir(uvutils):
-                    extra_history = uvutils._combine_history_addition(
-                        this.history, other.history
+                extra_history = uvutils._combine_history_addition(
+                    this.history, other.history
+                )
+                if extra_history is not None:
+                    this.history += (
+                        " Unique part of next object history follows. " + extra_history
                     )
-                    if extra_history is not None:
-                        this.history += (
-                            " Unique part of next object history follows. "
-                            + extra_history
-                        )
 
         # Check final object is self-consistent
         if run_check:
@@ -2855,6 +2881,7 @@ class SkyModel(UVBase):
                     )
             else:
                 freq_inds_use = np.arange(self.Nfreqs)
+
         if min_brightness is not None:
             if not isinstance(
                 min_brightness, Quantity
@@ -2900,6 +2927,7 @@ class SkyModel(UVBase):
             component_inds = component_inds[
                 np.nonzero(np.max(stokes_use.value, axis=0) <= max_brightness.value)[0]
             ]
+
         return component_inds
 
     @units.quantity_input(
@@ -3450,9 +3478,8 @@ class SkyModel(UVBase):
                     )
                     init_params["frame"] = "icrs"
 
-        if "hpx_frame" in init_params.keys():
-            if self.component_type == "healpix":
-                init_params["frame"] = init_params["hpx_frame"]
+        if self.component_type == "healpix" and "hpx_frame" in init_params.keys():
+            init_params["frame"] = init_params["hpx_frame"]
             del init_params["hpx_frame"]
 
         if self.component_type == "healpix" and "frame" not in init_params:
@@ -3920,6 +3947,7 @@ class SkyModel(UVBase):
             self.check(
                 check_extra=check_extra, run_check_acceptability=run_check_acceptability
             )
+
         return
 
     @classmethod
@@ -4486,7 +4514,12 @@ class SkyModel(UVBase):
                 filetype = "fhd"
 
         if filetype == "text":
-            self.read_text_catalog(filename)
+            self.read_text_catalog(
+                filename,
+                run_check=run_check,
+                check_extra=check_extra,
+                run_check_acceptability=run_check_acceptability,
+            )
         elif filetype == "gleam":
             if spectral_type is None:
                 spectral_type = "subband"
@@ -4495,6 +4528,9 @@ class SkyModel(UVBase):
                 spectral_type=spectral_type,
                 with_error=with_error,
                 use_paper_freqs=use_paper_freqs,
+                run_check=run_check,
+                check_extra=check_extra,
+                run_check_acceptability=run_check_acceptability,
             )
         elif filetype == "vot":
             self.read_votable_catalog(
@@ -4908,13 +4944,12 @@ class SkyModel(UVBase):
             comp_names = self._get_lon_lat_component_names()
             lon_name = None
             lat_name = None
-            for field in fieldnames:
-                if comp_names[0] in field:
-                    lon_name = field
-                if comp_names[1] in field:
-                    lat_name = field
-                if lon_name is not None and lat_name is not None:
-                    break
+            lon_name = fieldnames[
+                np.nonzero(np.char.find(fieldnames, comp_names[0]) > -1)[0][0]
+            ]
+            lat_name = fieldnames[
+                np.nonzero(np.char.find(fieldnames, comp_names[1]) > -1)[0][0]
+            ]
             for src in arr:
                 fieldvals = src
                 entry = dict(zip(fieldnames, fieldvals))

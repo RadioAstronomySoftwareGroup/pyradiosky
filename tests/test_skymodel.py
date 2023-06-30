@@ -19,7 +19,7 @@ with warnings.catch_warnings():
         "ignore", "Deprecated call to `pkg_resources.declare_namespace"
     )
     warnings.filterwarnings("ignore", "pkg_resources is deprecated as an API")
-    
+
     import pyuvdata.tests as uvtest
     import pyuvdata.utils as uvutils
 import scipy.io
@@ -362,6 +362,13 @@ def test_init_error(zenith_skycoord):
             skycoord=zenith_skycoord,
             stokes=[1.0, 0, 0, 0] * units.Jy,
             spectral_type="flat",
+        )
+    with pytest.raises(ValueError, match="spectral_type must be one of"):
+        SkyModel(
+            name=["zen"],
+            skycoord=zenith_skycoord,
+            stokes=[1.0, 0, 0, 0] * units.Jy,
+            spectral_type="foo",
         )
     with pytest.raises(
         ValueError,
@@ -746,18 +753,18 @@ def test_skymodel_init_errors(zenith_skycoord):
             freq_array=[1e8] * units.Hz,
         )
 
+    sky = SkyModel(
+        name="icrs_zen",
+        skycoord=icrs_coord,
+        stokes=[1.0, 0, 0, 0] * units.Jy,
+        spectral_type="flat",
+        freq_array=[1e8] * units.Hz,
+    )
+    sky.calc_frame_coherency()
+    sky.frame_coherency = sky.frame_coherency.value * units.m
     with pytest.raises(
         ValueError, match=("For point component types, the frame_coherency")
     ):
-        sky = SkyModel(
-            name="icrs_zen",
-            skycoord=icrs_coord,
-            stokes=[1.0, 0, 0, 0] * units.Jy,
-            spectral_type="flat",
-            freq_array=[1e8] * units.Hz,
-        )
-        sky.calc_frame_coherency()
-        sky.frame_coherency = sky.frame_coherency.value * units.m
         sky.check()
 
 
@@ -844,33 +851,48 @@ def test_jansky_to_kelvin_errors(zenith_skymodel):
     ):
         zenith_skymodel.jansky_to_kelvin()
 
+    zenith_skymodel.stokes = zenith_skymodel.stokes.value * units.K * units.sr
     with pytest.raises(
         ValueError,
         match="Either reference_frequency or freq_array must be set to convert to Jy.",
     ):
-        zenith_skymodel.stokes = zenith_skymodel.stokes.value * units.K * units.sr
         zenith_skymodel.kelvin_to_jansky()
 
 
 @pytest.mark.parametrize("order", ["ring", "nested"])
 @pytest.mark.parametrize("to_jy", [True, False])
 @pytest.mark.parametrize("to_k", [True, False])
-def test_healpix_to_point_loop(healpix_disk_new, order, to_jy, to_k):
+@pytest.mark.parametrize("frame_coherency", [True, False])
+@pytest.mark.parametrize("method", ["assign_to_healpix", "_point_to_healpix"])
+def test_healpix_to_point_loop(
+    healpix_disk_new, method, order, to_jy, to_k, frame_coherency
+):
     skyobj = healpix_disk_new
-    skyobj.calc_frame_coherency()
 
-    frame_coherency = copy.deepcopy(skyobj.frame_coherency)
-    # check strore=False
-    new_frame_coherency = skyobj.calc_frame_coherency(store=False)
-    assert np.array_equal(frame_coherency, new_frame_coherency)
+    if frame_coherency:
+        skyobj.calc_frame_coherency()
 
+        # check store=False
+        frame_coherency = copy.deepcopy(skyobj.frame_coherency)
+        new_frame_coherency = skyobj.calc_frame_coherency(store=False)
+        assert np.array_equal(frame_coherency, new_frame_coherency)
+
+    run_check = True
     if order == "nested":
         skyobj.hpx_order = "nested"
+    else:
+        run_check = False
 
     skyobj2 = skyobj.copy()
-    skyobj2.healpix_to_point(to_jy=to_jy)
 
-    skyobj2.assign_to_healpix(skyobj.nside, order=order, inplace=True, to_k=to_k)
+    skyobj2.healpix_to_point(to_jy=to_jy, run_check=run_check)
+
+    if method == "assign_to_healpix":
+        skyobj2.assign_to_healpix(
+            skyobj.nside, order=order, inplace=True, to_k=to_k, run_check=run_check
+        )
+    else:
+        skyobj2._point_to_healpix(to_k=to_k, run_check=run_check)
 
     if to_jy and not to_k:
         skyobj.kelvin_to_jansky()
@@ -880,9 +902,6 @@ def test_healpix_to_point_loop(healpix_disk_new, order, to_jy, to_k):
 
 def test_healpix_to_point_loop_ordering(healpix_disk_new):
     skyobj = healpix_disk_new
-
-    # add frame_coherency
-    skyobj.calc_frame_coherency()
 
     skyobj2 = skyobj.copy()
     skyobj2.hpx_order = "nested"
@@ -1190,7 +1209,9 @@ def test_calc_vector_rotation(time_location, moon_time_location, telescope_frame
 
 
 @pytest.mark.parametrize("spectral_type", ["flat", "full"])
-def test_pol_rotator(time_location, spectral_type):
+@pytest.mark.parametrize("below_horizon", [True, False])
+@pytest.mark.parametrize("unpolarized", [True, False])
+def test_pol_rotator(time_location, spectral_type, unpolarized, below_horizon):
     """Test coherency rotation is done for all polarized sources no horizon info."""
     time, telescope_location = time_location
 
@@ -1198,10 +1219,13 @@ def test_pol_rotator(time_location, spectral_type):
     ras = Longitude(np.linspace(0, 24, Nsrcs) * units.hr)
     decs = Latitude(np.linspace(-90, 90, Nsrcs) * units.deg)
     names = np.arange(Nsrcs).astype("str")
-    fluxes = np.array([[[5.5, 0.7, 0.3, 0.0]]] * Nsrcs).T * units.Jy
+    if unpolarized:
+        fluxes = np.array([[[1.0, 0.0, 0.0, 0.0]]] * Nsrcs).T * units.Jy
+    else:
+        fluxes = np.array([[[5.5, 0.7, 0.3, 0.0]]] * Nsrcs).T * units.Jy
 
-    # Make the last source non-polarized
-    fluxes[..., -1] = [[1.0], [0], [0], [0]] * units.Jy
+        # Make the last source non-polarized
+        fluxes[..., -1] = [[1.0], [0], [0], [0]] * units.Jy
 
     extra = {}
     # Add frequencies if "full" freq:
@@ -1222,7 +1246,10 @@ def test_pol_rotator(time_location, spectral_type):
         **extra,
     )
 
-    assert source._n_polarized == Nsrcs - 1
+    if unpolarized:
+        assert source._n_polarized == 0
+    else:
+        assert source._n_polarized == Nsrcs - 1
 
     source.update_positions(time, telescope_location)
 
@@ -1233,21 +1260,34 @@ def test_pol_rotator(time_location, spectral_type):
     assert np.allclose(rots1[..., inds], rots2)
 
     # Unset the horizon mask and confirm that all rotation matrices are calculated.
-    source.above_horizon = None
+    if below_horizon:
+        source.above_horizon = np.full(source.Ncomponents, False, dtype=bool)
+        warn_msg = ""
+        warn_type = None
+    else:
+        source.above_horizon = None
+        warn_msg = "Horizon cutoff undefined"
+        warn_type = UserWarning
 
-    with uvtest.check_warnings(UserWarning, match="Horizon cutoff undefined"):
+    with uvtest.check_warnings(warn_type, match=warn_msg):
         local_coherency = source.coherency_calc()
 
-    assert local_coherency.unit == units.Jy
-    # Check that all polarized sources are rotated.
-    assert not np.all(
-        units.quantity.isclose(
-            local_coherency[..., :-1], source.frame_coherency[..., :-1]
-        )
-    )
-    assert units.quantity.allclose(
-        local_coherency[..., -1], source.frame_coherency[..., -1]
-    )
+    if below_horizon:
+        assert local_coherency.size == 0
+    else:
+        assert local_coherency.unit == units.Jy
+        # Check that all polarized sources are rotated.
+        if unpolarized:
+            assert units.quantity.allclose(local_coherency, source.frame_coherency)
+        else:
+            assert not np.all(
+                units.quantity.isclose(
+                    local_coherency[..., :-1], source.frame_coherency[..., :-1]
+                )
+            )
+            assert units.quantity.allclose(
+                local_coherency[..., -1], source.frame_coherency[..., -1]
+            )
 
 
 def analytic_beam_jones(za, az, sigma=0.3):
@@ -1316,8 +1356,8 @@ def test_polarized_source_visibilities(time_location):
         alt, az = source.alt_az
         assert alt == src_astropy_altaz[ti].alt.radian
         assert az == src_astropy_altaz[ti].az.radian
-        alts[ti] = alt
-        azs[ti] = az
+        alts[ti] = alt[0]
+        azs[ti] = az[0]
 
         coherency_tmp = source.coherency_calc().squeeze()
         coherency_matrix_local[:, :, ti] = coherency_tmp
@@ -1426,8 +1466,8 @@ def test_polarized_source_smooth_visibilities(
         alt, az = source.alt_az
         assert alt == src_astropy_altaz[ti].alt.radian
         assert az == src_astropy_altaz[ti].az.radian
-        alts[ti] = alt
-        azs[ti] = az
+        alts[ti] = alt[0]
+        azs[ti] = az[0]
 
         coherency_tmp = source.coherency_calc().squeeze()
         coherency_matrix_local[:, :, ti] = coherency_tmp
@@ -1512,15 +1552,20 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
     assert skyobj_new == skyobj_full
 
     # change the history to test history handling
-    skyobj2.history += " testing the history."
-    skyobj_new = skyobj1.concat(skyobj2, inplace=False)
-    assert skyobj_new.history != skyobj_full.history
     expected_history = (
         skyobj_full.history
         + "  Downselected to specific components using pyradiosky."
         + " Combined skymodels along the component axis using pyradiosky. "
-        + "Unique part of next object history follows.  testing history."
     )
+    if comp_type == "point":
+        skyobj2.history += " testing the history."
+        expected_history += (
+            "Unique part of next object history follows.  testing history."
+        )
+    else:
+        skyobj2.history += " " + skyobj2.pyradiosky_version_str
+    skyobj_new = skyobj1.concat(skyobj2, inplace=False, run_check=False)
+    assert skyobj_new.history != skyobj_full.history
     assert uvutils._check_histories(skyobj_new.history, expected_history)
 
     skyobj_new = skyobj1.concat(skyobj2, inplace=False, verbose_history=True)
@@ -1804,14 +1849,14 @@ def test_healpix_import_err(zenith_skymodel):
     except ImportError:
         errstr = "The astropy-healpix module must be installed to use HEALPix methods"
 
+        sm = SkyModel(
+            nside=8,
+            hpx_inds=[0],
+            frame="icrs",
+            stokes=Quantity([1.0, 0.0, 0.0, 0.0], unit=units.K),
+            spectral_type="flat",
+        )
         with pytest.raises(ImportError, match=errstr):
-            sm = SkyModel(
-                nside=8,
-                hpx_inds=[0],
-                frame="icrs",
-                stokes=Quantity([1.0, 0.0, 0.0, 0.0], unit=units.K),
-                spectral_type="flat",
-            )
             sm.get_lon_lat()
 
         zenith_skymodel.nside = 32
@@ -1858,21 +1903,21 @@ def test_healpix_positions(tmp_path, time_location):
             frame="icrs",
         )
 
+    skyobj = SkyModel(
+        nside=nside,
+        hpx_inds=range(Npix),
+        stokes=stokes * units.K,
+        freq_array=freqs * units.Hz,
+        spectral_type="full",
+        frame="icrs",
+    )
+    skyobj.calc_frame_coherency()
+    skyobj.frame_coherency = skyobj.frame_coherency.value * units.m
     with pytest.raises(
         ValueError,
         match="For healpix component types, the frame_coherency parameter must have a "
         "unit that can be converted to",
     ):
-        skyobj = SkyModel(
-            nside=nside,
-            hpx_inds=range(Npix),
-            stokes=stokes * units.K,
-            freq_array=freqs * units.Hz,
-            spectral_type="full",
-            frame="icrs",
-        )
-        skyobj.calc_frame_coherency()
-        skyobj.frame_coherency = skyobj.frame_coherency.value * units.m
         skyobj.check()
 
     skyobj = SkyModel(
@@ -1953,8 +1998,7 @@ def test_flux_source_cuts():
     assert skyobj2 == skyobj3
 
 
-@pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index", "full"])
-def test_select(spec_type, time_location):
+def test_select(time_location):
     time, array_location = time_location
 
     skyobj = SkyModel.from_file(GLEAM_vot, with_error=True)
@@ -1965,7 +2009,7 @@ def test_select(spec_type, time_location):
 
     skyobj2 = skyobj.select(component_inds=np.arange(10), inplace=False)
 
-    skyobj.select(component_inds=np.arange(10))
+    skyobj.select(component_inds=np.arange(10), run_check=False)
 
     assert skyobj == skyobj2
 
@@ -1982,29 +2026,32 @@ def test_select_none():
 
 @pytest.mark.filterwarnings("ignore:freq_edge_array not set, calculating it from")
 @pytest.mark.parametrize(
-    "spec_type, init_kwargs, cut_kwargs",
+    "spec_type, init_kwargs, cut_kwargs, cut_type",
     [
-        ("flat", {}, {}),
-        ("flat", {"reference_frequency": np.ones(20) * 200e6 * units.Hz}, {}),
-        ("full", {"freq_array": np.array([1e8, 1.5e8]) * units.Hz}, {}),
+        ("flat", {}, {}, "min"),
+        ("flat", {"reference_frequency": np.ones(20) * 200e6 * units.Hz}, {}, "max"),
+        ("full", {"freq_array": np.array([1e8, 1.5e8]) * units.Hz}, {}, "both"),
         (
             "subband",
             {"freq_array": np.array([1e8, 1.5e8]) * units.Hz},
             {"freq_range": np.array([0.9e8, 2e8]) * units.Hz},
+            "both",
         ),
         (
             "subband",
             {"freq_array": np.array([1e8, 1.5e8]) * units.Hz},
             {"freq_range": np.array([1.1e8, 2e8]) * units.Hz},
+            "both",
         ),
         (
             "flat",
             {"freq_array": np.array([1e8]) * units.Hz},
             {"freq_range": np.array([0.9e8, 2e8]) * units.Hz},
+            "both",
         ),
     ],
 )
-def test_flux_cuts(spec_type, init_kwargs, cut_kwargs):
+def test_select_flux(spec_type, init_kwargs, cut_kwargs, cut_type):
     Nsrcs = 20
 
     minflux = 0.5
@@ -2035,10 +2082,15 @@ def test_flux_cuts(spec_type, init_kwargs, cut_kwargs):
         **init_kwargs,
     )
 
-    minI_cut = 1.0
-    maxI_cut = 2.3
-    minI_cut *= units.Jy
-    maxI_cut *= units.Jy
+    if cut_type in ["min", "both"]:
+        minI_cut = 1.0 * units.Jy
+    else:
+        minI_cut = None
+
+    if cut_type in ["max", "both"]:
+        maxI_cut = 2.3 * units.Jy
+    else:
+        maxI_cut = None
     if "freq_range" in cut_kwargs:
         freq_range = cut_kwargs["freq_range"]
     else:
@@ -2049,13 +2101,17 @@ def test_flux_cuts(spec_type, init_kwargs, cut_kwargs):
         brightness_freq_range=freq_range,
     )
 
-    if "freq_range" in cut_kwargs and np.min(
-        cut_kwargs["freq_range"] > np.min(init_kwargs["freq_array"])
+    if (
+        "freq_range" in cut_kwargs
+        and maxI_cut is not None
+        and np.min(cut_kwargs["freq_range"] > np.min(init_kwargs["freq_array"]))
     ):
         assert np.all(skyobj.stokes[0] <= maxI_cut)
     else:
-        assert np.all(skyobj.stokes[0] >= minI_cut)
-        assert np.all(skyobj.stokes[0] <= maxI_cut)
+        if minI_cut is not None:
+            assert np.all(skyobj.stokes[0] >= minI_cut)
+        if maxI_cut is not None:
+            assert np.all(skyobj.stokes[0] <= maxI_cut)
     assert np.all(skyobj.stokes[2] == Ucomp * units.Jy)
 
 
@@ -2096,7 +2152,7 @@ def test_flux_cuts(spec_type, init_kwargs, cut_kwargs):
         ),
     ],
 )
-def test_flux_cut_error(
+def test_select_flux_cut_error(
     spec_type, init_kwargs, cut_kwargs, error_category, error_message
 ):
     Nsrcs = 20
@@ -2134,16 +2190,16 @@ def test_flux_cut_error(
             "'unit' attribute. You should pass in an astropy Quantity instead."
         )
 
-    with pytest.raises(error_category, match=error_message):
-        minI_cut = 1.0
-        maxI_cut = 2.3
+    minI_cut = 1.0
+    maxI_cut = 2.3
 
-        minI_cut *= units.Jy
-        maxI_cut *= units.Jy
-        if "freq_range" in cut_kwargs:
-            freq_range = cut_kwargs["freq_range"]
-        else:
-            freq_range = None
+    minI_cut *= units.Jy
+    maxI_cut *= units.Jy
+    if "freq_range" in cut_kwargs:
+        freq_range = cut_kwargs["freq_range"]
+    else:
+        freq_range = None
+    with pytest.raises(error_category, match=error_message):
         skyobj.select(
             min_brightness=minI_cut,
             max_brightness=maxI_cut,
@@ -2473,23 +2529,68 @@ def test_get_matching_fields(name_to_match, name_list, kwargs, result):
 
 
 @pytest.mark.parametrize(
-    "name_to_match, name_list, error_message",
+    ["name_to_match", "name_list", "kwargs", "error_message"],
     [
         (
             "j2000",
             ["_RAJ2000", "_DEJ2000", "RAJ2000", "DEJ2000", "GLEAM"],
+            {},
             "More than one match for j2000 in",
         ),
         (
             "foo",
             ["_RAJ2000", "_DEJ2000", "RAJ2000", "DEJ2000", "GLEAM"],
+            {},
             "No match for foo in",
+        ),
+        (
+            "j2000",
+            ["_RAJ2000", "_DEJ2000", "RAJ2000", "DEJ2000", "GLEAM"],
+            {"exclude_start_pattern": "_"},
+            "More than one match for j2000 in",
         ),
     ],
 )
-def test_get_matching_fields_errors(name_to_match, name_list, error_message):
+def test_get_matching_fields_errors(name_to_match, name_list, kwargs, error_message):
     with pytest.raises(ValueError, match=error_message):
-        skymodel._get_matching_fields(name_to_match, name_list)
+        skymodel._get_matching_fields(name_to_match, name_list, **kwargs)
+
+
+@pytest.mark.parametrize("frame1", ["galactic", "icrs", "fk5"])
+@pytest.mark.parametrize("frame2", ["galactic", "icrs", "fk5"])
+@pytest.mark.parametrize("frame_col", [True, False])
+def test_get_frame_comp_cols(frame1, frame2, frame_col):
+    if frame1 == frame2 == "fk5" and not frame_col:
+        skycoord1 = SkyCoord(0, 0, unit="deg", frame=frame1, equinox="j2002")
+        skycoord2 = SkyCoord(0, 0, unit="deg", frame=frame2, equinox="j2002")
+    else:
+        skycoord1 = SkyCoord(0, 0, unit="deg", frame=frame1)
+        skycoord2 = SkyCoord(0, 0, unit="deg", frame=frame2)
+
+    # get component names from 1 and frame descriptor from 2
+    comp_names = skymodel._get_lon_lat_component_names(skycoord1.frame)
+    comp_names2 = skymodel._get_lon_lat_component_names(skycoord2.frame)
+    frame_desc_str = skymodel._get_frame_desc_str(skycoord2.frame)
+    component_fieldnames = []
+    if frame_col:
+        for comp_name in comp_names:
+            component_fieldnames.append(comp_name + "_foo")
+        component_fieldnames.append(frame_desc_str)
+    else:
+        for comp_name in comp_names:
+            # This will add e.g. ra_J2000 and dec_J2000 for FK5
+            component_fieldnames.append(comp_name + "_" + frame_desc_str)
+
+    if comp_names[0] not in comp_names2 or frame_col:
+        if frame2 != "fk5":
+            err_msg = "Longitudinal and Latidudinal component columns not identified."
+        else:
+            err_msg = "frame not recognized from coordinate column"
+
+        with pytest.raises(ValueError, match=err_msg):
+            skymodel._get_frame_comp_cols(component_fieldnames)
+    else:
+        skymodel._get_frame_comp_cols(component_fieldnames)
 
 
 @pytest.mark.parametrize("spec_type", ["flat", "subband"])
@@ -2502,7 +2603,11 @@ def test_read_gleam(spec_type):
 
     if spec_type == "subband":
         skyobj2 = SkyModel.from_file(
-            GLEAM_vot, spectral_type=spec_type, with_error=True, use_paper_freqs=True
+            GLEAM_vot,
+            spectral_type=spec_type,
+            with_error=True,
+            use_paper_freqs=True,
+            run_check=False,
         )
 
         assert skyobj2 != skyobj
@@ -2557,6 +2662,7 @@ def test_read_votable():
         "DEJ2000",
         "Si",
         frame="fk5",
+        run_check=False,
     )
     assert skyobj2 == skyobj
 
@@ -2702,13 +2808,19 @@ def test_fhd_catalog_reader():
     assert skyobj.Ncomponents == len(catalog)
 
 
-def test_fhd_catalog_reader_extended_sources():
-    catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog.sav")
+@pytest.mark.parametrize("extended", [True, False])
+def test_fhd_catalog_reader_extended_sources(extended):
+    if extended:
+        filename = "fhd_catalog.sav"
+    else:
+        filename = "fhd_catalog_no_extend.sav"
+    catfile = os.path.join(SKY_DATA_PATH, filename)
+
     skyobj = SkyModel()
     with uvtest.check_warnings(
         UserWarning, match="Source IDs are not unique. Defining unique IDs."
     ):
-        skyobj.read_fhd_catalog(catfile, expand_extended=True)
+        skyobj.read_fhd_catalog(catfile, expand_extended=True, run_check=False)
 
     catalog = scipy.io.readsav(catfile)["catalog"]
     ext_inds = np.where(
@@ -2896,7 +3008,7 @@ def test_text_catalog_loop(
         reference_frequency = skyobj.reference_frequency
         skyobj.reference_frequency = None
         skyobj.write_text_catalog(fname)
-        skyobj2 = SkyModel.from_file(fname)
+        skyobj2 = SkyModel.from_file(fname, run_check=False)
 
         assert skyobj == skyobj2
 
@@ -2958,7 +3070,10 @@ def test_read_text_catalog_error(tmp_path, time_location, old_str, new_str, err_
         frame="altaz",
         location=array_location,
     )
-    frame_coord = source_coord.transform_to("icrs")
+    if "icrs" in old_str:
+        frame_coord = source_coord.transform_to("icrs")
+    else:
+        frame_coord = source_coord.transform_to("fk5")
 
     names = "zen_source"
     stokes = [1.0, 0, 0, 0] * units.Jy
@@ -3093,13 +3208,17 @@ def test_at_frequencies(mock_point_skies, inplace, stype):
     fine_freqs = np.linspace(100e6, 130e6, Nfreqs_fine) * units.Hz
     fine_spectrum = (fine_freqs / fine_freqs[0]) ** (alpha) * units.Jy
 
+    run_check = True
+    if inplace:
+        run_check = False
+
     sky = mock_point_skies(stype)
     oldsky = sky.copy()
     old_freqs = oldsky.freq_array
     if stype == "full":
         with pytest.raises(ValueError, match="Some requested frequencies"):
             sky.at_frequencies(fine_freqs, inplace=inplace)
-        new = sky.at_frequencies(old_freqs, inplace=inplace)
+        new = sky.at_frequencies(old_freqs, inplace=inplace, run_check=run_check)
         if inplace:
             new = sky
             new.freq_edge_array = skymodel._get_freq_edges_from_centers(
@@ -3107,13 +3226,13 @@ def test_at_frequencies(mock_point_skies, inplace, stype):
             )
 
         assert units.quantity.allclose(new.freq_array, old_freqs)
-        new = sky.at_frequencies(old_freqs[5:10], inplace=inplace)
+        new = sky.at_frequencies(old_freqs[5:10], inplace=inplace, run_check=run_check)
         if inplace:
             new = sky
         assert units.quantity.allclose(new.freq_array, old_freqs[5:10])
     else:
         # Evaluate new frequencies, and confirm the new spectrum is correct.
-        new = sky.at_frequencies(fine_freqs, inplace=inplace)
+        new = sky.at_frequencies(fine_freqs, inplace=inplace, run_check=run_check)
         if inplace:
             new = sky
         assert units.quantity.allclose(new.freq_array, fine_freqs)
@@ -3177,6 +3296,7 @@ def test_at_frequencies_nan_handling(nan_handling):
     skyobj2.stokes[0, 1:-2, 4] = np.NaN  # only 2 good freqs
     skyobj2.stokes[0, 0, 5] = np.NaN  # no low or high frequency support
     skyobj2.stokes[0, -1, 5] = np.NaN  # no low or high frequency support
+    skyobj2.stokes[0, 1:, 6] = np.NaN  # only 1 good freqs
 
     message = ["Some stokes values are NaNs."]
     if nan_handling == "propagate":
@@ -3188,7 +3308,7 @@ def test_at_frequencies_nan_handling(nan_handling):
         message.extend(
             [
                 "1 components had all NaN stokes values. ",
-                "2 components had all NaN stokes values above one or more of the "
+                "3 components had all NaN stokes values above one or more of the "
                 "requested frequencies. ",
                 "2 components had all NaN stokes values below one or more of the "
                 "requested frequencies. ",
@@ -3215,8 +3335,8 @@ def test_at_frequencies_nan_handling(nan_handling):
         )
 
     if nan_handling == "propagate":
-        assert np.all(np.isnan(skyobj2_interp.stokes[:, :, 0:6]))
-        assert np.all(~np.isnan(skyobj2_interp.stokes[:, :, 6:]))
+        assert np.all(np.isnan(skyobj2_interp.stokes[:, :, 0:7]))
+        assert np.all(~np.isnan(skyobj2_interp.stokes[:, :, 7:]))
     elif nan_handling == "interp":
         assert np.all(np.isnan(skyobj2_interp.stokes[:, 0, 0]))
         assert np.allclose(
@@ -3317,7 +3437,7 @@ def test_at_frequencies_nan_handling(nan_handling):
             rtol=0,
         )
 
-    assert np.allclose(skyobj2_interp.stokes[:, :, 6:], skyobj_interp.stokes[:, :, 6:])
+    assert np.allclose(skyobj2_interp.stokes[:, :, 7:], skyobj_interp.stokes[:, :, 7:])
 
 
 @pytest.mark.parametrize("nan_handling", ["propagate", "interp", "clip"])
@@ -3391,7 +3511,7 @@ def test_skyh5_file_loop(mock_point_skies, time_location, stype, frame, tmpdir):
 
     sky.write_skyh5(testfile)
 
-    sky2 = SkyModel.from_file(testfile, filetype="skyh5")
+    sky2 = SkyModel.from_file(testfile, filetype="skyh5", run_check=False)
 
     assert sky2.filename == ["testfile.skyh5"]
     assert sky2 == sky
@@ -3871,7 +3991,11 @@ def test_skymodel_transform_healpix(
     if frame == "altaz":
         time, array_location = time_location
         frame = AltAz(obstime=time, location=array_location)
-    sky_obj.healpix_interp_transform(frame)
+    if frame == "icrs":
+        run_check = False
+    else:
+        run_check = True
+    sky_obj.healpix_interp_transform(frame, run_check=run_check)
 
     assert sky_obj2 != sky_obj
 
