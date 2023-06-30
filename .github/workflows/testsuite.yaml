@@ -177,7 +177,7 @@ jobs:
 
   warning_test:
     env:
-      ENV_NAME: tests
+      ENV_NAME: full_deps
       PYTHON: 3.8
     name: Warning Test
     runs-on: ubuntu-latest
@@ -231,7 +231,7 @@ jobs:
 
   docs_test:
       env:
-        ENV_NAME: tests
+        ENV_NAME: full_deps
         PYTHON: 3.9
       name: Tutorial Testing
       runs-on: ubuntu-latest
