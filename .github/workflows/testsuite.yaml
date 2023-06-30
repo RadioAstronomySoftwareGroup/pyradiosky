@@ -52,12 +52,7 @@ jobs:
 
       - name: Run Tests
         run: |
-          mkdir test-reports
-          mkdir -p empty
-          cd empty
-          python -m pytest --pyargs pyradiosky --cov=../pyradiosky --cov-config="../.coveragerc" --cov-report xml:".././coverage.xml" --junitxml="../test-reports/xunit.xml"
-          ls
-          cd ..
+          python -m pytest --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml
 
       - name: check coverage report
         run: |
@@ -67,7 +62,7 @@ jobs:
       - uses: codecov/codecov-action@v3
         if: success()
         with:
-          token: ${{secrets.CODECOV_TOKEN}} #required
+          token: ${{ secrets.CODECOV_TOKEN }} #required
           files: ./coverage.xml #optional
 
   min_deps:
@@ -112,7 +107,7 @@ jobs:
 
       - name: Run Tests
         run: |
-          python -m pytest --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml --junitxml=test-reports/xunit.xml
+          python -m pytest --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml
 
       - name: check coverage report
         run: |
@@ -163,11 +158,11 @@ jobs:
 
       - name: Install
         run: |
-          pip install --no-deps .
+          pip install --no-deps -e .
 
       - name: Run Tests
         run: |
-          python -m pytest --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml --junitxml=test-reports/xunit.xml
+          python -m pytest --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml
 
       - name: check coverage report
         run: |
@@ -220,12 +215,8 @@ jobs:
 
       - name: Run Tests
         run: |
-          mkdir test-reports
-          mkdir -p empty
-          cd empty
-          python -m pytest -W error --pyargs pyradiosky --cov=../pyradiosky --cov-config="../.coveragerc" --cov-report xml:".././coverage.xml" --junitxml="../test-reports/xunit.xml"
-          ls
-          cd ..
+          python -m pytest -W error --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml
+
 
       - name: check coverage report
         run: |
