@@ -4164,8 +4164,6 @@ class SkyModel(UVBase):
             filename=os.path.basename(catalog_csv),
         )
 
-        assert type(self.stokes_error) == type(stokes_error)
-
         if run_check:
             self.check(
                 check_extra=check_extra, run_check_acceptability=run_check_acceptability
