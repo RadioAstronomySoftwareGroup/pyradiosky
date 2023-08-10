@@ -866,7 +866,7 @@ def test_jansky_to_kelvin_errors(zenith_skymodel):
 def test_healpix_to_point_loop(
     healpix_disk_new, method, order, to_jy, to_k, frame_coherency
 ):
-    skyobj = healpix_disk_new
+    skyobj = healpix_disk_new.copy()
 
     if frame_coherency:
         skyobj.calc_frame_coherency()
@@ -879,11 +879,27 @@ def test_healpix_to_point_loop(
     run_check = True
     if order == "nested":
         skyobj.hpx_order = "nested"
+
+        # also add a length Ncomponent parameter.
+        # Don't need a separate parametrize for this
+        skyobj.add_extra_columns(
+            names="foo", values=np.arange(skyobj.Ncomponents, dtype=float)
+        )
+        skyobj.add_extra_columns(
+            names="bar", values=np.arange(skyobj.Ncomponents, dtype=int)
+        )
+        skyobj.add_extra_columns(
+            names=["blah", "bleg"],
+            values=[
+                np.arange(skyobj.Ncomponents, dtype=complex),
+                np.full(skyobj.Ncomponents, "", dtype=str),
+            ],
+        )
+
     else:
         run_check = False
 
     skyobj2 = skyobj.copy()
-
     skyobj2.healpix_to_point(to_jy=to_jy, run_check=run_check)
 
     if method == "assign_to_healpix":
@@ -897,6 +913,13 @@ def test_healpix_to_point_loop(
         skyobj.kelvin_to_jansky()
 
     assert skyobj == skyobj2
+
+    del skyobj, skyobj2, healpix_disk_new
+
+    sky = SkyModel()
+
+    sky = SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "healpix_disk.skyh5"))
+    sky.check()
 
 
 def test_healpix_to_point_loop_ordering(healpix_disk_new):
@@ -1526,7 +1549,14 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
     skyobj_full.extended_model_group = skyobj_full.name
     skyobj_full.beam_amp = np.ones((4, skyobj_full.Nfreqs, skyobj_full.Ncomponents))
     skyobj_full.calc_frame_coherency()
-
+    skyobj_full.add_extra_columns(
+        names=["foo", "bar", "gah"],
+        values=[
+            np.arange(skyobj_full.Ncomponents, dtype=float),
+            np.arange(skyobj_full.Ncomponents, dtype=int),
+            np.array(["gah " + str(ind) for ind in range(skyobj_full.Ncomponents)]),
+        ],
+    )
     skyobj1 = skyobj_full.select(
         component_inds=np.arange(skyobj_full.Ncomponents // 2), inplace=False
     )
@@ -2005,6 +2035,14 @@ def test_select(time_location):
     skyobj.beam_amp = np.ones((4, skyobj.Nfreqs, skyobj.Ncomponents))
     skyobj.extended_model_group = np.full(skyobj.Ncomponents, "", dtype="<U10")
     skyobj.update_positions(time, array_location)
+    skyobj.add_extra_columns(
+        names=["foo", "bar", "gah"],
+        values=[
+            np.arange(skyobj.Ncomponents, dtype=float),
+            np.arange(skyobj.Ncomponents, dtype=int),
+            np.array(["gah " + str(ind) for ind in range(skyobj.Ncomponents)]),
+        ],
+    )
 
     skyobj2 = skyobj.select(component_inds=np.arange(10), inplace=False)
 
@@ -3520,6 +3558,14 @@ def test_skyh5_file_loop(mock_point_skies, time_location, stype, frame, tmpdir):
 def test_skyh5_file_loop_gleam(spec_type, tmpdir):
     sky = SkyModel.from_file(GLEAM_vot, spectral_type=spec_type, with_error=True)
 
+    sky.add_extra_columns(
+        names=["foo", "bar", "gah"],
+        values=[
+            np.arange(sky.Ncomponents, dtype=float),
+            np.arange(sky.Ncomponents, dtype=int),
+            np.array(["gah " + str(ind) for ind in range(sky.Ncomponents)]),
+        ],
+    )
     testfile = str(tmpdir.join("testfile.skyh5"))
 
     sky.write_skyh5(testfile)
