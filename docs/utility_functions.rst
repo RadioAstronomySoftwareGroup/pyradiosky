@@ -1,5 +1,5 @@
 Utility Functions
 =================
 
-.. automodule:: utils
+.. automodule:: pyradiosky.utils
   :members:
