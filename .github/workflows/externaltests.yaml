@@ -14,8 +14,8 @@ jobs:
         # Adding -l {0} helps ensure conda can be found properly.
         shell: bash -l {0}
     env:
-      ENV_NAME: tests
-      PYTHON: 3.8
+      ENV_NAME: pyuvsim_tests
+      PYTHON: "3.10"
 
     steps:
       - uses: actions/checkout@main
