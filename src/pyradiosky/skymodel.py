@@ -282,7 +282,7 @@ def _add_value_hdf5_group(group, name, value, expected_type):
         group[name].attrs["object_type"] = object_type
 
 
-def _get_value_hdf5_group(group, name, expected_type):
+def _get_value_hdf5_group(group, name, str_type=None):
     dset = group[name]
 
     value = dset[()]
@@ -302,7 +302,13 @@ def _get_value_hdf5_group(group, name, expected_type):
     elif object_type == "time":
         value = Time(value)
 
-    if expected_type is str:
+    if str_type is None:
+        if isinstance(value, bytes) or (
+            isinstance(value, np.ndarray) and isinstance(value[0], bytes)
+        ):
+            str_type = True
+
+    if str_type:
         if isinstance(value, np.ndarray):
             value = np.array([n.tobytes().decode("utf8") for n in value[:]])
         else:
@@ -429,6 +435,9 @@ class SkyModel(UVBase):
         Beam amplitude at the source position, shape (4, Nfreqs, Ncomponents).
         4 element vector corresponds to [XX, YY, XY, YX] instrumental
         polarizations.
+    extra_column_dict : dict
+        Dictionary of data to put in the `extra_columns` attribute. The keys are the
+        column names, values should be 1D arrays, each with length Ncomponents.
     history : str
         History to add to object.
     filename : str or list of str
@@ -483,6 +492,7 @@ class SkyModel(UVBase):
         stokes_error=None,
         extended_model_group=None,
         beam_amp=None,
+        extra_column_dict=None,
         history="",
         filename=None,
     ):
@@ -683,6 +693,16 @@ class SkyModel(UVBase):
             form=("Ncomponents",),
             expected_type=str,
             required=False,
+        )
+
+        self._extra_columns = UVParameter(
+            "extra_columns",
+            description=(
+                "A recarray to store other information with a value per component."
+            ),
+            expected_type=np.recarray,
+            required=False,
+            form=("Ncomponents",),
         )
 
         self._history = UVParameter(
@@ -1010,6 +1030,12 @@ class SkyModel(UVBase):
             if beam_amp is not None:
                 self.beam_amp = beam_amp
 
+            if extra_column_dict is not None:
+                self.add_extra_columns(
+                    names=list(extra_column_dict.keys()),
+                    values=list(extra_column_dict.values()),
+                )
+
             # Indices along the component axis, such that the source is polarized at
             # any frequency.
             self._polarized = np.where(
@@ -1042,19 +1068,20 @@ class SkyModel(UVBase):
             else:
                 return self.hpx_frame.name
 
-        if not name.startswith("__"):
-            # Naming for galactic is different from astropy:
-            comp_names = self._get_lon_lat_component_names()
-            if name in comp_names:
-                if self.skycoord is not None:
-                    return getattr(self.skycoord, name)
-                warnings.warn(
-                    "It is more efficient to use the `get_lon_lat` method to get "
-                    "longitudinal and latitudinal coordinates for HEALPix maps."
-                )
-                comp_ind = np.nonzero(np.array(comp_names) == name)[0][0]
-                lon_lat = self.get_lon_lat()
-                return lon_lat[comp_ind]
+        if not name.startswith("_"):
+            if self.skycoord is not None or self.hpx_frame is not None:
+                # Naming for galactic is different from astropy:
+                comp_names = self._get_lon_lat_component_names()
+                if name in comp_names:
+                    if self.skycoord is not None:
+                        return getattr(self.skycoord, name)
+                    warnings.warn(
+                        "It is more efficient to use the `get_lon_lat` method to get "
+                        "longitudinal and latitudinal coordinates for HEALPix maps."
+                    )
+                    comp_ind = np.nonzero(np.array(comp_names) == name)[0][0]
+                    lon_lat = self.get_lon_lat()
+                    return lon_lat[comp_ind]
 
         # Error if attribute not found
         return super().__getattribute__(name)
@@ -1102,6 +1129,59 @@ class SkyModel(UVBase):
     def _time_position_params(self):
         """List of strings giving the time & position specific parameters."""
         return ["time", "telescope_location", "alt_az", "pos_lmn", "above_horizon"]
+
+    def add_extra_columns(self, *, names, values, dtype=None):
+        """
+        Add one or more length Ncomponent attributes to the object.
+
+        Parameters
+        ----------
+        name : str or list of str
+            The name(s) of the column(s).
+        value : np.ndarray or list of np.ndarray
+            The value(s) of the data or metadata, each must be a 1D array of length
+            Ncomponents. Note: Quantities are not supported.
+        dtype : str or list of str
+            The type(s) that the data or metadata should be. If not set, use the
+            dtype(s) of `value`.
+
+        """
+        if isinstance(names, str):
+            names = [names]
+        if isinstance(values, np.ndarray):
+            values = [values]
+        if len(names) != len(values):
+            raise ValueError("Must provide the same number of names and values.")
+        if dtype is not None and not isinstance(dtype, (list, tuple, np.ndarray)):
+            if len(names) == 1:
+                dtype = [dtype]
+            if len(names) != len(values):
+                raise ValueError(
+                    "If dtype is set, it must be the same length as `name`."
+                )
+        for val in values:
+            if val.shape != (self.Ncomponents,):
+                raise ValueError(
+                    "value array(s) must be 1D, Ncomponents length array(s)"
+                )
+        if dtype is None:
+            dtype = []
+            for val in values:
+                dtype.append(val.dtype)
+        dtype_obj = np.dtype(list(zip(names, dtype)))
+        new_recarray = np.rec.fromarrays(values, dtype=dtype_obj)
+        if self.extra_columns is None:
+            self.extra_columns = new_recarray
+        else:
+            combined_recarray = np.lib.recfunctions.merge_arrays(
+                (self.extra_columns, new_recarray), asrecarray=True, flatten=True
+            )
+            self.extra_columns = combined_recarray
+        expected_dtype = []
+        for name in self.extra_columns.dtype.names:
+            expected_dtype.append(self.extra_columns.dtype[name].type)
+
+        self._extra_columns.expected_type = expected_dtype
 
     def clear_time_position_specific_params(self):
         """Set  parameters which are time & position specific to ``None``."""
@@ -2665,6 +2745,33 @@ class SkyModel(UVBase):
                     )
                 raise ValueError(msg)
 
+        if this.extra_columns is not None or other.extra_columns is not None:
+            if this.extra_columns is None or other.extra_columns is None:
+                raise ValueError(
+                    "One object has extra_columns and the other does not. Cannot "
+                    "combine objects."
+                )
+            if set(this.extra_columns.dtype.names) != set(
+                this.extra_columns.dtype.names
+            ):
+                raise ValueError(
+                    "Both objects have extra_columns but the column names do not "
+                    "match. Cannot combine objects."
+                )
+            for name in this.extra_columns.dtype.names:
+                this_dtype = this.extra_columns.dtype[name].type
+                other_dtype = this.extra_columns.dtype[name].type
+                if this_dtype != other_dtype:
+                    raise ValueError(
+                        "Both objects have extra_columns but the dtypes for column "
+                        f"{name} do not match. Cannot combine objects."
+                    )
+            this.extra_columns = np.lib.recfunctions.stack_arrays(
+                (this.extra_columns, other.extra_columns),
+                asrecarray=True,
+                usemask=False,
+            )
+
         # check for non-overlapping names or healpix inds
         if this.component_type == "healpix":
             if np.intersect1d(this.hpx_inds, other.hpx_inds).size > 0:
@@ -3341,11 +3448,11 @@ class SkyModel(UVBase):
                     skycoord_dict = {}
                     for key in header["skycoord"]:
                         if key in ["frame", "representation_type"]:
-                            expected_type = str
+                            str_type = True
                         else:
-                            expected_type = None
+                            str_type = False
                         skycoord_dict[key] = _get_value_hdf5_group(
-                            header["skycoord"], key, expected_type
+                            header["skycoord"], key, str_type
                         )
                     init_params["skycoord"] = SkyCoord(**skycoord_dict)
                 else:
@@ -3370,7 +3477,7 @@ class SkyModel(UVBase):
                 if "hpx_frame" in header:
                     if isinstance(header["hpx_frame"], h5py.Dataset):
                         # hpx_frame was stored as a string
-                        frame_str = _get_value_hdf5_group(header, "hpx_frame", str)
+                        frame_str = _get_value_hdf5_group(header, "hpx_frame", True)
                         dummy_coord = SkyCoord(0, 0, unit="rad", frame=frame_str)
                         init_params[
                             "hpx_frame"
@@ -3380,11 +3487,11 @@ class SkyModel(UVBase):
                         skycoord_dict = {}
                         for key in header["hpx_frame"]:
                             if key in ["frame", "representation_type"]:
-                                expected_type = str
+                                str_type = True
                             else:
-                                expected_type = None
+                                str_type = False
                             skycoord_dict[key] = _get_value_hdf5_group(
-                                header["hpx_frame"], key, expected_type
+                                header["hpx_frame"], key, str_type
                             )
                         dummy_coord = SkyCoord(0, 0, unit="rad", **skycoord_dict)
                         init_params[
@@ -3392,7 +3499,7 @@ class SkyModel(UVBase):
                         ] = dummy_coord.frame.replicate_without_data(copy=True)
                 elif "frame" in header:
                     # frame was stored as a string
-                    frame_str = _get_value_hdf5_group(header, "frame", str)
+                    frame_str = _get_value_hdf5_group(header, "frame", True)
                     dummy_coord = SkyCoord(0, 0, unit="rad", frame=frame_str)
                     init_params["hpx_frame"] = dummy_coord.frame.replicate_without_data(
                         copy=True
@@ -3402,13 +3509,16 @@ class SkyModel(UVBase):
                 if par in ["lat", "lon", "frame", "ra", "dec"]:
                     parname = par
                     if par == "frame":
-                        expected_type = "str"
+                        str_type = True
                     else:
-                        expected_type = Quantity
+                        str_type = False
                 else:
                     param = getattr(self, par)
                     parname = param.name
-                    expected_type = param.expected_type
+                    if param.expected_type is str:
+                        str_type = True
+                    else:
+                        str_type = False
 
                 # skip optional params if not present
                 if par in optional_params:
@@ -3420,7 +3530,7 @@ class SkyModel(UVBase):
                         f"Expected parameter {parname} is missing in file."
                     )
 
-                value = _get_value_hdf5_group(header, parname, expected_type)
+                value = _get_value_hdf5_group(header, parname, str_type)
 
                 if parname == "nside":
                     value = int(value)
@@ -3460,6 +3570,15 @@ class SkyModel(UVBase):
             # remove parameters not needed in __init__
             init_params.pop("Ncomponents")
             init_params.pop("Nfreqs")
+
+            # special handling for the extra_columns
+            if "extra_columns" in header:
+                extra_columns_dict = {}
+                for key in header["extra_columns"]:
+                    extra_columns_dict[key] = _get_value_hdf5_group(
+                        header["extra_columns"], key
+                    )
+                init_params["extra_column_dict"] = extra_columns_dict
 
             # get stokes array
             dgrp = fileobj["/Data"]
@@ -4843,6 +4962,14 @@ class SkyModel(UVBase):
                         continue
                     expected_type = type(value)
                     _add_value_hdf5_group(sc_group, key, value, expected_type)
+
+            # special handling for the extra_columns
+            if self.extra_columns is not None:
+                ec_group = header.create_group("extra_columns")
+                for name in self.extra_columns.dtype.names:
+                    value = self.extra_columns[name]
+                    expected_type = self.extra_columns.dtype[name].type
+                    _add_value_hdf5_group(ec_group, name, value, expected_type)
 
             # write out the stokes array
             dgrp = fileobj.create_group("Data")
