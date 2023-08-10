@@ -216,12 +216,11 @@ a) using extended_model_group attribute
     :width: 600
 
 b) using stokes_error attribute, changing component type
-******************************************************
+********************************************************
 .. code-block:: python
 
   >>> import os
   >>> from pyradiosky import SkyModel
-  >>> from pyradiosky import utils
   >>> import matplotlib.pyplot as plt # doctest: +SKIP
   >>> sm = SkyModel()
 
@@ -752,7 +751,7 @@ SkyModel: Concatenating data
 ------------------------------------------
 
 a) using select and concat methods
-*******
+**********************************
 .. code-block:: python
 
   >>> import os
