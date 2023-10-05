@@ -1,0 +1,132 @@
+\documentclass[11pt, oneside]{article}
+\usepackage{geometry}
+\geometry{letterpaper}
+\usepackage{graphicx}
+\usepackage[titletoc,toc,title]{appendix}
+\usepackage{amssymb}
+\usepackage{physics}
+\usepackage{array}
+\usepackage{makecell}
+
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks = true
+}
+
+\usepackage{cleveref}
+
+\title{Memo: SkyH5 file format}
+\author{Bryna Hazelton, and the pyradiosky team}
+\date{October 5, 2023}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\section{Introduction}
+\label{sec:intro}
+
+This memo introduces a new HDF5\footnote{\url{https://www.hdfgroup.org/}}-based
+file format of a SkyModel object in \verb+pyradiosky+\footnote{\url{https://github.com/RadioAstronomySoftwareGroup/pyradiosky}},
+a python package that provides objects and interfaces for representing diffuse, extended and compact astrophysical radio sources.
+Here, we describe the required and optional elements and the structure of this file format, called \textit{SkyH5}.
+
+We assume that the user has a working knowledge of HDF5 and the associated
+python bindings in the package \verb+h5py+\footnote{\url{https://www.h5py.org/}}, as
+well as SkyModel objects in pyradiosky. For more information about HDF5, please
+visit \url{https://portal.hdfgroup.org/display/HDF5/HDF5}. For more information
+about the parameters present in a SkyModel object, please visit
+\url{https://pyradiosky.readthedocs.io/en/latest/skymodel.html}. An
+example for how to interact with SkyModel objects in pyradiosky is available at
+\url{http://pyradiosky.readthedocs.io/en/latest/tutorial.html}.
+
+Note that throughout the documentation, we assume a row-major convention (i.e.,
+C-ordering) for the dimension specification of multi-dimensional arrays. For
+example, for a two-dimensional array with shape ($N$, $M$), the $M$-dimension is
+varying fastest, and is contiguous in memory. This convention is the same as
+Python and the underlying C-based HDF5 library. Users of languages with the
+opposite column-major convention (i.e., Fortran-ordering, seen also in MATLAB
+and Julia) must transpose these axes.
+
+\section{Overview}
+\label{sec:overview}
+A SkyH5 object contains data representing catalogs and maps of
+astrophysical radio sources, including the associated metadata necessary to interpret them.
+A SkyH5 file contains two primary HDF5 groups: the \verb+Header+ group, which contains the metadata, and
+the \verb+Data+ group, which contains the Stokes parameters representing the
+flux densities or the temperatures of the sources. Datasets in the \verb+Data+ group
+are can be passed through HDF5's compression
+pipeline, to reduce the amount of on-disk space required to store the data.
+However, because HDF5 is aware of any compression applied to a dataset, there is
+little that the user has to explicitly do when reading data. For users
+interested in creating new files, the use of compression is optional in the
+SkyH5 format, because the HDF5 file is self-documenting in this regard.
+
+In the discussion below, we discuss required and optional datasets in the
+various groups. We note in parenthesis the corresponding attribute of a SkyModels
+object. Note that in nearly all cases, the names are coincident, to make things
+as transparent as possible to the user.
+
+\section{Header}
+\label{sec:header}
+The \verb+Header+ group of the file contains the metadata necessary to interpret
+the data. We begin with the required parameters, then continue to optional
+ones. Unless otherwise noted, all datasets are scalars (i.e., not arrays). The
+precision of the data type is also not specified as part of the format, because
+in general the user is free to set it according to the desired use case (and
+HDF5 records the precision and endianness when generating datasets). When using
+the standard \verb+h5py+-based implementation in pyuvdata, this typically
+results in 32-bit integers and double precision floating point numbers. Each
+entry in the list contains \textbf{(1)} the exact name of the dataset in the
+HDF5 file, in boldface, \textbf{(2)} the expected datatype of the dataset, in
+italics, \textbf{(3)} a brief description of the data, and \textbf{(4)} the name
+of the corresponding attribute on a SkyModel object.
+
+Note that string datatypes should be handled with care. See
+the Appendix in the UVH5 memo (\url{https://github.com/RadioAstronomySoftwareGroup/pyuvdata/blob/main/docs/references/uvh5_memo.pdf})
+for appropriately defining them for interoperability between different HDF5 implementations.
+
+\subsection{Required Parameters}
+\label{sec:req_params}
+\begin{itemize}
+
+\item \textbf{component\_type}: \textit{string} The type of components in the SkyModel. The options are: `healpix' and `point'.
+If component_type is `healpix', the components are the pixels in a HEALPix map in units compatible with K or Jy/sr.
+If the component_type is `point', the components are point-like sources, or point like components of extended sources,
+in units compatible with Jy or K sr. Some additional parameters are required depending on the component type.
+
+\item \textbf{Ncomponents}: \textit{int} The number of components in the SkyModel. This can be the number of individual
+compact sources, or it can include components of extended sources, or the number of pixels in a map.
+
+\item \textbf{spectral\_type}: \textit{string} This describes the type of spectral model for the components. The options are:
+`spectral\_index', `subband', `flat', or `full'. If the spectral model uses a spectral index, a the `reference\_frequency' and
+`spectral\_index` parameters are required. The convention for the spectral index is $I=I_0 \frac{f}{f_0}^{\alpha}$, where
+$I_0} is the `stokes` parameter at the `reference\_frequency' parameter $f_0$ and $\alpha$ is the `spectral\_index` parameter.
+Note that the spectral index is assumed to apply in the units of the stokes parameter (i.e. there is no additive factor of 2 applied
+to convert between temperature and flux density units).
+The subband spectral model is used for catalogs with multiple flux measurements at different frequencies (i.e. GLEAM
+\url{https://www.mwatelescope.org/science/galactic-science/gleam/}). For subband  spectral models, the `freq_array`
+and `freq_edge_array` parameters are required to give the nominal (usually the central) frequency and the top and bottom of
+each subband respectively.
+The flat spectral model assumes no spectral flux dependence, which can be useful for testing.
+
+
+
+\item \textbf{Nfreqs}: \textit{int}
+Nfreqs
+Number of frequencies if spectral_type is ‘full’ or ‘subband’, 1 otherwise.
+
+
+history
+String of history.
+
+name
+Component name, not required for HEALPix maps. shape (Ncomponents,)
+
+skycoord
+astropy.coordinates.SkyCoord object that contains the componentpositions, shape (Ncomponents,).
+
+spectral_type
+Type of spectral flux specification, options are: ‘full’,’flat’, ‘subband’, ‘spectral_index’.
+
+stokes
+Component flux per frequency and Stokes parameter. Units compatible with one of: [‘Jy’, ‘K sr’, ‘Jy/sr’, ‘K’]. Shape: (4, Nfreqs, Ncomponents).
