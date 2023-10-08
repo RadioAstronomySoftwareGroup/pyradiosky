@@ -116,7 +116,7 @@ def flat_spectrum_skymodel(
         nside=nside,
         stokes=stokes * units.K,
         history=history_string,
-        frame=frame
+        frame=frame,
     )
 
 
@@ -159,7 +159,10 @@ if __name__ == "__main__":
         "--fname", type=str, help="Output file name", default="noise_sky.hdf5"
     )
     parser.add_argument(
-        "--frame", type=str, help="Astropy Frame for output SkyModel, default ICRS", default="icrs"
+        "--frame",
+        type=str,
+        help="Astropy Frame for output SkyModel, default ICRS",
+        default="icrs",
     )
 
     args = parser.parse_args()
@@ -180,7 +183,9 @@ if __name__ == "__main__":
         f" and variance {var} K^2 at channel {args.ref_chan}."
     )
 
-    sky = flat_spectrum_skymodel(var, nside, freqs=freq_array, ref_chan=args.ref_chan, frame=frame)
+    sky = flat_spectrum_skymodel(
+        var, nside, freqs=freq_array, ref_chan=args.ref_chan, frame=frame
+    )
     sky.check()
     print(sky.history)
     print(f"Saving to {fname}.")
