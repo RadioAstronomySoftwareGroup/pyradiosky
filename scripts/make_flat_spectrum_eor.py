@@ -15,7 +15,7 @@ f21 = 1.420405751e9
 
 
 def flat_spectrum_skymodel(
-    variance, nside, ref_chan=0, ref_zbin=0, redshifts=None, freqs=None
+    variance, nside, ref_chan=0, ref_zbin=0, redshifts=None, freqs=None, frame="icrs"
 ):
     """
     Generate a full-frequency SkyModel of a flat-spectrum (noiselike) EoR signal.
@@ -116,6 +116,7 @@ def flat_spectrum_skymodel(
         nside=nside,
         stokes=stokes * units.K,
         history=history_string,
+        frame=frame
     )
 
 
@@ -157,11 +158,15 @@ if __name__ == "__main__":
     parser.add_argument(
         "--fname", type=str, help="Output file name", default="noise_sky.hdf5"
     )
+    parser.add_argument(
+        "--frame", type=str, help="Astropy Frame for output SkyModel, default ICRS", default="icrs"
+    )
 
     args = parser.parse_args()
 
     var = args.variance
     nside = args.nside
+    frame = args.frame
 
     fname = args.fname
     start_freq = args.start_freq
@@ -175,7 +180,7 @@ if __name__ == "__main__":
         f" and variance {var} K^2 at channel {args.ref_chan}."
     )
 
-    sky = flat_spectrum_skymodel(var, nside, freqs=freq_array, ref_chan=args.ref_chan)
+    sky = flat_spectrum_skymodel(var, nside, freqs=freq_array, ref_chan=args.ref_chan, frame=frame)
     sky.check()
     print(sky.history)
     print(f"Saving to {fname}.")
