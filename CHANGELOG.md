@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Changed
+- Added an `extra_columns` attribute to SkyModel, a recarray to store other catalog
+information with a value per component.
 - Updated the pyuvdata requirement to >= 2.4.1
 
 ## [0.3.0] - 2023-04-10
