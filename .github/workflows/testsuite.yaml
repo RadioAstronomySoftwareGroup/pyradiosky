@@ -271,4 +271,4 @@ jobs:
         - name: Run Tests
           run: |
             cd docs
-            python -m pytest --doctest-glob="*.rst"
+            python -m pytest --doctest-glob="*.rst" -W "error::DeprecationWarning"

@@ -490,6 +490,7 @@ b) creating and writing out point catalog, using calculate_rise_set_lsts and cle
   ...     print(param)
   _above_horizon
   _extended_model_group
+  _extra_columns
   _hpx_inds
   _name
   _reference_frequency
