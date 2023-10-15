@@ -55,7 +55,7 @@ Required:
 * h5py>=3.1
 * numpy>=1.20
 * scipy>=1.3
-* pyuvdata>=2.2.10
+* pyuvdata>=2.4.1
 * setuptools_scm>=7.0.3
 
 Optional:

@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- Updated the pyuvdata requirement to >= 2.4.1
+
 ## [0.3.0] - 2023-04-10
 
 ### Added

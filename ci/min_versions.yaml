@@ -12,7 +12,7 @@ dependencies:
   - coverage
   - pytest-cov
   - setuptools_scm==7.0.3
-  - pyuvdata==2.2.10
+  - pyuvdata==2.4.1
   - pip
   - pip:
       - lunarsky==0.2.1
