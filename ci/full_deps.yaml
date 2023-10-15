@@ -11,7 +11,7 @@ dependencies:
   - pip
   - pytest-cov
   - pyuvdata>=2.4.1
-  - scipy>=1.3
+  - scipy>=1.5
   - setuptools_scm>=7.0.3
   - pip:
       - lunarsky>=0.2.1

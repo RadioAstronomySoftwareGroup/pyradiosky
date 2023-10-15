@@ -44,7 +44,7 @@ setup_args = {
     "include_package_data": True,
     "install_requires": [
         "numpy>=1.20",
-        "scipy>=1.3",
+        "scipy>=1.5",
         "astropy>=5.2",
         "h5py>=3.1",
         "pyuvdata>=2.4.1",
