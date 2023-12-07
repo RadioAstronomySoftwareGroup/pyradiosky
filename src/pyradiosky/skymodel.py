@@ -1152,15 +1152,14 @@ class SkyModel(UVBase):
                     )
             else:
                 dtype = [dtype]
-        for val in values:
+        for index, val in enumerate(values):
             if val.shape != (self.Ncomponents,):
                 raise ValueError(
-                    "value array(s) must be 1D, Ncomponents length array(s)"
+                    "value array(s) must be 1D, Ncomponents length array(s). The value "
+                    f"array in index {index} is not the right shape."
                 )
         if dtype is None:
-            dtype = []
-            for val in values:
-                dtype.append(val.dtype)
+            dtype = [val.dtype for val in values]
         dtype_obj = np.dtype(list(zip(names, dtype)))
         new_recarray = np.rec.fromarrays(values, dtype=dtype_obj)
         if self.extra_columns is None:
@@ -1170,9 +1169,10 @@ class SkyModel(UVBase):
                 (self.extra_columns, new_recarray), asrecarray=True, flatten=True
             )
             self.extra_columns = combined_recarray
-        expected_dtype = []
-        for name in self.extra_columns.dtype.names:
-            expected_dtype.append(self.extra_columns.dtype[name].type)
+        expected_dtype = [
+            self.extra_columns.dtype[name].type
+            for name in self.extra_columns.dtype.names
+        ]
 
         self._extra_columns.expected_type = expected_dtype
 
@@ -2739,9 +2739,15 @@ class SkyModel(UVBase):
             if set(this.extra_columns.dtype.names) != set(
                 other.extra_columns.dtype.names
             ):
+                set_diff = set(this.extra_columns.dtype.names) - set(
+                    other.extra_columns.dtype.names
+                )
                 raise ValueError(
                     "Both objects have extra_columns but the column names do not "
-                    "match. Cannot combine objects."
+                    "match. Cannot combine objects. Left object columns are: "
+                    f"{this.extra_columns.dtype.names}. Right object columns are: "
+                    f"{other.extra_columns.dtype.names}. Unmatched columns are "
+                    f"{set_diff}"
                 )
             for name in this.extra_columns.dtype.names:
                 this_dtype = this.extra_columns.dtype[name].type
