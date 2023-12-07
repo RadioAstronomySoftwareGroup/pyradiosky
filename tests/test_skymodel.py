@@ -946,7 +946,10 @@ def test_extra_columns_errors():
 
     with pytest.raises(
         ValueError,
-        match=re.escape("value array(s) must be 1D, Ncomponents length array(s)"),
+        match=re.escape(
+            "value array(s) must be 1D, Ncomponents length array(s). The "
+            "value array in index 0 is not the right shape."
+        ),
     ):
         skyobj.add_extra_columns(
             names="foo", values=np.arange(skyobj.Ncomponents - 1, dtype=float)
@@ -1945,8 +1948,12 @@ def test_concat_compatibility_errors(healpix_disk_new, time_location):
     )
     with pytest.raises(
         ValueError,
-        match="Both objects have extra_columns but the column names do not match. "
-        "Cannot combine objects.",
+        match=re.escape(
+            "Both objects have extra_columns but the column names do not match. Cannot "
+            "combine objects. Left object columns are: ('foo', 'bar', 'gah'). Right "
+            "object columns are: ('blech', 'bar', 'gah'). Unmatched columns are "
+            "{'foo'}"
+        ),
     ):
         skyobj1.concat(skyobj2)
     skyobj2 = skyobj_gleam_subband.select(
