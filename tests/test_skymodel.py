@@ -886,6 +886,9 @@ def test_healpix_to_point_loop(
             names="foo", values=np.arange(skyobj.Ncomponents, dtype=float)
         )
         skyobj.add_extra_columns(
+            names="foo2", values=np.arange(skyobj.Ncomponents, dtype=float), dtype=float
+        )
+        skyobj.add_extra_columns(
             names="bar", values=np.arange(skyobj.Ncomponents, dtype=int)
         )
         skyobj.add_extra_columns(
@@ -920,6 +923,44 @@ def test_healpix_to_point_loop(
 
     sky = SkyModel.from_skyh5(os.path.join(SKY_DATA_PATH, "healpix_disk.skyh5"))
     sky.check()
+
+
+def test_extra_columns_errors():
+    skyobj = SkyModel.from_file(GLEAM_vot, with_error=True)
+
+    with pytest.raises(
+        ValueError, match="Must provide the same number of names and values."
+    ):
+        skyobj.add_extra_columns(
+            names=["foo", "bar"], values=np.arange(skyobj.Ncomponents, dtype=float)
+        )
+
+    with pytest.raises(
+        ValueError, match="If dtype is set, it must be the same length as `name`."
+    ):
+        skyobj.add_extra_columns(
+            names="foo",
+            values=np.arange(skyobj.Ncomponents, dtype=float),
+            dtype=[float, int],
+        )
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape("value array(s) must be 1D, Ncomponents length array(s)"),
+    ):
+        skyobj.add_extra_columns(
+            names="foo", values=np.arange(skyobj.Ncomponents - 1, dtype=float)
+        )
+
+    with pytest.raises(TypeError, match="data type 'foo' not understood"):
+        skyobj.add_extra_columns(
+            names=["foo", "bar"],
+            values=[
+                np.arange(skyobj.Ncomponents, dtype=float),
+                np.arange(skyobj.Ncomponents, dtype=int),
+            ],
+            dtype="foo",
+        )
 
 
 def test_healpix_to_point_loop_ordering(healpix_disk_new):
@@ -1556,6 +1597,7 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
             np.arange(skyobj_full.Ncomponents, dtype=int),
             np.array(["gah " + str(ind) for ind in range(skyobj_full.Ncomponents)]),
         ],
+        dtype=[float, int, str],
     )
     skyobj1 = skyobj_full.select(
         component_inds=np.arange(skyobj_full.Ncomponents // 2), inplace=False
@@ -1868,6 +1910,65 @@ def test_concat_compatibility_errors(healpix_disk_new, time_location):
     skyobj_hpx_disk.clear_time_position_specific_params()
     skyobj1.history = skyobj_hpx_disk.history
     assert skyobj1 == skyobj_hpx_disk
+
+    skyobj1 = skyobj_gleam_subband.select(
+        component_inds=np.arange(skyobj_gleam_subband.Ncomponents // 2), inplace=False
+    )
+    skyobj2 = skyobj_gleam_subband.select(
+        component_inds=np.arange(
+            skyobj_gleam_subband.Ncomponents // 2, skyobj_gleam_subband.Ncomponents
+        ),
+        inplace=False,
+    )
+    skyobj1.add_extra_columns(
+        names=["foo", "bar", "gah"],
+        values=[
+            np.arange(skyobj1.Ncomponents, dtype=float),
+            np.arange(skyobj1.Ncomponents, dtype=int),
+            np.array(["gah " + str(ind) for ind in range(skyobj1.Ncomponents)]),
+        ],
+    )
+    with pytest.raises(
+        ValueError,
+        match="One object has extra_columns and the other does not. Cannot combine "
+        "objects.",
+    ):
+        skyobj1.concat(skyobj2)
+
+    skyobj2.add_extra_columns(
+        names=["blech", "bar", "gah"],
+        values=[
+            np.arange(skyobj2.Ncomponents, dtype=float),
+            np.arange(skyobj2.Ncomponents, dtype=int),
+            np.array(["gah " + str(ind) for ind in range(skyobj2.Ncomponents)]),
+        ],
+    )
+    with pytest.raises(
+        ValueError,
+        match="Both objects have extra_columns but the column names do not match. "
+        "Cannot combine objects.",
+    ):
+        skyobj1.concat(skyobj2)
+    skyobj2 = skyobj_gleam_subband.select(
+        component_inds=np.arange(
+            skyobj_gleam_subband.Ncomponents // 2, skyobj_gleam_subband.Ncomponents
+        ),
+        inplace=False,
+    )
+    skyobj2.add_extra_columns(
+        names=["foo", "bar", "gah"],
+        values=[
+            np.arange(skyobj2.Ncomponents, dtype=int),
+            np.arange(skyobj2.Ncomponents, dtype=int),
+            np.array(["gah " + str(ind) for ind in range(skyobj2.Ncomponents)]),
+        ],
+    )
+    with pytest.raises(
+        ValueError,
+        match="Both objects have extra_columns but the dtypes for column "
+        "foo do not match. Cannot combine objects.",
+    ):
+        skyobj1.concat(skyobj2)
 
 
 def test_healpix_import_err(zenith_skymodel):
@@ -2325,6 +2426,10 @@ def test_select_field(spec_type, init_kwargs):
 
     assert np.all(skyobj2.ra >= lon_range[0])
     assert np.all(skyobj2.ra <= lon_range[1])
+
+    # check error if ask for galactic coords b/c this skymodel.frame doesn't have them
+    with pytest.raises(AttributeError, match="'SkyModel' object has no attribute 'b'"):
+        skyobj2.b
 
     lat_range = Latitude([-45, 45], units.deg)
     skyobj2 = skyobj.copy()
@@ -3951,6 +4056,16 @@ def test_skymodel_init_with_frame(coord_kwds, err_msg, exp_frame):
             if exp_frame == "icrs":
                 assert lon == sky.ra
                 assert lat == sky.dec
+        if sky.component_type == "healpix":
+            sky.hpx_frame = None
+            with pytest.raises(
+                AttributeError, match="'SkyModel' object has no attribute 'ra'"
+            ):
+                sky.ra
+            with pytest.raises(
+                ValueError, match="Required UVParameter _hpx_frame has not been set."
+            ):
+                sky.check()
 
 
 def test_skymodel_tranform_frame(zenith_skymodel, zenith_skycoord):

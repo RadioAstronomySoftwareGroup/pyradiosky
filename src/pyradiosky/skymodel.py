@@ -1144,13 +1144,14 @@ class SkyModel(UVBase):
             values = [values]
         if len(names) != len(values):
             raise ValueError("Must provide the same number of names and values.")
-        if dtype is not None and not isinstance(dtype, (list, tuple, np.ndarray)):
-            if len(names) == 1:
+        if dtype is not None:
+            if isinstance(dtype, (list, tuple, np.ndarray)):
+                if len(dtype) != len(names):
+                    raise ValueError(
+                        "If dtype is set, it must be the same length as `name`."
+                    )
+            else:
                 dtype = [dtype]
-            if len(names) != len(values):
-                raise ValueError(
-                    "If dtype is set, it must be the same length as `name`."
-                )
         for val in values:
             if val.shape != (self.Ncomponents,):
                 raise ValueError(
@@ -2736,7 +2737,7 @@ class SkyModel(UVBase):
                     "combine objects."
                 )
             if set(this.extra_columns.dtype.names) != set(
-                this.extra_columns.dtype.names
+                other.extra_columns.dtype.names
             ):
                 raise ValueError(
                     "Both objects have extra_columns but the column names do not "
@@ -2744,7 +2745,7 @@ class SkyModel(UVBase):
                 )
             for name in this.extra_columns.dtype.names:
                 this_dtype = this.extra_columns.dtype[name].type
-                other_dtype = this.extra_columns.dtype[name].type
+                other_dtype = other.extra_columns.dtype[name].type
                 if this_dtype != other_dtype:
                     raise ValueError(
                         "Both objects have extra_columns but the dtypes for column "
