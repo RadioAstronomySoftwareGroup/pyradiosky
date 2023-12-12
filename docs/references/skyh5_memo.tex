@@ -138,6 +138,7 @@ Note this is \textbf{required} if the component\_type is `point'. The keys must 
 	\item \textbf{frame}: \textit{string} The name of the coordinate frame (e.g. `icrs', `fk5', `galactic'). Must be a frame supported by \verb+astropy+.
 	\item \textbf{representation\_type}: \textit{string} The representation type, one of `spherical', `cartesian' or `cylindrical'
 	\item Representation component names (e.g. \textbf{ra}, \textbf{dec}, \textbf{alt}, \textbf{az}): \textit{float} Two or three such components must be present, 	which ones are required depend on the frame. These are one-dimensional arrays of size (Ncomponents).
+	\end{itemize}
 And may include any other attributes accepted as input parameters for an \verb+astropy.coordinates.SkyCoord+object (e.g. `obstime', `equinox', `location').
 Each of these datasets may have `unit' and `object\_type' attributes and may be either a scalar or a one-dimensional array of size (Ncomponents) as appropriate.
 (\textit{skycoord})
@@ -155,13 +156,14 @@ Note this is \textbf{required} if the component\_type is `healpix' and should no
 The keys must include:
 	\begin{itemize}
 	\item \textbf{frame}: \textit{string} The name of the coordinate frame (e.g. `icrs', `fk5', `galactic'). Must be a frame supported by \verb+astropy+.
+	\end{itemize}
 And may include any other scalar attributes accepted as input parameters for an \verb+astropy.coordinates.SkyCoord+object (e.g. `obstime', `equinox', `location').
 Each of these datasets may have `unit' and `object\_type' attributes as appropriate.
 (\textit{hpx\_frame})
 
 \item \textbf{hpx\_inds}: \textit{int}
 The HEALPix indices for the included components. Does not need to include all the HEALPix pixels in the map.
-This is a one-dimensional array of shape (Ncomponents,).
+This is a one-dimensional array of size (Ncomponents).
 Note this is \textbf{required} if the component\_type is `healpix' and should not be defined otherwise. (\textit{hpx\_inds})
 
 \item \textbf{freq\_array}: \textit{float}
@@ -169,7 +171,28 @@ Frequency array giving the nominal (or central) frequency in a unit that can be 
 Note this is \textbf{required} if the spectral\_type is `full' or `subband' and should not be defined otherwise. (\textit{freq\_array})
 
 \item \textbf{freq\_edge\_array}: \textit{float}
-Array giving the frequency band edges in a unit that can be converted to Hz, only required if spectral_type is `subband'.
+Array giving the frequency band edges in a unit that can be converted to Hz, only required if spectral\_type is `subband'.
 This is a two dimensional array with shape (2, Nfreqs). The zeroth index in the first dimension holds the lower band edge
 and the first index holds the upper band edge.
 Note this is \textbf{required} if the spectral\_type is `subband' and should not be defined otherwise. (\textit{freq\_edge\_array})
+
+\item \textbf{reference\_frequency}: \textit{float}
+Reference frequency giving the frequency at which the flux in the stokes parameter was measured in a unit that can be converted to Hz.
+This is a one-dimensional array of size (Ncomponents).
+Note this is \textbf{required} if the spectral\_type is `spectral\_index' and should not be defined if the spectral\_type is `full' or `subband'.
+(\textit{reference\_frequency})
+
+\item \textbf{spectral\_index}: \textit{float}
+The spectral index describing the flux evolution with frequency, see details in the `spectral\_type' description above.
+This is a one-dimensional array of size (Ncomponents).
+Note this is \textbf{required} if the spectral\_type is `spectral\_index' and should not be defined otherwise.
+(\textit{spectral\_index})
+
+\item \textbf{extended\_model\_group}: \textit{string}
+Identifier that groups components of an extended source model.
+This is a one-dimensional array of size (Ncomponents), with empty strings for point sources that are not components of an extended source.
+(\textit{extended\_model\_group})
+\end{itemize}
+
+
+\end{document}
