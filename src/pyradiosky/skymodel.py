@@ -505,7 +505,7 @@ class SkyModel(UVBase):
         self._Nfreqs = UVParameter("Nfreqs", description=desc, expected_type=int)
 
         desc = (
-            ":class:`astropy.coordinates.SkyCoord` object that contains the component"
+            ":class:`astropy.coordinates.SkyCoord` object that contains the component "
             "positions, shape (Ncomponents,)."
         )
         self._skycoord = SkyCoordParameter(
