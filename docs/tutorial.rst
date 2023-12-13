@@ -99,6 +99,10 @@ d) text
 
 e) skyh5
 ********
+
+SkyH5 is a new HDF5 based file format based on the SkyModel object. The format is fully
+described in the `SkyH5 memo <https://github.com/RadioAstronomySoftwareGroup/pyradiosky/tree/main/docs/references/sky5_memo.pdf>`__.
+
 .. code-block:: python
 
   >>> import os

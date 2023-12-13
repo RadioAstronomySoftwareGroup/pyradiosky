@@ -638,8 +638,8 @@ class SkyModel(UVBase):
 
         desc = (
             "Electric field coherency per component in the object frame (given by "
-            "`skycoord.frame` if `component_type='point'` or `hpx_frame` if  "
-            "`component_type='healpix'). shape (2, 2, Nfreqs, Ncomponents,) "
+            "`skycoord.frame` if `component_type` is 'point' or `hpx_frame` if  "
+            "`component_type` is 'healpix'). The shape is (2, 2, Nfreqs, Ncomponents,)."
         )
         # The coherency is a 2x2 matrix giving electric field correlation in Jy
         self._frame_coherency = UVParameter(
