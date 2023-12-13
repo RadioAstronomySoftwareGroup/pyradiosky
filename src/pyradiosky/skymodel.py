@@ -636,10 +636,15 @@ class SkyModel(UVBase):
             required=False,
         )
 
+        desc = (
+            "Electric field coherency per component in the object frame (given by "
+            "`skycoord.frame` if `component_type='point'` or `hpx_frame` if  "
+            "`component_type='healpix'). shape (2, 2, Nfreqs, Ncomponents,) "
+        )
         # The coherency is a 2x2 matrix giving electric field correlation in Jy
         self._frame_coherency = UVParameter(
             "frame_coherency",
-            description="Ra/Dec coherency per component. shape (2, 2, Nfreqs, Ncomponents,) ",
+            description=desc,
             required=False,
             form=(2, 2, "Nfreqs", "Ncomponents"),
             expected_type=Quantity,
@@ -3415,8 +3420,6 @@ class SkyModel(UVBase):
                 "_freq_edge_array",
                 "_reference_frequency",
                 "_spectral_index",
-                "_stokes_error",
-                "_beam_amp",
                 "_extended_model_group",
             ]
 
@@ -3426,8 +3429,6 @@ class SkyModel(UVBase):
                 "_freq_edge_array",
                 "_reference_frequency",
                 "_spectral_index",
-                "_stokes_error",
-                "_beam_amp",
                 "_extended_model_group",
             ]
 
@@ -3573,9 +3574,26 @@ class SkyModel(UVBase):
 
             # get stokes array
             dgrp = fileobj["/Data"]
-            init_params["stokes"] = dgrp["stokes"] * units.Unit(
-                dgrp["stokes"].attrs["unit"]
-            )
+            init_params["stokes"] = _get_value_hdf5_group(dgrp, "stokes", False)
+
+            if "stokes_error" in dgrp:
+                init_params["stokes_error"] = _get_value_hdf5_group(
+                    dgrp, "stokes_error", False
+                )
+            elif "stokes_error" in header:
+                # old way
+                init_params["stokes_error"] = _get_value_hdf5_group(
+                    header, "stokes_error", False
+                )
+
+            if "beam_amp" in dgrp:
+                init_params["beam_amp"] = _get_value_hdf5_group(dgrp, "beam_amp", False)
+            elif "beam_amp" in header:
+                # old way
+                init_params["beam_amp"] = _get_value_hdf5_group(
+                    header, "beam_amp", False
+                )
+
             # frame is a new parameter, check if it exists and try to read
             # otherwise default to ICRS (the old assumed frame.)
             if "skycoord" not in init_params and self.component_type != "healpix":
@@ -4908,8 +4926,6 @@ class SkyModel(UVBase):
                 "_freq_edge_array",
                 "_reference_frequency",
                 "_spectral_index",
-                "_stokes_error",
-                "_beam_amp",
                 "_extended_model_group",
             ]
             for par in header_params:
@@ -4973,6 +4989,26 @@ class SkyModel(UVBase):
             )
             # Use `str` to ensure this works for Composite units (e.g. Jy/sr) as well.
             dgrp["stokes"].attrs["unit"] = str(self.stokes.unit)
+
+            if self.stokes_error is not None:
+                dgrp.create_dataset(
+                    "stokes_error",
+                    data=self.stokes_error,
+                    compression=data_compression,
+                    dtype=self.stokes_error.dtype,
+                    chunks=True,
+                )
+                # Use `str` to ensure this works for Composite units (e.g. Jy/sr) as well.
+                dgrp["stokes_error"].attrs["unit"] = str(self.stokes_error.unit)
+
+            if self.beam_amp is not None:
+                dgrp.create_dataset(
+                    "beam_amp",
+                    data=self.beam_amp,
+                    compression=data_compression,
+                    dtype=self.beam_amp.dtype,
+                    chunks=True,
+                )
 
     def write_text_catalog(self, filename):
         """

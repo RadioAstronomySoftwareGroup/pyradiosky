@@ -3687,6 +3687,23 @@ def test_skyh5_file_loop_gleam(spec_type, tmpdir):
     assert sky2 == sky
 
 
+@pytest.mark.filterwarnings("ignore:Source IDs are not unique. Defining unique IDs.")
+@pytest.mark.parametrize(
+    ["file_file"], [["fhd_catalog_with_beam_values.sav"], ["extended_source_test.sav"]]
+)
+def test_skyh5_file_loop_fhd(file_file, tmpdir):
+    sky = SkyModel.from_file(
+        os.path.join(SKY_DATA_PATH, file_file), expand_extended=True
+    )
+
+    testfile = str(tmpdir.join("testfile.skyh5"))
+    sky.write_skyh5(testfile)
+
+    sky2 = SkyModel.from_file(testfile)
+
+    assert sky2 == sky
+
+
 @pytest.mark.parametrize("history", [None, "test"])
 def test_skyh5_file_loop_healpix(healpix_disk_new, history, tmpdir):
     sky = healpix_disk_new
@@ -3761,9 +3778,16 @@ def test_skyh5_units(tmpdir):
     assert sky2 == sky
 
 
-@pytest.mark.parametrize("include_frame", [True, False])
-def test_skyh5_backwards_compatibility(tmpdir, include_frame):
-    sky = SkyModel.from_file(GLEAM_vot, with_error=True)
+@pytest.mark.parametrize(
+    ["include_frame", "cat_source"], [[True, "GLEAM"], [False, "fhd"]]
+)
+def test_skyh5_backwards_compatibility(tmpdir, include_frame, cat_source):
+    if cat_source == "GLEAM":
+        sky = SkyModel.from_file(GLEAM_vot, with_error=True)
+    else:
+        sky = SkyModel.from_file(
+            os.path.join(SKY_DATA_PATH, "fhd_catalog_with_beam_values.sav")
+        )
 
     if not include_frame:
         sky.transform_to("icrs")
@@ -3791,6 +3815,16 @@ def test_skyh5_backwards_compatibility(tmpdir, include_frame):
                 "No frame available in this file, assuming 'icrs'. "
                 "Consider re-writing this file to ensure future compatility."
             )
+        if cat_source == "GLEAM":
+            del h5f["/Data/stokes_error"]
+            header = h5f["/Header"]
+            skymodel._add_value_hdf5_group(
+                header, "stokes_error", sky.stokes_error, Quantity
+            )
+        else:
+            del h5f["/Data/beam_amp"]
+            header = h5f["/Header"]
+            skymodel._add_value_hdf5_group(header, "beam_amp", sky.beam_amp, float)
 
     with uvtest.check_warnings(UserWarning, match=err_msg):
         sky2 = SkyModel.from_file(testfile)
