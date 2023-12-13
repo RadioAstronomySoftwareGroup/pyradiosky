@@ -2,7 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+- A memo describing the SkyH5 format in docs/references.
+
 ### Changed
+- Moved the optional data-sized arrays (stokes_error and beam_amp) from the Header
+datagroup to the Data datagroup in SkyH5 files.
 - Added an `extra_columns` attribute to SkyModel, a recarray to store other catalog
 information with a value per component.
 - Updated the pyuvdata requirement to >= 2.4.1

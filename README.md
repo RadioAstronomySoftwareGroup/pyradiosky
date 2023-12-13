@@ -14,6 +14,13 @@ The primary user class is `SkyModel`, which supports:
   - conversion between RA/Dec and Azimuth/Elevation including calculating full
   polarization coherencies in Az/El.
 
+# File formats
+
+pyradiosky supports reading in catalogs from several formats, including VO Table files,
+text files, [FHD](https://github.com/EoRImaging/FHD) catalog files and SkyH5 files and
+supports writing to SkyH5 and text files. SkyH5 is an HDF5-based file format defined by
+the pyradiosky team, a full description is in the [SkyH5 memo](docs/references/skyh5_memo.pdf).
+
 # Community Guidelines
 Contributions to this package to add new file formats or address any of the
 issues in the [issue log](https://github.com/RadioAstronomySoftwareGroup/pyradiosky/issues)
