@@ -26,17 +26,17 @@
 \label{sec:intro}
 
 This memo introduces a new HDF5\footnote{\url{https://www.hdfgroup.org/}} based
-file format of a SkyModel object in \texttt{pyradiosky}\footnote{\url{https://github.com/RadioAstronomySoftwareGroup/pyradiosky}},
+file format of a \texttt{SkyModel} object in \texttt{pyradiosky}\footnote{\url{https://github.com/RadioAstronomySoftwareGroup/pyradiosky}},
 a python package that provides objects and interfaces for representing diffuse, extended and compact astrophysical radio sources.
 Here, we describe the required and optional elements and the structure of this file format, called \textit{SkyH5}.
 
 We assume that the user has a working knowledge of HDF5 and the associated
 python bindings in the package \texttt{h5py}\footnote{\url{https://www.h5py.org/}}, as
-well as SkyModel objects in \texttt{pyradiosky}. For more information about HDF5, please
+well as \texttt{SkyModel} objects in \texttt{pyradiosky}. For more information about HDF5, please
 visit \url{https://portal.hdfgroup.org/display/HDF5/HDF5}. For more information
-about the parameters present in a SkyModel object, please visit
+about the parameters present in a \texttt{SkyModel} object, please visit
 \url{https://pyradiosky.readthedocs.io/en/latest/skymodel.html}.
-Examples of how to interact with SkyModel objects in \texttt{pyradiosky} are available at
+Examples of how to interact with \texttt{SkyModel} objects in \texttt{pyradiosky} are available at
 \url{http://pyradiosky.readthedocs.io/en/latest/tutorial.html}.
 
 Note that throughout the documentation, we assume a row-major convention (i.e.,
@@ -51,7 +51,7 @@ and Julia) must transpose these axes.
 \label{sec:overview}
 A SkyH5 object contains data representing catalogs and maps of
 astrophysical radio sources, including the associated metadata necessary to interpret them.
-A SkyH5 file contains two primary HDF5 groups: the \texttt{pyradiosky} group, which contains the metadata, and
+A SkyH5 file contains two primary HDF5 groups: the \texttt{Header} group, which contains the metadata, and
 the \texttt{Data} group, which contains the Stokes parameters representing the
 flux densities or temperatures of the sources (as well as some optional arrays the same size as the stokes parameters data).
 Datasets in the \texttt{Data} group
@@ -62,20 +62,20 @@ little that the user has to explicitly do when reading data. For users
 interested in creating new files, the use of compression is optional in the
 SkyH5 format, because the HDF5 file is self-documenting in this regard.
 
-Many of the datasets in SkyH5 files have units associated with them (represented as \texttt{astropy Quantity} objects on the SkyModel object).
+Many of the datasets in SkyH5 files have units associated with them (represented as \texttt{astropy Quantity} objects on the \texttt{SkyModel} object).
 The units are stored as attributes on the datasets with the name ``unit''.
 Datasets that derive from other \texttt{astropy} objects (e.g. \texttt{astropy Time,
 astropy EarthLocation, astropy Latitude, astropy Longitude})
 also have an ``object\_type'' attribute indicating the object type.
 
 In the discussion below, we discuss required and optional datasets in the
-various groups. We note in parenthesis the corresponding attribute of a SkyModels
+various groups. We note in parenthesis the corresponding attribute of a \texttt{SkyModel}
 object. Note that in nearly all cases, the names are coincident, to make things
 as transparent as possible to the user.
 
 \section{Header}
 \label{sec:header}
-The \texttt{pyradiosky} group of the file contains the metadata necessary to interpret
+The \texttt{Header} group of the file contains the metadata necessary to interpret
 the data. We begin with the required parameters, then continue to optional
 ones. Unless otherwise noted, all datasets are scalars (i.e., not arrays). The
 precision of the data type is also not specified as part of the format, because
@@ -86,7 +86,7 @@ results in 32-bit integers and double precision floating point numbers. Each
 entry in the list contains \textbf{(1)} the exact name of the dataset in the
 HDF5 file, in boldface, \textbf{(2)} the expected datatype of the dataset, in
 italics, \textbf{(3)} a brief description of the data, and \textbf{(4)} the name
-of the corresponding attribute on a SkyModel object.
+of the corresponding attribute on a \texttt{SkyModel} object.
 
 Note that string datatypes should be handled with care. See
 the Appendix in the UVH5 memo (\url{https://github.com/RadioAstronomySoftwareGroup/pyuvdata/blob/main/docs/references/uvh5_memo.pdf})
@@ -96,12 +96,12 @@ for appropriately defining them for interoperability between different HDF5 impl
 \label{sec:req_params}
 \begin{itemize}
 
-\item \textbf{component\_type}: \textit{string} The type of components in the SkyModel. The options are: ``healpix'' and ``point''.
+\item \textbf{component\_type}: \textit{string} The type of components in the sky model. The options are: ``healpix'' and ``point''.
 If component\_type is ``healpix'', the components are the pixels in a HEALPix map in units compatible with K or Jy/sr.
 If the component\_type is ``point'', the components are point-like sources, or point like components of extended sources,
 in units compatible with Jy or K sr. Some additional parameters are required depending on the component type. (\textit{component\_type})
 
-\item \textbf{Ncomponents}: \textit{int} The number of components in the SkyModel. This can be the number of individual
+\item \textbf{Ncomponents}: \textit{int} The number of components in the sky model. This can be the number of individual
 compact sources, or it can include components of extended sources, or the number of pixels in a map. (\textit{Ncomponents})
 
 \item \textbf{spectral\_type}: \textit{string} This describes the type of spectral model for the components. The options are:
@@ -197,9 +197,9 @@ This is a one-dimensional array of size (Ncomponents), with empty strings for po
 
 \subsection{Extra Columns}
 \label{sec:extra-columns}
-SkyModel objects support ``extra columns'', which are additional arbitrary per-component arrays of metadata that are useful to carry
-around with the data but which are not formally supported as a reserved keyword in the \texttt{pyradiosky}. In a SkyH5 file,
-extra columns are handled by creating a datagroup called \texttt{extra\_columns} inside the \texttt{pyradiosky} datagroup.
+\texttt{SkyModel} objects support ``extra columns'', which are additional arbitrary per-component arrays of metadata that are useful to carry
+around with the data but which are not formally supported as a reserved keyword in the \texttt{Header}. In a SkyH5 file,
+extra columns are handled by creating a datagroup called \textbf{extra\_columns} inside the \texttt{Data} datagroup.
 When possible, these quantities should be HDF5 datatypes, to support interoperability between UVH5 readers.
 Inside of the extra\_columns datagroup, each extra columns is saved as a key-value pair using a dataset, where the name of the
 extra columns is the name of the dataset and its corresponding array is saved in the dataset. The ``unit'' and ``object\_type'' HDF5 attributes
@@ -208,7 +208,7 @@ due to the lack of support inside of \texttt{pyradiosky} for ensuring the attrib
 
 \section{Data}
 \label{sec:data}
-In addition to the \texttt{pyradiosky} datagroup in the root namespace, there must be one called \texttt{Data}.
+In addition to the \texttt{Data} datagroup in the root namespace, there must be one called \texttt{Data}.
 This datagroup saves the Stokes parameters representing the flux densities or temperatures of the sources and
 some optional arrays that are the same size. They are also all expected to be the same shape: (4, Nfreqs, Ncomponents)
 where the first dimension indexes the polarization direction, ordered (I, Q, U, V).
