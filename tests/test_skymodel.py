@@ -2956,6 +2956,8 @@ def test_fhd_catalog_reader():
     catalog = scipy.io.readsav(catfile)["catalog"]
     assert skyobj.Ncomponents == len(catalog)
 
+    assert np.all(skyobj.reference_frequency > 50 * units.MHz)
+
 
 @pytest.mark.parametrize("extended", [True, False])
 def test_fhd_catalog_reader_extended_sources(extended):
