@@ -148,10 +148,8 @@ a) using extended_model_group attribute
   point
   >>> print(sm.spectral_type)
   spectral_index
-  >>> # correction done since catalog reference frequencies had wrong power
-  >>> sm.reference_frequency = sm.reference_frequency*10**6
   >>> print(np.unique(sm.reference_frequency))
-  [1.82435013e+08 2.15675003e+08] Hz
+  [1.82435e+08 2.15675e+08] Hz
   >>> print(np.unique(sm.spectral_index))
   [-0.8]
   >>> print(np.unique(sm.extended_model_group))
@@ -184,7 +182,7 @@ a) using extended_model_group attribute
 
   >>> # confirming that there is one reference frequency for this extended model group
   >>> print(np.unique(sm.reference_frequency[index_32768]))
-  [2.15675003e+08] Hz
+  [2.15675e+08] Hz
 
   >>> # plots of fluxes are sensible at one frequency since fluxes can change with frequency, plots below provide fluxes
   >>> # when frequency = reference frequency (more on this in at_frequencies section)
@@ -870,15 +868,13 @@ b) spectral index spectral type
   >>> filename = os.path.join(DATA_PATH, "fhd_catalog.sav")
   >>> sm.read_fhd_catalog(filename)
 
-  >>> # correction done since catalog reference frequencies had wrong power
-  >>> sm.reference_frequency = sm.reference_frequency*10**6
-  >>> print(np.unique(sm.reference_frequency))
-  [7.40000000e+07 1.80000000e+08 1.81000000e+08 2.15675003e+08] Hz
+  >>> print(np.unique(sm.reference_frequency.to("MHz")))
+  [ 74.    180.    181.    215.675] MHz
 
   >>> print(sm.stokes.value[0,0,8235])
   0.5017849802970886
   >>> print(sm.reference_frequency[8235])
-  215675003.0517578 Hz
+  215675008.0 Hz
   >>> # last component (at index 8325) was chosen due to nonzero spectral index
   >>> print(sm.spectral_index[8235])
   -0.8

@@ -4337,7 +4337,8 @@ class SkyModel(UVBase):
         ids = catalog["id"].astype(str)
         ra = catalog["ra"]
         dec = catalog["dec"]
-        source_freqs = catalog["freq"]
+        # FHD catalogs frequencies are in MHz
+        source_freqs = catalog["freq"] * 1e6 * units.Hz
         spectral_index = catalog["alpha"]
         Nsrcs = len(catalog)
         extended_model_group = np.full(Nsrcs, "", dtype="<U10")
@@ -4428,7 +4429,9 @@ class SkyModel(UVBase):
                         beam_amp_new[:, use_index : use_index + Ncomps] = beam_amp_ext
                         beam_amp_new[:, use_index + Ncomps :] = beam_amp[:, use_index:]
                         beam_amp = beam_amp_new
-                    source_freqs = np.insert(source_freqs, use_index, src["freq"])
+                    source_freqs = np.insert(
+                        source_freqs, use_index, src["freq"] * 1e6 * units.Hz
+                    )
                     spectral_index = np.insert(spectral_index, use_index, src["alpha"])
 
         ra = Longitude(ra, units.deg)
@@ -4443,7 +4446,7 @@ class SkyModel(UVBase):
             frame="icrs",
             stokes=stokes,
             spectral_type="spectral_index",
-            reference_frequency=Quantity(source_freqs, "hertz"),
+            reference_frequency=source_freqs,
             spectral_index=spectral_index,
             beam_amp=beam_amp,
             extended_model_group=extended_model_group,
