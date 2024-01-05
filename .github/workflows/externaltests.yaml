@@ -15,7 +15,7 @@ jobs:
         shell: bash -l {0}
     env:
       ENV_NAME: pyuvsim_tests
-      PYTHON: "3.10"
+      PYTHON: "3.11"
 
     steps:
       - uses: actions/checkout@main
