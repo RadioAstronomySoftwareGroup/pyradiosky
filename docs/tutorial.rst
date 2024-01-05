@@ -1201,10 +1201,11 @@ d) Other time and position related attributes and methods
    [1.73  0.175]]
 
   >>> # Can directly access direction cosines of the sources
-  >>> print(sm.pos_lmn)
-  [[ 2.13602658e-13  3.01536896e-02]
-   [-3.42597674e-14  1.71010072e-01]
-   [ 1.00000000e+00  9.84807753e-01]]
+  >>> with np.printoptions(precision=1):
+  ...   print(sm.pos_lmn)
+  [[ 2.1e-13  3.0e-02]
+   [-3.4e-14  1.7e-01]
+   [ 1.0e+00  9.8e-01]]
 
   >>> # Use the `clear_time_position_specific_params` method to clear out all
   >>> # attributes related to location and time
