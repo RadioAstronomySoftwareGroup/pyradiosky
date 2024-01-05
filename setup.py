@@ -26,6 +26,15 @@ def branch_scheme(version):
 with io.open("README.md", "r", encoding="utf-8") as readme_file:
     readme = readme_file.read()
 
+healpix_reqs = ["astropy-healpix>=0.6"]
+astroquery_reqs = ["astroquery>=0.4.4"]
+lunarsky_reqs = ["lunarsky>=0.2.1"]
+all_optional_reqs = healpix_reqs + astroquery_reqs + lunarsky_reqs
+
+doc_reqs = ["matplotlib", "pypandoc", "sphinx"]
+test_reqs = all_optional_reqs + ["coverage", "pre-commit", "pytest", "pytest-cov"]
+
+
 setup_args = {
     "name": "pyradiosky",
     "author": "Radio Astronomy Software Group",
@@ -51,22 +60,13 @@ setup_args = {
         "setuptools_scm>=7.0.3",
     ],
     "extras_require": {
-        "healpix": ["astropy-healpix>=0.6"],
-        "astroquery": ["astroquery>=0.4.4"],
-        "lunarsky": ["lunarsky>=0.2.1"],
-        "all": ["astropy-healpix", "astroquery"],
-        "doc": ["sphinx", "pypandoc"],
-        "dev": [
-            "astropy-healpix",
-            "astroquery",
-            "coverage",
-            "lunarsky>=0.2.1",
-            "pytest",
-            "pre-commit",
-            "pytest-cov",
-            "sphinx",
-            "pypandoc",
-        ],
+        "healpix": healpix_reqs,
+        "astroquery": astroquery_reqs,
+        "lunarsky": lunarsky_reqs,
+        "all": all_optional_reqs,
+        "test": test_reqs,
+        "doc": doc_reqs,
+        "dev": test_reqs + doc_reqs,
     },
     "classifiers": [
         "Development Status :: 1 - Planning",

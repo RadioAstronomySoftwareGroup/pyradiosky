@@ -20,8 +20,8 @@ This tutorial should give a basic introduction to all the methods.
 SkyModel: Reading in files and creating SkyModel objects
 --------------------------------------------------------
 
-a) FHD
-******
+a) FHD files
+************
 .. code-block:: python
 
   >>> import os
@@ -40,8 +40,8 @@ a) FHD
   >>> # FHD default: expand_extended=True.
   >>> sm = SkyModel.from_file(filename)
 
-b) GLEAM
-********
+b) GLEAM catalog
+****************
 .. code-block:: python
 
   >>> import os
@@ -58,8 +58,8 @@ b) GLEAM
   >>> # GLEAM defaults: spectral_type="subband", with_error=False.
   >>> sm = SkyModel.from_file(filename)
 
-c) VOTable
-**********
+c) VOTable files
+****************
 .. code-block:: python
 
   >>> import os
@@ -80,8 +80,13 @@ c) VOTable
   >>> sm = SkyModel.from_file(filename, table_name="VIII_1000_single", id_column="source_id",
   ...                         lon_column="RAJ2000", lat_column="DEJ2000", frame="fk5", flux_columns="Si")
 
-d) text
-*******
+d) Text files
+*************
+
+Note that we have a fairly strict definition of the columns and formatting of text
+catalog files. See the documentation on :meth:`pyradiosky.SkyModel.read_text_catalog`
+for details.
+
 .. code-block:: python
 
   >>> import os
@@ -97,8 +102,8 @@ d) text
   >>> # an empty object, optionally specify the file type.
   >>> sm = SkyModel.from_file(filename)
 
-e) skyh5
-********
+e) Skyh5 files
+**************
 
 SkyH5 is a new HDF5 based file format based on the SkyModel object. The format is fully
 described in the `SkyH5 memo <https://github.com/RadioAstronomySoftwareGroup/pyradiosky/tree/main/docs/references/sky5_memo.pdf>`__.
@@ -121,28 +126,39 @@ described in the `SkyH5 memo <https://github.com/RadioAstronomySoftwareGroup/pyr
 SkyModel: Plotting
 ------------------
 
-a) using extended_model_group attribute
-*********************************************
+a) Plotting extended models
+***************************
 .. code-block:: python
 
   >>> import os
   >>> import numpy as np
-  >>> import matplotlib.pyplot as plt # doctest: +SKIP
+  >>> import matplotlib.pyplot as plt
   >>> from pyradiosky import SkyModel
   >>> from pyradiosky.data import DATA_PATH
   >>> sm = SkyModel()
 
+  >>> # This is a small FHD save file that contains extended source models
+  >>> # for Fornax A and Pictor A. The two lobes of Fornax are identified
+  >>> # as separate sources
   >>> filename = os.path.join(DATA_PATH, "fhd_catalog_with_beam_values.sav")
   >>> sm.read_fhd_catalog(filename)
 
-  >>> plt.scatter(sm.ra, sm.dec) # doctest: +SKIP
-  >>> plt.xlabel("RA (deg)") # doctest: +SKIP
-  >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
+  >>> # First, let's just plot the location of all the components
+  >>> _ = plt.scatter(sm.ra, sm.dec)
+  >>> _ = plt.xlabel("RA (deg)")
+  >>> _ = plt.ylabel("Dec (deg)")
   >>> # for RA to be in conventional order, use .value when integer required
-  >>> plt.xlim(max(sm.ra.value), min(sm.ra.value)) # doctest: +SKIP
+  >>> _ = plt.xlim(max(sm.ra.value), min(sm.ra.value))
   >>> # extends axis limits 5% beyond given limits
-  >>> plt.autoscale() # doctest: +SKIP
+  >>> plt.autoscale()
   >>> plt.show() # doctest: +SKIP
+  >>> plt.savefig("Images/fhd_catalog_extended_models_radec.png")
+  >>> plt.clf()
+
+.. image:: Images/fhd_catalog_extended_models_radec.png
+    :width: 600
+
+.. code-block:: python
 
   >>> print(sm.Ncomponents)
   4597
@@ -156,124 +172,132 @@ a) using extended_model_group attribute
   [1.82435e+08 2.15675e+08] Hz
   >>> print(np.unique(sm.spectral_index))
   [-0.8]
+
+  >>> # print the unique extended model group names
+  >>> # Ideally, these should contain source names. Unfortunately in this file
+  >>> # all we have are source id numbers.
   >>> print(np.unique(sm.extended_model_group))
   ['32768' '32769' '32770']
-  >>> # beam amplitude for stokes parameter index = 0 (stokes I or unpolarized), Nfreqs index = 0 (first and only frequency
-  >>> # since Nfreqs = 1 for spectral index type), Ncomponents index = : (all components)
-  >>> print(np.unique(sm.beam_amp[0,0,:]))
-  [0.12874769 0.56623143 0.59106636]
 
-  >>> # Use `calc_frame_coherency` to calculate and optionally save it on the object
-  >>> # default is `store=True` which will save it on the object rather than returning it
-  >>> sm.calc_frame_coherency()
-  >>> # coherency (2 x 2 matrix of electric field correlation) for polarization1 index = 0 (North),
-  >>> # polarization2 index = 0 (North), Nfreqs index = 0 (first and only frequency since Nfreqs = 1 for
-  >>> # spectral index type), Ncomponents index = 0 (first component)
-  >>> print(sm.frame_coherency[0,0,0,0])
-  (8.400908470153809+0j) Jy
-
-  >>> # dividing by 10^6 since frequency typically plotted in units of MHz
-  >>> plt.scatter(sm.reference_frequency/10**6, sm.spectral_index) # doctest: +SKIP
-  >>> plt.xlabel("Reference Frequency (MHz)") # doctest: +SKIP
-  >>> plt.ylabel("Spectral Index") # doctest: +SKIP
+  >>> # Next plot the reference frequency and spectral index of the components.
+  >>> # There are two reference frequencies, one for Pic A and one for Fornax.
+  >>> # They have the same spectral index in this file, which is not right. This is
+  >>> # presumably caused by them being set to the FHD default because they weren't set properly.
+  >>> _ = plt.scatter(sm.reference_frequency.to("MHz"), sm.spectral_index)
+  >>> _ = plt.xlabel("Reference Frequency (MHz)")
+  >>> _ = plt.ylabel("Spectral Index")
   >>> plt.show() # doctest: +SKIP
+  >>> plt.savefig("Images/fhd_catalog_extended_models_refspec.png")
+  >>> plt.clf()
 
-  >>> index_32768 = []
-  >>> for j in range(len(sm.extended_model_group)):
-  ...     if sm.extended_model_group[j] == "32768":
-  ...         # indices for extended model group 32768
-  ...         index_32768.append(j)
+.. image:: Images/fhd_catalog_extended_models_refspec.png
+    :width: 600
 
+.. code-block:: python
+
+  >>> # Find the index array for the first source (Pic A)
+  >>> index_32768 = np.nonzero(sm.extended_model_group == "32768")[0]
   >>> # confirming that there is one reference frequency for this extended model group
   >>> print(np.unique(sm.reference_frequency[index_32768]))
   [2.15675e+08] Hz
 
-  >>> # plots of fluxes are sensible at one frequency since fluxes can change with frequency, plots below provide fluxes
-  >>> # when frequency = reference frequency (more on this in at_frequencies section)
-
+  >>> # plots of fluxes are only sensible if they are all from the same frequency.
+  >>> # The plots below show fluxes for Pic A at the (common) reference frequency
   >>> # log taken since these fluxes have different orders of magnitude
-  >>> plt.hist(np.log(sm.stokes.value[0,0,index_32768]), bins=20) # doctest: +SKIP
-  >>> plt.xlabel("log(Flux (Jy))") # doctest: +SKIP
-  >>> plt.ylabel("Counts") # doctest: +SKIP
+  >>> _ = plt.hist(np.log(sm.stokes.value[0,0,index_32768]), bins=20)
+  >>> _ = plt.xlabel("log(Flux (Jy))")
+  >>> _ = plt.ylabel("Counts")
   >>> plt.show() # doctest: +SKIP
+  >>> plt.savefig("Images/fhd_catalog_extended_models_fluxcounts.png")
+  >>> plt.clf()
 
-  >>> plt.scatter(x=sm.ra[index_32768],y=sm.dec[index_32768],c=sm.stokes[0,0,index_32768],cmap="plasma") # doctest: +SKIP
-  >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.75) # doctest: +SKIP
-  >>> plt.xlim(max(sm.ra.value[index_32768]), min(sm.ra.value[index_32768])) # doctest: +SKIP
-  >>> plt.autoscale() # doctest: +SKIP
-  >>> plt.xlabel("RA (deg)") # doctest: +SKIP
-  >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
+.. image:: Images/fhd_catalog_extended_models_fluxcounts.png
+    :width: 600
+
+.. code-block:: python
+
+  >>> # Now plot all the components for the Pic A extended source model, with components colored by their flux
+  >>> _ = plt.scatter(x=sm.ra[index_32768],y=sm.dec[index_32768],c=sm.stokes[0,0,index_32768].value,cmap="plasma")
+  >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.75)
+  >>> _ = plt.xlim(max(sm.ra.value[index_32768]), min(sm.ra.value[index_32768]))
+  >>> plt.autoscale()
+  >>> _ = plt.xlabel("RA (deg)")
+  >>> _ = plt.ylabel("Dec (deg)")
   >>> plt.show() # doctest: +SKIP
+  >>> plt.savefig("Images/fhd_catalog_extended_models_radec_picA.png")
+  >>> plt.clf()
 
-.. image:: Images/fhd_catalog_with_beam_values_radec.png
+.. image:: Images/fhd_catalog_extended_models_radec_picA.png
     :width: 600
 
-.. image:: Images/fhd_catalog_with_beam_values_refspec.png
-    :width: 600
-
-.. image:: Images/fhd_catalog_with_beam_values_fluxcounts.png
-    :width: 600
-
-.. image:: Images/fhd_catalog_with_beam_values_radec_32768.png
-    :width: 600
-
-b) using stokes_error attribute, changing component type
-********************************************************
+b) Plotting fluxes with error bars
+**********************************
 .. code-block:: python
 
   >>> import os
   >>> from pyradiosky import SkyModel
-  >>> import matplotlib.pyplot as plt # doctest: +SKIP
+  >>> from pyradiosky.data import DATA_PATH
+  >>> import matplotlib.pyplot as plt
   >>> sm = SkyModel()
 
+  >>> # This files contains the first 50 sources from the GLEAM catalog.
   >>> filename = os.path.join(DATA_PATH, "gleam_50srcs.vot")
+  >>> # Set the `with_error` parameter to True to read in the flux errors to the
+  >>> # `stokes_error` attribute
   >>> sm.read_gleam_catalog(filename, with_error = True)
 
-  >>> # these are centers of frequency bands
-  >>> x = sm.freq_array.value/(10**6)
+  >>> # Plot the fluxes as a function of frequencies with error bars
   >>> # flux for stokes parameter = 0 (stokes I or unpolarized), Nfreqs index = : (all frequencies),
   >>> # Ncomponents index = 0 (first component)
-  >>> y_error = sm.stokes_error[0,:,0].value
-  >>> plt.errorbar(x, y, yerr = y_error, fmt="o", ecolor = "red", color="yellow") # doctest: +SKIP
-  >>> plt.xlabel("Frequency (MHz)") # doctest: +SKIP
-  >>> plt.ylabel("Flux (Jy)") # doctest: +SKIP
+  >>> _ = plt.errorbar(sm.freq_array.to("MHz"), sm.stokes[0,:,0], yerr = sm.stokes_error[0,:,0], fmt="o", ecolor = "red", color="yellow")
+  >>> _ = plt.xlabel("Frequency (MHz)")
+  >>> _ = plt.ylabel("Flux (Jy)")
   >>> plt.show() # doctest: +SKIP
-
-  >>> # in_place=True so it’s applied to current object
-  >>> sm.assign_to_healpix(16, order="nested", inplace=True)
-  >>> print(sm.nside)
-  16
-  >>> print(sm.hpx_order)
-  nested
+  >>> plt.savefig("Images/gleam_50srcs_freqflux.png")
+  >>> plt.clf()
 
 .. image:: Images/gleam_50srcs_freqflux.png
     :width: 600
 
-c) incorporating astropy healpix package (like plotting pixels), changing component type cont., changing frames
-***************************************************************************************************************
+.. _plotting_healpix_maps:
+
+c) Plotting Healpix maps, converting to pixel type and changing coordinate frames
+*********************************************************************************
+
 .. code-block:: python
 
   >>> import os
   >>> import numpy as np
   >>> import math
-  >>> import matplotlib.pyplot as plt # doctest: +SKIP
-  >>> from matplotlib.patches import Polygon # doctest: +SKIP
+  >>> import matplotlib.pyplot as plt
+  >>> from matplotlib.patches import Polygon
   >>> from pyradiosky import SkyModel
   >>> from pyradiosky.data import DATA_PATH
   >>> from astropy_healpix import HEALPix
   >>> from astropy.coordinates import SkyCoord
   >>> sm = SkyModel()
 
+  >>> # This is a coarse Healpix map of the Global Sky Model (GSM)
   >>> filename = os.path.join(DATA_PATH, "gsm_icrs.skyh5")
   >>> sm.read_skyh5(filename)
 
-  >>> plt.scatter(sm.ra, sm.dec) # doctest: +SKIP
-  >>> plt.xlim(max(sm.ra.value), min(sm.ra.value)) # doctest: +SKIP
-  >>> plt.autoscale() # doctest: +SKIP
-  >>> plt.xlabel("RA (deg)") # doctest: +SKIP
-  >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
+  >>> # First plot the pixel locations on a flat RA/Dec grid.
+  >>> ra, dec = sm.get_lon_lat()
+  >>> _ = plt.scatter(ra, dec)
+  >>> _ = plt.xlim(max(sm.ra.value), min(sm.ra.value))
+  >>> plt.autoscale()
+  >>> _ = plt.xlabel("RA (deg)")
+  >>> _ = plt.ylabel("Dec (deg)")
   >>> plt.show() # doctest: +SKIP
+  >>> plt.savefig("Images/gsm_icrs_radec.png")
+  >>> plt.clf()
 
+.. image:: Images/gsm_icrs_radec.png
+    :width: 600
+
+.. code-block:: python
+
+  >>> # Print some information about this object
   >>> # a HEALPix map has Ncomponents = 12*nside^2, where components are pixels
   >>> print(sm.Ncomponents)
   768
@@ -295,109 +319,92 @@ c) incorporating astropy healpix package (like plotting pixels), changing compon
   8
   >>> print(sm.frame)
   icrs
-  >>> # Use `calc_frame_coherency` to calculate the frame coherency, set store=False to
-  >>> # return it and not store it.
-  >>> frame_coherency = sm.calc_frame_coherency(store=False)
-  >>> print(frame_coherency[:,:,0,0])
-  [[2352.45649693+0.j    0.        +0.j]
-   [   0.        +0.j 2352.45649693+0.j]] K
 
-  >>> plt.hist(np.log(sm.stokes.value[0,0,:]), bins=100) # doctest: +SKIP
-  >>> plt.xlabel("log(Flux (Jy))") # doctest: +SKIP
-  >>> plt.ylabel("Counts") # doctest: +SKIP
+  >>> # Plot a histogram of the Stokes I fluxes
+  >>> _ = plt.hist(np.log(sm.stokes.value[0,0,:]), bins=100)
+  >>> _ = plt.xlabel("log(Flux (Jy))")
+  >>> _ = plt.ylabel("Counts")
   >>> plt.show() # doctest: +SKIP
+  >>> plt.savefig("Images/gsm_icrs_fluxcounts.png")
+  >>> plt.clf()
 
-  >>> sm_point = sm.copy()
-  >>> sm_point.healpix_to_point()
-  >>> print(sm_point.ra[:3])
-  [45d00m00s 135d00m00s 225d00m00s]
-  >>> print(sm_point.dec[:3])
-  [84d08m59.03857067s 84d08m59.03857067s 84d08m59.03857067s]
-  >>> print(sm_point.dec[:3].value)
-  [84.14973294 84.14973294 84.14973294]
-  >>> sm_point.transform_to("galactic")
-  >>> sm_point.transform_to("icrs")
-  >>> # confirms same RA and DEC after transforming point catalog back to icrs frame
-  >>> print(sm_point.ra[:3])
-  [45d00m00s 135d00m00s 225d00m00s]
-  >>> print(sm_point.dec[:3])
-  [84d08m59.03857067s 84d08m59.03857067s 84d08m59.03857067s]
+.. image:: Images/gsm_icrs_fluxcounts.png
+    :width: 600
 
-  >>> # used instead of transform_to since this interpolates to new pixel centers, as pixels defined by coordinate system
-  >>> sm.healpix_interp_transform("galactic")
+.. code-block:: python
+
+  >>> # Use the astropy_healpix library to get some information about the map
   >>> hp = HEALPix(sm.nside, sm.hpx_order, sm.frame)
-  >>> print(hp.npix)
-  768
   >>> print(hp.pixel_area)
   0.016362461737446838 sr
   >>> print(hp.pixel_resolution)
   439.74226071262797 arcmin
 
-  >>> coord = SkyCoord("00h42m44.3503s +41d16m08.634s", frame="galactic")
-  >>> print(round(hp.interpolate_bilinear_skycoord(coord, sm.stokes.value[0,0,:])))
-  6540
+  >>> # Now plot the pixels on a Mollweide projection with flux shown in color
+  >>> ra, dec = sm.get_lon_lat()
+  >>> _ = plt.subplot(111, projection="mollweide")
+  >>> plt.grid(True)
+  >>> _ = plt.scatter(ra.wrap_at('180d').radian, dec.radian,c=sm.stokes[0,0,:].value,cmap="plasma")
+  >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.5, format="%4.1e")
+  >>> plt.show() # doctest: +SKIP
+  >>> plt.savefig("Images/gsm_icrs_flux_molliwede.png")
+  >>> plt.clf()
 
-  >>> gal_l, gal_b = sm.get_lon_lat()
-  >>> gal_l_pi = (gal_l.radian/math.pi)[:3]
-  >>> gal_b_cos = np.cos(gal_b.radian)[:3]
-  >>> fig, ax = plt.subplots() # doctest: +SKIP
-  >>> ax.scatter(gal_l_pi, gal_b_cos, alpha = 0) # doctest: +SKIP
-  >>> ax.set_xlabel("phi / pi") # doctest: +SKIP
-  >>> ax.set_ylabel("cos(theta)") # doctest: +SKIP
-  >>> for i, txt in enumerate(sm.hpx_inds[:3]): # doctest: +SKIP
-  ...     #adds pixel index at center of each pixel
-  ...     ax.annotate(txt, (gal_l_pi[i], gal_b_cos[i]), fontsize=8) # doctest: +SKIP
-  >>> for hpx_ind in sm.hpx_inds[:3]: # doctest: +SKIP
-  ...     lon = hp.boundaries_lonlat(hpx_ind, 100)[0]/math.pi # doctest: +SKIP
-  ...     lat = np.cos(hp.boundaries_lonlat(hpx_ind, 100)[1]) # doctest: +SKIP
-  ...     lon = lon.value # doctest: +SKIP
-  ...     lat = lat.value # doctest: +SKIP
-  ...     vertices = np.vstack([lon.ravel(), lat.ravel()]).transpose() # doctest: +SKIP
-  ...     p = Polygon(vertices, closed=True, edgecolor="black", facecolor="none") # doctest: +SKIP
-  ...     # adds boundaries around each pixel
-  ...     ax.add_patch(p) # doctest: +SKIP
-
-  >>> gal_l, gal_b = sm.get_lon_lat()
-  >>> gal_l_pi = (gal_l.radian/math.pi)[:3]
-  >>> gal_b_cos = np.cos(gal_b.radian)[:3]
-  >>> fig, ax = plt.subplots() # doctest: +SKIP
-  >>> ax.scatter(gal_l_pi, gal_b_cos, alpha = 0) # doctest: +SKIP
-  >>> ax.set_xlabel("phi / pi") # doctest: +SKIP
-  >>> ax.set_ylabel("cos(theta)") # doctest: +SKIP
-  >>> # nested instead of ring
-  >>> for ind, txt in enumerate(hp.ring_to_nested(sm.hpx_inds)[:3]): # doctest: +SKIP
-  ...     ax.annotate(txt, (gal_l_pi[ind], gal_b_cos[ind]), fontsize=8) # doctest: +SKIP
-  >>> for hpx_ind in sm.hpx_inds[:3]: # doctest: +SKIP
-  ...     lon = hp.boundaries_lonlat(hpx_ind, 100)[0]/math.pi # doctest: +SKIP
-  ...     lat = np.cos(hp.boundaries_lonlat(hpx_ind, 100)[1]) # doctest: +SKIP
-  ...     lon = lon.value # doctest: +SKIP
-  ...     lat = lat.value # doctest: +SKIP
-  ...     vertices = np.vstack([lon.ravel(), lat.ravel()]).transpose() # doctest: +SKIP
-  ...     p = Polygon(vertices, closed=True, edgecolor="black", facecolor="none") # doctest: +SKIP
-  ...     ax.add_patch(p) # doctest: +SKIP
-
-.. image:: Images/gsm_icrs_radec.png
+.. image:: Images/gsm_icrs_flux_molliwede.png
     :width: 600
 
-.. image:: Images/gsm_icrs_fluxcounts.png
+.. code-block:: python
+
+  >>> # It'd be nice to see this in a galactic frame.
+  >>> # For `point` components, the frame can be changed by using the `transform_to`
+  >>> # method, which just calls the astropy SkyCoord method of the same name.
+  >>> # For Healpix maps, though, this isn't right because Healpix pixel locations
+  >>> # are defined in the desired frame, so we actually need to interpolate to the new pixel locations.
+  >>> sm_galactic = sm.healpix_interp_transform("galactic", inplace=False)
+
+  >>> # Now plot the pixels on a Mollweide projection with flux shown in color
+  >>> l, b = sm_galactic.get_lon_lat()
+  >>> _ = plt.subplot(111, projection="mollweide")
+  >>> plt.grid(True)
+  >>> _ = plt.scatter(l.wrap_at('180d').radian, b.radian,c=sm_galactic.stokes[0,0,:].value,cmap="plasma")
+  >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.5, format="%4.1e")
+  >>> plt.show() # doctest: +SKIP
+  >>> plt.savefig("Images/gsm_galactic_flux_molliwede.png")
+  >>> plt.clf()
+
+.. image:: Images/gsm_galactic_flux_molliwede.png
     :width: 600
 
-.. image:: Images/gsm_icrs_phiz_ring.png
+.. code-block:: python
+
+  >>> # We can compare this to converting each healpix pixel to a point sources and
+  >>> # converting those sources to galactic coordinates (avoiding the interpolation)
+  >>> sm_point = sm.copy()
+  >>> sm_point.healpix_to_point()
+  >>> sm_point.transform_to("galactic")
+  >>> pt_l, pt_b = sm_point.get_lon_lat()
+  >>> _ = plt.subplot(111, projection="mollweide")
+  >>> plt.grid(True)
+  >>> _ = plt.scatter(pt_l.wrap_at('180d').radian, pt_b.radian,c=sm_point.stokes[0,0,:].value,cmap="plasma")
+  >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.5, format="%4.1e")
+  >>> plt.show() # doctest: +SKIP
+  >>> plt.savefig("Images/gsm_point_galactic_flux_molliwede.png")
+  >>> plt.clf()
+
+.. image:: Images/gsm_point_galactic_flux_molliwede.png
     :width: 600
 
-.. image:: Images/gsm_icrs_phiz_nested.png
-    :width: 600
 
 SkyModel: Creating and writing out catalogs
 -------------------------------------------
 
-a) creating and writing out healpix catalog, using get_lon_lat method
-*********************************************************************
+a) Creating and writing out healpix catalog
+*******************************************
 .. code-block:: python
 
   >>> import os
   >>> import numpy as np
-  >>> import matplotlib.pyplot as plt # doctest: +SKIP
+  >>> import matplotlib.pyplot as plt
   >>> from astropy import units
   >>> from pyradiosky import SkyModel
 
@@ -412,14 +419,13 @@ a) creating and writing out healpix catalog, using get_lon_lat method
   >>> write_file = os.path.join(".", "zero.skyh5")
   >>> sm.write_skyh5(write_file)
 
-b) creating and writing out point catalog, using calculate_rise_set_lsts and clear_time_position_specific_params methods
-************************************************************************************************************************
+b) Creating and writing out point catalog
+*****************************************
 .. code-block:: python
 
   >>> import os
   >>> import numpy as np
   >>> from pyradiosky import SkyModel
-  >>> from pyradiosky.data import DATA_PATH
   >>> from astropy import units
   >>> from astropy.coordinates import (
   ...     SkyCoord,
@@ -445,61 +451,10 @@ b) creating and writing out point catalog, using calculate_rise_set_lsts and cle
   ...   name="zen_source", skycoord=icrs_coord, stokes=[1.0, 0, 0, 0] * units.Jy,
   ...   spectral_type="flat", history = "drawn from zenith_skymodel in test_skymodel.py"
   ... )
-  >>> print(sm.check(check_extra=True, run_check_acceptability=True))
-  True
 
   >>> print(sm.name)
   ['zen_source']
   >>> # print(sm.history) to learn where the sky model is drawn from and how it is read/written
-  >>> sm.update_positions(time, array_location)
-
-  >>> sm.calculate_rise_set_lsts(array_location.lat)
-  >>> print(np.array_str(sm._rise_lst, precision=7))
-  [1.1624007]
-  >>> print(np.array_str(sm._set_lst, precision=7))
-  [5.1105785]
-
-  >>> # coherency in local alt/az basis can be different from coherency in ra/dec basis
-  >>> print(sm.coherency_calc()[:,:,0,0])
-  [[0.5+0.j 0. +0.j]
-   [0. +0.j 0.5+0.j]] Jy
-
-  >>> print(sm.time)
-  2015-03-01 00:00:00.000
-  >>> print(sm.telescope_location)
-  (5109342.76037543, 2005241.90402741, -3239939.46926403) m
-  >>> # only print the altitude, since it's close to zenith the azimuth is ill defined
-  >>> print(np.array_str(sm.alt_az[0], precision=7))
-  [1.5707963]
-  >>> # only print the n part, since it's close to zenith the l & m are ill defined
-  >>> print(np.array_str(sm.pos_lmn[2], precision=7))
-  [1.]
-  >>> print(sm.above_horizon)
-  [ True]
-  >>> sm.clear_time_position_specific_params()
-  >>> print(sm.time)
-  None
-  >>> print(sm.telescope_location)
-  None
-  >>> print(sm.alt_az)
-  None
-  >>> print(sm.pos_lmn)
-  None
-  >>> print(sm.above_horizon)
-  None
-
-  >>> for param in sm.ncomponent_length_params:
-  ...     print(param)
-  _above_horizon
-  _extended_model_group
-  _extra_columns
-  _hpx_inds
-  _name
-  _reference_frequency
-  _skycoord
-  _spectral_index
-  >>> print(sm.Ncomponents)
-  1
 
   >>> # works for any point component type
   >>> write_file = os.path.join(".", "zen_source.txt" )
@@ -508,18 +463,18 @@ b) creating and writing out point catalog, using calculate_rise_set_lsts and cle
 SkyModel: Selecting data
 ------------------------
 
-a) using cut_nonrising method
-*****************************
+a) Removing sources that do not rise
+************************************
 .. code-block:: python
 
   >>> import os
   >>> import numpy as np
   >>> from pyradiosky import SkyModel
-  >>> from pyradiosky.data import DATA_PATH
   >>> from astropy import units
   >>> from astropy.coordinates import EarthLocation
   >>> from astropy.time import Time, TimeDelta
 
+  >>> # Make a SkyModel object with a grid of sources in the Alt/Az frame
   >>> array_location = EarthLocation(lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0)
   >>> time = Time("2015-03-01 00:00:00", scale="utc", location=array_location)
 
@@ -554,135 +509,134 @@ a) using cut_nonrising method
   >>> print(sm2.Ncomponents)
   320
 
-b) using plotly package and select and select methods
-*****************************************************
+b) Select
+*********
+
+The :meth:`pyradiosky.SkyModel.select` method lets you select components to keep on the
+object while removing others. Selections can be specified by coordinate or flux ranges
+or by component index number.
+
 .. code-block:: python
 
   >>> import os
   >>> import numpy as np
-  >>> import matplotlib.pyplot as plt # doctest: +SKIP
+  >>> import matplotlib.pyplot as plt
   >>> from pyradiosky import SkyModel
   >>> from pyradiosky.data import DATA_PATH
   >>> from astropy import units
-  >>> from astropy.coordinates import (
-  ...     SkyCoord,
-  ...     EarthLocation,
-  ...     Angle,
-  ...     AltAz,
-  ...     Longitude,
-  ...     Latitude,
-  ...     Galactic)
-  >>> import plotly.express as px # doctest: +SKIP
+  >>> from astropy.coordinates import Longitude, Latitude
   >>> sm = SkyModel()
 
   >>> filename = os.path.join(DATA_PATH, "gleam_50srcs.vot")
   >>> sm.read_gleam_catalog(filename)
 
-  >>> sm.jansky_to_kelvin()
+  >>> # First just plot the source locations and fluxes
+  >>> # pick a single frequency to plot fluxes for:
+  >>> print(sm.freq_array[13].to("MHz"))
+  181.0 MHz
 
-  >>> plt.scatter(x=sm.ra, y=sm.dec, c=sm.stokes[0,13,:], cmap="plasma") # doctest: +SKIP
-  >>> cbar=plt.colorbar(label="Flux (K)", orientation="vertical",shrink=.75) # doctest: +SKIP
-  >>> plt.xlim(max(sm.ra.value), min(sm.ra.value)) # doctest: +SKIP
-  >>> plt.autoscale() # doctest: +SKIP
-  >>> plt.xlabel("RA (deg)") # doctest: +SKIP
-  >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
+  >>> _ = plt.subplot(111)
+  >>> _ = plt.scatter(x=sm.ra, y=sm.dec, c=sm.stokes[0,13,:].value, cmap="plasma")
+  >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.75)
+  >>> _ = plt.xlim(max(sm.ra.value), min(sm.ra.value))
+  >>> plt.autoscale()
+  >>> _ = plt.xlabel("RA (deg)")
+  >>> _ = plt.ylabel("Dec (deg)")
   >>> plt.show() # doctest: +SKIP
+  >>> plt.savefig("Images/gleam_50srcs_radec.png")
+  >>> plt.clf()
 
-  >>> sm.kelvin_to_jansky()
+.. image:: Images/gleam_50srcs_radec.png
+    :width: 600
 
-  >>> plt.scatter(x=sm.ra, y=sm.dec, c=sm.stokes[0,13,:], cmap="plasma") # doctest: +SKIP
-  >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.75) # doctest: +SKIP
-  >>> plt.xlim(max(sm.ra.value), min(sm.ra.value)) # doctest: +SKIP
-  >>> plt.autoscale() # doctest: +SKIP
-  >>> plt.xlabel("RA (deg)") # doctest: +SKIP
-  >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
+.. code-block:: python
+
+  >>> # Now plot a histogram of the log fluxes (at 181 MHz)
+  >>> _ = plt.hist(np.log(sm.stokes.value[0,13,:]), bins=10)
+  >>> _ = plt.xlabel("log(Flux (Jy))")
+  >>> _ = plt.ylabel("Counts")
   >>> plt.show() # doctest: +SKIP
+  >>> plt.savefig("Images/gleam_50srcs_fluxcounts.png")
+  >>> plt.clf()
 
-  >>> plt.hist(np.log(sm.stokes.value[0,13,:]), bins=10) # doctest: +SKIP
-  >>> plt.xlabel("log(Flux (Jy))") # doctest: +SKIP
-  >>> plt.ylabel("Counts") # doctest: +SKIP
-  >>> plt.show() # doctest: +SKIP
+.. image:: Images/gleam_50srcs_fluxcounts.png
+    :width: 600
+
+.. code-block:: python
 
   >>> print(sm.freq_array)
   [7.60e+07 8.40e+07 9.20e+07 9.90e+07 1.07e+08 1.15e+08 1.22e+08 1.30e+08
    1.43e+08 1.51e+08 1.58e+08 1.66e+08 1.74e+08 1.81e+08 1.89e+08 1.97e+08
    2.04e+08 2.12e+08 2.20e+08 2.27e+08] Hz
 
+  >>> # Now make a copy and select only the sources with 340 < RA < 360
   >>> sm2 = sm.copy()
   >>> sm2.select(lon_range = Longitude([340, 360], units.deg))
-  >>> plt.scatter(x=sm2.ra, y=sm2.dec, c=sm2.stokes[0,13,:], cmap="plasma") # doctest: +SKIP
-  >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.75) # doctest: +SKIP
-  >>> plt.xlim(max(sm.ra.value), min(sm.ra.value)) # doctest: +SKIP
-  >>> plt.autoscale() # doctest: +SKIP
-  >>> plt.xlabel("RA (deg)") # doctest: +SKIP
-  >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
+  >>> # plot their locations
+  >>> _ = plt.scatter(x=sm2.ra, y=sm2.dec, c=sm2.stokes[0,13,:].value, cmap="plasma")
+  >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.75)
+  >>> _ = plt.xlim(max(sm.ra.value), min(sm.ra.value))
+  >>> plt.autoscale()
+  >>> _ = plt.xlabel("RA (deg)")
+  >>> _ = plt.ylabel("Dec (deg)")
   >>> plt.show() # doctest: +SKIP
+  >>> plt.savefig("Images/gleam_50srcs_radec_raselect.png")
+  >>> plt.clf()
 
+.. image:: Images/gleam_50srcs_radec_raselect.png
+    :width: 600
+
+.. code-block:: python
+
+  >>> # Now make a copy and select only the sources 0.1 Jy < flux < 1 Jy
+  >>> # where the fluxes are between 100-200 MHz
   >>> sm3 = sm.copy()
-  >>> sm3.select(min_brightness=.1*units.Jy, max_brightness=1*units.Jy, brightness_freq_range=[100*10**6,
-  ...            200*10**6]*units.Hz)
-  >>> plt.scatter(x=sm3.ra, y=sm3.dec, c=sm3.stokes[0,13,:], cmap="plasma") # doctest: +SKIP
-  >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.75) # doctest: +SKIP
-  >>> plt.xlim(max(sm.ra.value), min(sm.ra.value)) # doctest: +SKIP
-  >>> plt.autoscale() # doctest: +SKIP
-  >>> plt.xlabel("RA (deg)") # doctest: +SKIP
-  >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
-  >>> plt.show() # doctest: +SKIP
-
-  >>> plt.hist(np.log(sm3.stokes.value[0,13,:]), bins=10) # doctest: +SKIP
-  >>> plt.xlabel("log(Flux (Jy))") # doctest: +SKIP
-  >>> plt.ylabel("Counts") # doctest: +SKIP
-  >>> plt.show() # doctest: +SKIP
-
-  >>> fig = px.scatter(x=sm2.ra.value, y=sm2.dec.value, color=sm2.stokes[0,13,:].value, # doctest: +SKIP
-  ...                  labels={"x": "RA (deg)", "y": "DEC (deg)", "color": "Flux (Jy)"}) # doctest: +SKIP
-  >>> fig.add_trace(px.scatter(x=sm3.ra.value, y=sm3.dec.value, symbol_sequence=["x"], # doctest: +SKIP
-  ...                          color=sm3.stokes[0,13,:].value, labels={"x": "RA (deg)", "y": "DEC (deg)", # doctest: +SKIP
-  ...                          "color": "Flux (Jy)"}).data[0]) # doctest: +SKIP
-  >>> # for RA to be in conventional order
-  >>> fig.update_layout(xaxis_range=[max(sm3.ra.value),min(sm3.ra.value)]) # doctest: +SKIP
-  >>> # like autoscale
-  >>> fig["layout"]["xaxis"].update(autorange = True) # doctest: +SKIP
-  >>> fig.show() # doctest: +SKIP
-
-  >>> sm4 = sm.select(
-  ...   min_brightness=0.2 * units.Jy, max_brightness=1.5 * units.Jy, inplace=False
+  >>> sm3.select(
+  ...    min_brightness=.1*units.Jy, max_brightness=1*units.Jy, brightness_freq_range=[100, 200]*units.MHz
   ... )
+  >>> print(sm3.Ncomponents)
+  23
 
-  >>> print(sm.Ncomponents)
-  50
-  >>> print(sm4.Ncomponents)
-  9
-
-.. image:: Images/gleam_50srcs_radec_K.png
-    :width: 600
-
-.. image:: Images/gleam_50srcs_radec_Jy.png
-    :width: 600
-
-.. image:: Images/gleam_50srcs_fluxcounts.png
-    :width: 600
-
-.. image:: Images/gleam_50srcs_radec_lonselect.png
-    :width: 600
+  >>> # plot their locations
+  >>> _ = plt.scatter(x=sm3.ra, y=sm3.dec, c=sm3.stokes[0,13,:].value, cmap="plasma")
+  >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.75)
+  >>> _ = plt.xlim(max(sm.ra.value), min(sm.ra.value))
+  >>> plt.autoscale()
+  >>> _ = plt.xlabel("RA (deg)")
+  >>> _ = plt.ylabel("Dec (deg)")
+  >>> plt.show() # doctest: +SKIP
+  >>> plt.savefig("Images/gleam_50srcs_radec_fluxselect.png")
+  >>> plt.clf()
 
 .. image:: Images/gleam_50srcs_radec_fluxselect.png
     :width: 600
 
+.. code-block:: python
+
+  >>> # plot their flux histogram (at 181 MHz)
+  >>> _ = plt.hist(np.log(sm3.stokes.value[0,13,:]), bins=10)
+  >>> _ = plt.xlabel("log(Flux (Jy))")
+  >>> _ = plt.ylabel("Counts")
+  >>> plt.show() # doctest: +SKIP
+  >>> plt.savefig("Images/gleam_50srcs_fluxcounts_fluxselect.png")
+  >>> plt.clf()
+
 .. image:: Images/gleam_50srcs_fluxcounts_fluxselect.png
     :width: 600
 
-.. image:: Images/gleam_50srcs_radec_compare.png
-    :width: 600
+c) Selecting Healpix components by distance
+*******************************************
 
-c) using select method, incorporating astropy healpix package
-*********************************************************************
+The same kinds of selections can be done on point and Healpix components. For
+Healpix components, the `astropy_healpix` package can also be used to help identify
+components by distance.
+
 .. code-block:: python
 
   >>> import os
   >>> import numpy as np
   >>> import math
-  >>> import matplotlib.pyplot as plt # doctest: +SKIP
+  >>> import matplotlib.pyplot as plt
   >>> from pyradiosky import SkyModel
   >>> from pyradiosky.data import DATA_PATH
   >>> from astropy import units as u
@@ -692,74 +646,115 @@ c) using select method, incorporating astropy healpix package
   >>> filename = os.path.join(DATA_PATH, "gsm_icrs.skyh5")
   >>> sm.read_skyh5(filename)
 
-  >>> plt.scatter(sm.ra, sm.dec) # doctest: +SKIP
-  >>> plt.xlim(max(sm.ra.value), min(sm.ra.value)) # doctest: +SKIP
-  >>> plt.autoscale() # doctest: +SKIP
-  >>> plt.xlabel("RA (deg)") # doctest: +SKIP
-  >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
+  >>> ra, dec = sm.get_lon_lat()
+  >>> _ = plt.subplot(111, projection="mollweide")
+  >>> plt.grid(True)
+  >>> _ = plt.scatter(ra.wrap_at('180d').radian, dec.radian, c=sm.stokes[0,0,:].value, cmap="plasma")
+  >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.5, format="%4.1e")
   >>> plt.show() # doctest: +SKIP
+  >>> plt.savefig("Images/gsm_icrs_flux_molliwede.png")
+  >>> plt.clf()
 
+.. image:: Images/gsm_icrs_flux_molliwede.png
+    :width: 600
+
+.. code-block:: python
+
+  >>> # You can specify component inds to select. First we'll just try selecting the
+  >>> # first 50 components.
   >>> sm_new = sm.copy()
-  >>> inds = list(range(0, 24))
+  >>> inds = list(range(0, 50))
   >>> sm_new.select(component_inds=inds)
 
-  >>> plt.scatter(sm_new.ra, sm_new.dec) # doctest: +SKIP
-  >>> plt.xlim(max(sm.ra.value), min(sm.ra.value)) # doctest: +SKIP
-  >>> plt.autoscale() # doctest: +SKIP
-  >>> plt.xlabel("RA (deg)") # doctest: +SKIP
-  >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
+  >>> ra_new, dec_new = sm_new.get_lon_lat()
+  >>> _ = plt.subplot(111, projection="mollweide")
+  >>> plt.grid(True)
+  >>> # Use the vmin & vmax parameters to keep the colors the same as in the original map above
+  >>> _ = plt.scatter(
+  ...   ra_new.wrap_at('180d').radian,
+  ...   dec_new.radian,
+  ...   c=sm_new.stokes[0,0,:],
+  ...   cmap="plasma",
+  ...   vmin=np.min(sm.stokes.value[0,0,:]),
+  ...   vmax=np.max(sm.stokes.value[0,0,:])
+  ... )
+  >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.5, format="%4.1e")
   >>> plt.show() # doctest: +SKIP
+  >>> plt.savefig("Images/gsm_icrs_indselect_molliwede.png")
+  >>> plt.clf()
 
-  >>> write_file = os.path.join(".", "gsm_icrs_new.skyh5" )
-  >>> sm_new.write_skyh5(write_file)
-
-  >>> # used instead of transform_to since this interpolates to new pixel centers, as pixels defined by coordinate system
-  >>> sm.healpix_interp_transform("galactic")
-  >>> hp = HEALPix(sm.nside, sm.hpx_order, sm.frame)
-
-  >>> cone_index = hp.cone_search_lonlat(10 * u.deg, 10 * u.deg, radius=5 * u.deg)
-  >>> print(cone_index)
-  [304 273 337 305]
-  >>> lon, lat = sm.get_lon_lat()
-  >>> plt.scatter(lon.value[cone_index], lat.value[cone_index]) # doctest: +SKIP
-  >>> plt.xlim(max(lon.value[cone_index]), min(lon.value[cone_index])) # doctest: +SKIP
-  >>> plt.autoscale() # doctest: +SKIP
-  >>> plt.xlabel("Galactic Longitude (deg)") # doctest: +SKIP
-  >>> plt.ylabel("Galactic Latitude (deg)") # doctest: +SKIP
-  >>> plt.show() # doctest: +SKIP
-
-  >>> neighbours_10 = hp.neighbours(10)
-  >>> print(neighbours_10)
-  [21 20  9  2  3 11 22 37]
-  >>> plt.scatter(lon.value[neighbours_10], lat.value[neighbours_10]) # doctest: +SKIP
-  >>> plt.xlim(max(lon.value[neighbours_10]), min(lon.value[neighbours_10])) # doctest: +SKIP
-  >>> plt.autoscale() # doctest: +SKIP
-  >>> plt.xlabel("Galactic Longitude (deg)") # doctest: +SKIP
-  >>> plt.ylabel("Galactic Latitude (deg)") # doctest: +SKIP
-  >>> plt.show() # doctest: +SKIP
-
-.. image:: Images/gsm_icrs_radec.png
+.. image:: Images/gsm_icrs_indselect_molliwede.png
     :width: 600
 
-.. image:: Images/gsm_icrs_radec_indselect.png
+.. code-block:: python
+
+  >>> # Let's change over to galactic coordinates using healpix_interp_transform
+  >>> sm_galactic = sm.copy()
+  >>> sm_galactic.healpix_interp_transform("galactic")
+
+  >>> # Figuring out which indices you want can be a little complicated, especially since
+  >>> # there are two possible indexing schemes for Healpix maps ('ring' and 'nested').
+  >>> # Of course you can do it by using the pixel coordinates, but there are also
+  >>> # some nice convenience functions in the astropy_healpix library that can help.
+  >>> hp = HEALPix(sm_galactic.nside, sm_galactic.hpx_order, sm_galactic.frame)
+  >>> cone_index = hp.cone_search_lonlat(10 * u.deg, 10 * u.deg, radius=25 * u.deg)
+  >>> sm_gal_cone = sm_galactic.select(component_inds=cone_index, inplace=False)
+  >>> l_cone, b_cone = sm_gal_cone.get_lon_lat()
+  >>> _ = plt.subplot(111, projection="mollweide")
+  >>> plt.grid(True)
+  >>> _ = plt.scatter(
+  ...   l_cone.wrap_at('180d').radian,
+  ...   b_cone.radian,
+  ...   c=sm_gal_cone.stokes[0,0,:],
+  ...   cmap="plasma",
+  ...   vmin=np.min(sm.stokes.value[0,0,:]),
+  ...   vmax=np.max(sm.stokes.value[0,0,:])
+  ... )
+  >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.5, format="%4.1e")
+  >>> plt.show() # doctest: +SKIP
+  >>> plt.savefig("Images/gsm_gal_coneselect_molliwede.png")
+  >>> plt.clf()
+
+.. image:: Images/gsm_gal_coneselect_molliwede.png
     :width: 600
 
-.. image:: Images/gsm_icrs_glgb_coneselect.png
-    :width: 600
+.. code-block:: python
 
-.. image:: Images/gsm_icrs_glgb_neighborselect.png
+  >>> # The astropy-healpix `neighbours` method can identify all the neighboring
+  >>> # pixel indices for a given pixel
+  >>> neighbours = hp.neighbours(400)
+  >>> print(neighbours)
+  [463 431 399 336 368 401 432 464]
+  >>> sm_gal_nb = sm_galactic.select(component_inds=neighbours, inplace=False)
+  >>> l_nb, b_nb = sm_gal_nb.get_lon_lat()
+  >>> _ = plt.subplot(111, projection="mollweide")
+  >>> plt.grid(True)
+  >>> _ = plt.scatter(
+  ...   l_nb.wrap_at('180d').radian,
+  ...   b_nb.radian,
+  ...   c=sm_gal_nb.stokes[0,0,:],
+  ...   cmap="plasma",
+  ...   vmin=np.min(sm.stokes.value[0,0,:]),
+  ...   vmax=np.max(sm.stokes.value[0,0,:])
+  ... )
+  >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.5, format="%4.1e")
+  >>> plt.show() # doctest: +SKIP
+  >>> plt.savefig("Images/gsm_gal_neighborselect_molliwede.png")
+  >>> plt.clf()
+
+.. image:: Images/gsm_gal_neighborselect_molliwede.png
     :width: 600
 
 SkyModel: Concatenating data
-------------------------------------------
+----------------------------
 
-a) using select and concat methods
-**********************************
+The :meth:`pyradiosky.SkyModel.concat` method allows catalogs to be combined.
+
 .. code-block:: python
 
   >>> import os
   >>> import numpy as np
-  >>> import matplotlib.pyplot as plt # doctest: +SKIP
+  >>> import matplotlib.pyplot as plt
   >>> from pyradiosky import SkyModel
   >>> from pyradiosky.data import DATA_PATH
   >>> from astropy import units
@@ -776,50 +771,71 @@ a) using select and concat methods
   >>> filename = os.path.join(DATA_PATH, "pointsource_catalog.txt")
   >>> sm.read_text_catalog(filename)
 
-  >>> plt.scatter(x=sm.ra, y=sm.dec, c=sm.stokes[0,0,:], cmap="plasma") # doctest: +SKIP
-  >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.75) # doctest: +SKIP
-  >>> plt.xlim(max(sm.ra.value), min(sm.ra.value)) # doctest: +SKIP
-  >>> plt.autoscale() # doctest: +SKIP
-  >>> plt.xlabel("RA (deg)") # doctest: +SKIP
-  >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
+  >>> # This is a small test catalog file with three components
+  >>> filename = os.path.join(DATA_PATH, "pointsource_catalog.txt")
+  >>> sm.read_text_catalog(filename)
+
+  >>> # First, just plot the component locations and flux
+  >>> _ = plt.scatter(x=sm.ra, y=sm.dec, c=sm.stokes[0,0,:].value, cmap="plasma")
+  >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.75)
+  >>> _ = plt.xlim(max(sm.ra.value), min(sm.ra.value))
+  >>> plt.autoscale()
+  >>> _ = plt.xlabel("RA (deg)")
+  >>> _ = plt.ylabel("Dec (deg)")
   >>> plt.show() # doctest: +SKIP
-
-  >>> sm2 = sm.copy()
-  >>> sm2.select(lon_range = Longitude([1.26, 1.31], units.deg))
-
-  >>> sm3 = sm.copy()
-  >>> sm3.select(lon_range = Longitude([1.31, 1.36], units.deg))
-
-  >>> sm_new = sm2.concat(sm3, inplace=False)
-  >>> write_file = os.path.join(".", "2srcs.txt" )
-  >>> sm_new.write_text_catalog(write_file)
-
-  >>> plt.scatter(x=sm_new.ra, y=sm_new.dec, c=sm_new.stokes[0,0,:], cmap="plasma") # doctest: +SKIP
-  >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.75) # doctest: +SKIP
-  >>> plt.xlim(max(sm_new.ra.value), min(sm_new.ra.value)) # doctest: +SKIP
-  >>> plt.autoscale() # doctest: +SKIP
-  >>> plt.xlabel("RA (deg)") # doctest: +SKIP
-  >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
-  >>> plt.show() # doctest: +SKIP
+  >>> plt.savefig("Images/pointsource_catalog_radec.png")
+  >>> plt.clf()
 
 .. image:: Images/pointsource_catalog_radec.png
     :width: 600
 
+.. code-block:: python
+
+  >>> # Now split the catalog up using the select method
+  >>> sm2 = sm.select(lon_range = Longitude([1.0, 1.31], units.deg), inplace=False)
+  >>> sm3 = sm.select(lon_range = Longitude([1.31, 1.36], units.deg), inplace=False)
+
+  >>> # Recombine the catalog using the concat method
+  >>> sm_new = sm2.concat(sm3, inplace=False)
+
+  >>> _ = plt.scatter(x=sm_new.ra, y=sm_new.dec, c=sm_new.stokes[0,0,:].value, cmap="plasma")
+  >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.75)
+  >>> _ = plt.xlim(max(sm_new.ra.value), min(sm_new.ra.value))
+  >>> plt.autoscale()
+  >>> _ = plt.xlabel("RA (deg)")
+  >>> _ = plt.ylabel("Dec (deg)")
+  >>> plt.show() # doctest: +SKIP
+  >>> plt.savefig("Images/pointsource_catalog_radec_concat.png")
+  >>> plt.clf()
+
 .. image:: Images/pointsource_catalog_radec_concat.png
     :width: 600
 
-SkyModel: using at_frequencies method
--------------------------------------
+SkyModel: Calculating fluxes at specific frequencies
+----------------------------------------------------
 
-a) subband spectral type
-********************************
+The :meth:`pyradiosky.SkyModel.at_frequencies` method can be used to calculate flux
+values for the components at specific frequencies. The calculation depends on the
+spectral type of the SkyModel. For ``'spectral_index'`` type components, the calculation is
+just :math:`I=I_0 \frac{f}{f_0}^{\alpha}`, where :math:`I_0` is the flux at the
+reference_frequency :math:`f_0`` and :math:`\alpha`` is the spectral_index. For ``'subband'``
+type components, the flux is interpolated from the subband central frequencies (The type
+of interpolation can be specified with the ``freq_interp_kind`` parameter). For ``'flat'``
+type components, the flux does not depend on frequency. SkyModel objects that have the
+``'full'`` spectral type do not have a well defined spectral model so the
+:meth:`pyradiosky.SkyModel.at_frequencies` can only be used to select specific
+frequencies to keep (i.e. all passed frequencies must be in the ``freq_array``).
+
+a) Subband spectral type
+************************
 .. code-block:: python
 
   >>> import os
   >>> from pyradiosky import SkyModel
   >>> from pyradiosky.data import DATA_PATH
   >>> from astropy import units
-  >>> import matplotlib.pyplot as plt # doctest: +SKIP
+  >>> from matplotlib.lines import Line2D
+  >>> import matplotlib.pyplot as plt
   >>> sm = SkyModel()
 
   >>> filename = os.path.join(DATA_PATH, "gleam_50srcs.vot")
@@ -830,41 +846,42 @@ a) subband spectral type
    1.43e+08 1.51e+08 1.58e+08 1.66e+08 1.74e+08 1.81e+08 1.89e+08 1.97e+08
    2.04e+08 2.12e+08 2.20e+08 2.27e+08] Hz
 
-  >>> plt.scatter(x=sm.ra, y=sm.dec, c=sm.stokes[0,4,:], cmap="plasma") # doctest: +SKIP
-  >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.75) # doctest: +SKIP
-  >>> plt.xlim(max(sm.ra.value), min(sm.ra.value)) # doctest: +SKIP
-  >>> plt.autoscale() # doctest: +SKIP
-  >>> plt.xlabel("RA (deg)") # doctest: +SKIP
-  >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
+  >>> sm_new = sm.at_frequencies(
+  ...   freqs=[110, 153, 200]*units.MHz, inplace=False, freq_interp_kind="cubic",
+  ...   nan_handling="clip", run_check=True, atol=None
+  ... )
+
+  >>> print(sm_new.freq_array)
+  [110. 153. 200.] MHz
+
+  >>> _ = plt.plot(sm.freq_array.to("MHz"), sm.stokes[0,:,0:5].value, marker='o', markersize=2)
+  >>> plt.gca().set_prop_cycle(None)
+  >>> _ = plt.plot(sm_new.freq_array, sm_new.stokes[0,:,0:5].value, marker=(5, 2), linestyle='None')
+  >>> plt.autoscale()
+  >>> _ = plt.xlabel("Frequencies (MHz)")
+  >>> _ = plt.ylabel("Flux (Jy)")
+  >>> _ = plt.vlines(sm_new.freq_array, ymin=-1, ymax = 3, linestyle="dashed", colors="darkgrey")
+  >>> _ = plt.ylim(-0.1,2.8)
+  >>> legend_elements = [
+  ...    Line2D([0], [0], color="black", marker='o', markersize=2, label="subband spectra"),
+  ...    Line2D([0], [0], color="black", marker=(5, 2), linestyle='None', label="interpolated at frequencies"),
+  ... ]
+  >>> _ = plt.legend(handles=legend_elements)
   >>> plt.show() # doctest: +SKIP
+  >>> plt.savefig("Images/gleam_subband_spectra_atfreqs.png")
+  >>> plt.clf()
 
-  >>> sm.at_frequencies(freqs=[200*10**6]*units.Hz, inplace=True, freq_interp_kind="cubic", nan_handling="clip",
-  ...                   run_check=True, atol=None)
-
-  >>> print(sm.freq_array)
-  [2.e+08] Hz
-
-  >>> plt.scatter(x=sm.ra, y=sm.dec, c=sm.stokes[0,0,:], cmap="plasma") # doctest: +SKIP
-  >>> cbar=plt.colorbar(label="Flux (Jy)", orientation="vertical",shrink=.75) # doctest: +SKIP
-  >>> plt.xlim(max(sm.ra.value), min(sm.ra.value)) # doctest: +SKIP
-  >>> plt.autoscale() # doctest: +SKIP
-  >>> plt.xlabel("RA (deg)") # doctest: +SKIP
-  >>> plt.ylabel("DEC (deg)") # doctest: +SKIP
-  >>> plt.show() # doctest: +SKIP
-
-.. image:: Images/gleam_50srcs_radec_oldfreq.png
+.. image:: Images/gleam_subband_spectra_atfreqs.png
     :width: 600
 
-.. image:: Images/gleam_50srcs_radec_newfreq.png
-    :width: 600
-
-b) spectral index spectral type
-*************************************
+b) Spectral index spectral type
+*******************************
 .. code-block:: python
 
   >>> import os
+  >>> from astropy import units
   >>> import numpy as np
-  >>> import matplotlib.pyplot as plt # doctest: +SKIP
+  >>> import matplotlib.pyplot as plt
   >>> from pyradiosky import SkyModel
   >>> from pyradiosky.data import DATA_PATH
   >>> sm = SkyModel()
@@ -875,86 +892,329 @@ b) spectral index spectral type
   >>> print(np.unique(sm.reference_frequency.to("MHz")))
   [ 74.    180.    181.    215.675] MHz
 
-  >>> print(sm.stokes.value[0,0,8235])
-  0.5017849802970886
-  >>> print(sm.reference_frequency[8235])
-  215675008.0 Hz
-  >>> # last component (at index 8325) was chosen due to nonzero spectral index
-  >>> print(sm.spectral_index[8235])
-  -0.8
+  >>> # pick a bright component with a non-zero spectral index
+  >>> # (a spectral index of zero means that the flux is the same at all frequencies)
+  >>> comp_use = 3437
+  >>> print(sm.spectral_index[comp_use])
+  -0.2865136
+  >>> print(sm.stokes[0,0,comp_use])
+  11.424072265625 Jy
+  >>> print(sm.reference_frequency[comp_use].to("MHz"))
+  180.0 MHz
 
-  >>> x = np.linspace(75*10**6, 225*10**6, 16)
-  >>> # y = sm.stokes.value[0,0,8235] (flux is accurate for a frequency x) when x = sm.reference_frequency[8235]
-  >>> y = sm.stokes.value[0,0,8235]*(x/sm.reference_frequency[8235])**sm.spectral_index[8235]
-  >>> plt.plot(x/10**6,y) # doctest: +SKIP
-  >>> plt.scatter(sm.reference_frequency[8235]/10**6, sm.stokes.value[0,0,8235]) # doctest: +SKIP
-  >>> plt.xlabel("Reference Frequency (MHz)") # doctest: +SKIP
-  >>> plt.ylabel("Flux (Jy)") # doctest: +SKIP
-  >>> # this plot illustrates how flux changes with frequency
+  >>> freqs_calc = np.linspace(75, 225, 16) * units.MHz
+  >>> sm_new = sm.at_frequencies(freqs=freqs_calc, inplace=False)
+  >>> _ = plt.plot(freqs_calc, sm_new.stokes[0, :, comp_use], marker='o', markersize=2, label="calculated at frequencies")
+  >>> _ = plt.scatter(sm.reference_frequency[comp_use].to("MHz"), sm.stokes.value[0,0,comp_use], label="reference")
+  >>> _ = plt.xlabel("Frequency (MHz)")
+  >>> _ = plt.ylabel("Flux (Jy)")
+  >>> _ = plt.legend()
   >>> plt.show() # doctest: +SKIP
+  >>> plt.savefig("Images/fhd_catalog_specind_atfreqs.png")
+  >>> plt.clf()
 
-  >>> print(sm.stokes.value[0,0,0])
-  1.185837984085083
-  >>> print(sm.reference_frequency[0])
-  181000000.0 Hz
-  >>> print(sm.spectral_index[0])
-  0.0
-
-  >>> x = np.linspace(75*10**6, 225*10**6, 16)
-  >>> y = sm.stokes.value[0,0,0]*(x/sm.reference_frequency[0]/10**6)**sm.spectral_index[0]
-  >>> plt.plot(x/10**6,y) # doctest: +SKIP
-  >>> plt.scatter(sm.reference_frequency[0]/10**6, sm.stokes.value[0,0,0]) # doctest: +SKIP
-  >>> plt.xlabel("Reference Frequency (MHz)") # doctest: +SKIP
-  >>> plt.ylabel("Flux (Jy)") # doctest: +SKIP
-  >>> # if spectral index is 0, the spectrum is flat meaning same flux for all frequencies, that's why the
-  >>> # at_frequencies method for the flat spectral type just copies
-  >>> plt.show() # doctest: +SKIP
-
-  >>> sm.at_frequencies(freqs=[200*10**6]*units.Hz, inplace=True, run_check=True, atol=None)
-  >>> print(f"{sm.stokes[0,0,8235]:.4f}")
-  0.5330 Jy
-
-.. image:: Images/fhd_catalog_refflux_nonzerospec.png
+.. image:: Images/fhd_catalog_specind_atfreqs.png
     :width: 600
 
-.. image:: Images/fhd_catalog_refflux_zerospec.png
-    :width: 600
 
 c) full spectral type
 *****************************
 .. code-block:: python
 
   >>> import os
+  >>> from astropy import units
   >>> import numpy as np
-  >>> import matplotlib.pyplot as plt # doctest: +SKIP
+  >>> import matplotlib.pyplot as plt
   >>> from pyradiosky import SkyModel
   >>> from pyradiosky.data import DATA_PATH
   >>> sm = SkyModel()
 
   >>> filename = os.path.join(DATA_PATH, "gsm_icrs.skyh5")
   >>> sm.read_skyh5(filename)
+  >>> print(sm.spectral_type)
+  full
 
   >>> print(sm.freq_array)
   [5.00000000e+07 6.11111111e+07 7.22222222e+07 8.33333333e+07
    9.44444444e+07 1.05555556e+08 1.16666667e+08 1.27777778e+08
    1.38888889e+08 1.50000000e+08] Hz
 
-  >>> plt.hist(np.log(sm.stokes.value[0,9,:]), bins=100) # doctest: +SKIP
-  >>> plt.xlabel("log(Flux (Jy))") # doctest: +SKIP
-  >>> plt.ylabel("Counts") # doctest: +SKIP
-  >>> plt.show() # doctest: +SKIP
-
-  >>> sm.at_frequencies(freqs=[150*10**6]*units.Hz, inplace=True, run_check=True, atol=None)
+  >>> # On full spectral types, `at_frequencies` can be used to select a subset of frequencies to keep
+  >>> sm.at_frequencies(freqs=[50, 150]*units.MHz, inplace=True)
   >>> print(sm.freq_array)
-  [1.5e+08] Hz
+  [ 50. 150.] MHz
 
-  >>> plt.hist(np.log(sm.stokes.value[0,0,:]), bins=100) # doctest: +SKIP
-  >>> plt.xlabel("log(Flux (Jy))") # doctest: +SKIP
-  >>> plt.ylabel("Counts") # doctest: +SKIP
-  >>> plt.show() # doctest: +SKIP
 
-.. image:: Images/gsm_icrs_fluxcounts_150MHzfreqind.png
-    :width: 600
+SkyModel: changing the component type
+-------------------------------------
 
-.. image:: Images/gsm_icrs_fluxcounts_150MHzatfreq.png
-    :width: 600
+The :meth:`pyradiosky.SkyModel.healpix_to_point` method can be used to convert healpix
+map components to point components. In this method, the flux density for each map component is
+multiplied by the pixel area to get the fluxes for the new point components. If the
+healpix map is in temperature units, the units can be optionally converted to Jy.
+This is useful for some simulators that only accept point-like source components.
+An example using this method is shown in :ref:`plotting_healpix_maps`.
+
+Similarly, the :meth:`pyradiosky.SkyModel.assign_to_healpix` method can be used to assign
+point components to their nearest healpix pixel. Caution is advised for this method as it
+can move the sources from their proper location (if they are not located precisely at a
+pixel center), but there are times where it is useful. The units can also be optionally
+converted to temperature units.
+
+.. code-block:: python
+
+  >>> import os
+  >>> import numpy as np
+  >>> from pyradiosky import SkyModel
+  >>> from pyradiosky.data import DATA_PATH
+  >>> sm = SkyModel()
+
+  >>> filename = os.path.join(DATA_PATH, "gsm_icrs.skyh5")
+  >>> sm.read_skyh5(filename)
+  >>> print(sm.stokes[0,0,0:5])
+  [4704.91299386 3864.90157423 3933.76949248 4258.30083558 6520.16612935] K
+
+  >>> sm_point = sm.copy()
+  >>> sm_point.healpix_to_point(to_jy=True)
+  >>> print(sm_point.stokes[0,0,0:5])
+  [5913.05776607 4857.3451408  4943.89721506 5351.76290379 8194.43824307] Jy
+
+  >>> # The names are assigned automatically based on the healpix parameters
+  >>> print(sm_point.name[0:5])
+  ['nside8_ring_0' 'nside8_ring_1' 'nside8_ring_2' 'nside8_ring_3'
+   'nside8_ring_4']
+
+  >>> # These sources can turned back into a healpix map with `assign_to_healpix`
+  >>> sm_new = sm_point.assign_to_healpix(nside=8, order="ring", to_k=True)
+  >>> print(sm_new.stokes[0,0,0:5])
+  [4704.91299386 3864.90157423 3933.76949248 4258.30083558 6520.16612935] K
+
+
+SkyModel: Convenience methods
+-------------------------------------
+
+SkyModel has several other useful convenience methods.
+
+a) Converting between kelvin and Jansky units
+*********************************************
+.. code-block:: python
+
+  >>> import os
+  >>> import numpy as np
+  >>> from pyradiosky import SkyModel
+  >>> from pyradiosky.data import DATA_PATH
+
+  >>> filename = os.path.join(DATA_PATH, "gleam_50srcs.vot")
+  >>> sm = SkyModel.from_file(filename)
+  >>> print(sm.stokes[0,0,0:5])
+  [ 0.528997 -0.032702  0.463359  2.686571  0.393777] Jy
+
+  >>> # Convert from Jy to K sr
+  >>> sm.jansky_to_kelvin()
+  >>> print(sm.stokes[0,0,0:5])
+  [ 0.00298095 -0.00018428  0.00261107  0.01513907  0.00221897] K sr
+
+  >>> # Read in the GSM Healpix map
+  >>> gsm_file = os.path.join(DATA_PATH, "gsm_icrs.skyh5")
+  >>> gsm = SkyModel.from_file(gsm_file)
+  >>> print(gsm.stokes[0,0,0:5])
+  [4704.91299386 3864.90157423 3933.76949248 4258.30083558 6520.16612935] K
+
+  >>> # Convert from K to Jy / sr
+  >>> gsm.kelvin_to_jansky()
+  >>> print(gsm.stokes[0,0,0:5])
+  [361379.47094723 296859.06795353 302148.74108755 327075.65583124
+   500807.17526256] Jy / sr
+
+
+b) Calculating rise and set LSTs
+********************************
+.. code-block:: python
+
+  >>> import os
+  >>> import numpy as np
+  >>> from pyradiosky import SkyModel
+  >>> from pyradiosky.data import DATA_PATH
+
+  >>> filename = os.path.join(DATA_PATH, "gleam_50srcs.vot")
+  >>> sm = SkyModel.from_file(filename)
+
+  >>> import os
+  >>> import numpy as np
+  >>> from astropy.coordinates import EarthLocation, Longitude, Latitude
+  >>> from astropy import units
+  >>> from astropy.time import Time
+  >>> from pyradiosky import SkyModel
+
+  >>> # Make a SkyModel object with a grid of sources in the Alt/Az frame
+  >>> array_location = EarthLocation(lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0)
+  >>> time = Time("2015-03-01 00:00:00", scale="utc", location=array_location)
+
+  >>> Nras = 5
+  >>> Ndecs = 5
+  >>> Nsrcs = Nras * Ndecs
+  >>> lon = array_location.lon.deg
+  >>> ra = np.linspace(lon - 90, lon + 90, Nras)
+  >>> dec = np.linspace(-90, 90, Ndecs)
+  >>> ra, dec = np.meshgrid(ra, dec)
+  >>> ra = Longitude(ra.flatten(), units.deg)
+  >>> dec = Latitude(dec.flatten(), units.deg)
+  >>> names = ["src{}".format(i) for i in range(Nsrcs)]
+  >>> stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
+  >>> # all unpolarized, 1 Jy sources
+  >>> stokes[0, ...] = 1.0 * units.Jy
+
+  >>> sm = SkyModel(name=names, ra=ra, dec=dec, frame="icrs", stokes=stokes, spectral_type="flat")
+
+  >>> # choose a different array location and time
+  >>> new_array_location = EarthLocation(lat="-26.7033194 deg", lon="116.67081524 deg", height="377.83 m")
+  >>> new_time = Time("2015-03-05 00:00:00", scale="utc", location=array_location)
+  >>> sm.update_positions(new_time, new_array_location)
+
+  >>> # This calculation is usually called internally e.g. by the `cut_nonrising` method
+  >>> # but it can be called by users and this shows how to do it.
+  >>> sm.calculate_rise_set_lsts(array_location.lat)
+  >>> # Sources that never rise or set have nan values in their rise and set times.
+  >>> print(sm._rise_lst)
+  [       nan        nan        nan        nan        nan 2.83559585
+   3.62099401 4.40639218 5.19179034 5.9771885  3.47194714 4.2573453
+   5.04274347 5.82814163 0.33035449 4.10829843 4.89369659 5.67909475
+   0.18130761 0.96670577        nan        nan        nan        nan
+          nan]
+
+  >>> print(sm._set_lst)
+  [       nan        nan        nan        nan        nan 1.05398577
+   1.83938394 2.6247821  3.41018026 4.19557843 0.41763449 1.20303265
+   1.98843081 2.77382898 3.55922714 6.0644685  0.56668136 1.35207952
+   2.13747769 2.92287585        nan        nan        nan        nan
+          nan]
+
+  >>> # Check if the sources are currently above the horizon
+  >>> print(sm.above_horizon)
+  [ True  True  True  True  True  True  True  True False False  True  True
+   False False False  True  True False False False False False False False
+   False]
+
+c) Calculating coherencies
+**************************
+.. code-block:: python
+
+  >>> import os
+  >>> import numpy as np
+  >>> from pyradiosky import SkyModel
+  >>> from astropy import units
+  >>> from astropy.coordinates import (
+  ...     SkyCoord,
+  ...     EarthLocation,
+  ...     Angle,
+  ...     AltAz,
+  ...     Longitude,
+  ...     Latitude,
+  ...     Galactic)
+  >>> from astropy.time import Time
+
+  >>> # Create a single source a little off of zenith
+  >>> array_location = EarthLocation(lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0)
+  >>> time = Time("2015-03-01 00:00:00", scale="utc", location=array_location)
+  >>> source_coord = SkyCoord(
+  ...     alt=Angle(80, unit=units.deg),
+  ...     az=Angle(0, unit=units.deg),
+  ...     obstime=time,
+  ...     frame="altaz",
+  ...     location=array_location)
+  >>> icrs_coord = source_coord.transform_to("icrs")
+  >>> # make it polarized for coherency rotation to be interesting
+  >>> sm = SkyModel(
+  ...    name="offzen_source",
+  ...    skycoord=icrs_coord,
+  ...    stokes=[1.0, 0.2, 0, 0] * units.Jy,
+  ...    spectral_type="flat"
+  ...  )
+
+  >>> # Call calc_frame_coherency to calculate the coherency in the reference frame and
+  >>> # store it on the SkyModel object
+  >>> sm.calc_frame_coherency()
+  >>> print(sm.frame_coherency[:,:,0,0])
+  [[0.6+0.j 0. +0.j]
+   [0. +0.j 0.4+0.j]] Jy
+
+  >>> # Set the location and time to calculate a local coherency in the alt/az basis
+  >>> sm.update_positions(time, array_location)
+
+  >>> # Call calc_frame_coherency to calculate the local coherency in the alt/az basis
+  >>> # and (optionally) store it on the SkyModel object
+  >>> # coherency in local alt/az basis is different from the coherency in ra/dec basis for polarized sources
+  >>> print(sm.coherency_calc()[:,:,0,0])
+  [[ 5.99999999e-01+0.j -1.20482720e-05+0.j]
+   [-1.20482720e-05+0.j  4.00000001e-01+0.j]] Jy
+
+
+d) Other time and position related attributes and methods
+*********************************************************
+.. code-block:: python
+
+  >>> import os
+  >>> import numpy as np
+  >>> from pyradiosky import SkyModel
+  >>> from astropy import units
+  >>> from astropy.coordinates import (
+  ...     SkyCoord,
+  ...     EarthLocation,
+  ...     Angle,
+  ...     AltAz,
+  ...     Longitude,
+  ...     Latitude,
+  ...     Galactic)
+  >>> from astropy.time import Time
+
+  >>> # Create a couple sources near zenith
+  >>> array_location = EarthLocation(lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0)
+  >>> time = Time("2015-03-01 00:00:00", scale="utc", location=array_location)
+  >>> source_coord = SkyCoord(
+  ...     alt=Angle([90, 80], unit=units.deg),
+  ...     az=Angle([0, 10], unit=units.deg),
+  ...     obstime=time,
+  ...     frame="altaz",
+  ...     location=array_location)
+  >>> icrs_coord = source_coord.transform_to("icrs")
+  >>> stokes = np.zeros((4, 1, 2)) * units.Jy
+  >>> # all unpolarized, 1 Jy sources
+  >>> stokes[0, ...] = 1.0 * units.Jy
+  >>> sm = SkyModel(
+  ...    name=["zen", "offzen"],
+  ...    skycoord=icrs_coord,
+  ...    stokes=stokes,
+  ...    spectral_type="flat"
+  ...  )
+
+  >>> # Examine some of the time/location related paramters
+  >>> sm.update_positions(time, array_location)
+  >>> print(sm.time)
+  2015-03-01 00:00:00.000
+  >>> print(sm.telescope_location)
+  (5109342.76037543, 2005241.90402741, -3239939.46926403) m
+
+  >>> # Can directly access the alt/az of the sources
+  >>> print(sm.alt_az)
+  [[1.57079633 1.3962634 ]
+   [1.729832   0.17453293]]
+
+  >>> # Can directly access direction cosines of the sources
+  >>> print(sm.pos_lmn)
+  [[ 2.13602658e-13  3.01536896e-02]
+   [-3.42597674e-14  1.71010072e-01]
+   [ 1.00000000e+00  9.84807753e-01]]
+
+  >>> # Use the `clear_time_position_specific_params` method to clear out all
+  >>> # attributes related to location and time
+  >>> sm.clear_time_position_specific_params()
+  >>> print(sm.time)
+  None
+  >>> print(sm.telescope_location)
+  None
+  >>> print(sm.alt_az)
+  None
+  >>> print(sm.pos_lmn)
+  None
+  >>> print(sm.above_horizon)
+  None
