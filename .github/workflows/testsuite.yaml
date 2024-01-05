@@ -175,48 +175,36 @@ jobs:
           token: ${{secrets.CODECOV_TOKEN}} #required
           files: ./coverage.xml #optional
 
+  # Use pip for diversity
   warning_test:
     env:
-      ENV_NAME: full_deps
-      PYTHON: "3.11"
+      PYTHON: "3.10"
     name: Warning Test
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        # Adding -l {0} helps ensure conda can be found properly.
-        shell: bash -l {0}
     steps:
       - uses: actions/checkout@main
         with:
           fetch-depth: 0
 
-      - name: Setup Minimamba
-        uses: conda-incubator/setup-miniconda@v2
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
-          miniforge-variant: Mambaforge
-          miniforge-version: latest
-          use-mamba: true
           python-version: ${{ env.PYTHON }}
-          environment-file: ci/${{ env.ENV_NAME }}.yaml
-          activate-environment: ${{ env.ENV_NAME }}
 
-      - name: Conda Info
+      - name: Install
+        run: pip install -e .[dev]
+
+      - name: Environment Info
         run: |
-          conda info -a
-          conda list
+          pip list
           PYVER=`python -c "import sys; print('{:d}.{:d}'.format(sys.version_info.major, sys.version_info.minor))"`
           if [[ $PYVER != ${{ env.PYTHON }} ]]; then
             exit 1;
           fi
 
-      - name: Install
-        run: |
-          pip install --no-deps .
-
       - name: Run Tests
         run: |
           python -m pytest -W error --cov=pyradiosky --cov-config=.coveragerc --cov-report xml:./coverage.xml
-
 
       - name: check coverage report
         run: |
