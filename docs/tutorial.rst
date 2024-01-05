@@ -1194,10 +1194,11 @@ d) Other time and position related attributes and methods
   >>> print(sm.telescope_location)
   (5109342.76037543, 2005241.90402741, -3239939.46926403) m
 
-  >>> # Can directly access the alt/az of the sources
-  >>> print(sm.alt_az)
-  [[1.57079633 1.3962634 ]
-   [1.729832   0.17453293]]
+  >>> # Limit the precision for testing on different platforms
+  >>> with np.printoptions(precision=3):
+  ...   print(sm.alt_az)
+  [[1.571 1.396]
+   [1.73  0.175]]
 
   >>> # Can directly access direction cosines of the sources
   >>> print(sm.pos_lmn)
