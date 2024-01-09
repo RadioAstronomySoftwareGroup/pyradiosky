@@ -59,9 +59,11 @@ setup_args = {
         "dev": [
             "astropy-healpix",
             "astroquery",
+            "coverage",
             "lunarsky>=0.2.1",
             "pytest",
             "pre-commit",
+            "pytest-cov",
             "sphinx",
             "pypandoc",
         ],
