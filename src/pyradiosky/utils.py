@@ -211,7 +211,7 @@ def download_gleam(
         from astroquery.vizier import Vizier
     except ImportError as e:
         raise ImportError(
-            "The astroquery module required to use the download_gleam function."
+            "The astroquery module is required to use the download_gleam function."
         ) from e
 
     if for_testing:  # pragma: no cover
@@ -219,6 +219,10 @@ def download_gleam(
         filename = "gleam_50srcs.vot"
         overwrite = True
         row_limit = 50
+        # We have frequent CI failures with messages like
+        #  "Failed to resolve 'vizier.u-strasbg.fr'"
+        # Try using a US mirror to see if we have fewer errors
+        Vizier.VIZIER_SERVER = "vizier.cfa.harvard.edu"
 
     opath = os.path.join(path, filename)
     if os.path.exists(opath) and not overwrite:
