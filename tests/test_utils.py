@@ -110,7 +110,7 @@ def test_astroquery_missing_error(tmp_path):
     except ImportError:
         with pytest.raises(
             ImportError,
-            match="The astroquery module required to use the download_gleam function.",
+            match="The astroquery module is required to use the download_gleam function.",
         ):
             skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=10)
 
