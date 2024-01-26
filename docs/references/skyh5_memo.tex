@@ -26,18 +26,20 @@
 \label{sec:intro}
 
 This memo introduces a new HDF5\footnote{\url{https://www.hdfgroup.org/}} based
-file format of a \texttt{SkyModel} object in \texttt{pyradiosky}\footnote{\url{https://github.com/RadioAstronomySoftwareGroup/pyradiosky}},
-a python package that provides objects and interfaces for representing diffuse, extended and compact astrophysical radio sources.
-Here, we describe the required and optional elements and the structure of this file format, called \textit{SkyH5}.
+file format of a \texttt{SkyModel} object in
+\texttt{pyradiosky}\footnote{\url{https://github.com/RadioAstronomySoftwareGroup/pyradiosky}},
+a python package that provides objects and interfaces for representing diffuse,
+extended and compact astrophysical radio sources. Here, we describe the required
+and optional elements and the structure of this file format, called \textit{SkyH5}.
 
 We assume that the user has a working knowledge of HDF5 and the associated
 python bindings in the package \texttt{h5py}\footnote{\url{https://www.h5py.org/}}, as
-well as \texttt{SkyModel} objects in \texttt{pyradiosky}. For more information about HDF5, please
-visit \url{https://portal.hdfgroup.org/display/HDF5/HDF5}. For more information
-about the parameters present in a \texttt{SkyModel} object, please visit
+well as \texttt{SkyModel} objects in \texttt{pyradiosky}. For more information about
+HDF5, pleasevisit \url{https://portal.hdfgroup.org/display/HDF5/HDF5}. For more
+information about the parameters present in a \texttt{SkyModel} object, please visit
 \url{https://pyradiosky.readthedocs.io/en/latest/skymodel.html}.
-Examples of how to interact with \texttt{SkyModel} objects in \texttt{pyradiosky} are available at
-\url{http://pyradiosky.readthedocs.io/en/latest/tutorial.html}.
+Examples of how to interact with \texttt{SkyModel} objects in \texttt{pyradiosky} are
+available at \url{http://pyradiosky.readthedocs.io/en/latest/tutorial.html}.
 
 Note that throughout the documentation, we assume a row-major convention (i.e.,
 C-ordering) for the dimension specification of multi-dimensional arrays. For
@@ -50,10 +52,11 @@ and Julia) must transpose these axes.
 \section{Overview}
 \label{sec:overview}
 A SkyH5 object contains data representing catalogs and maps of
-astrophysical radio sources, including the associated metadata necessary to interpret them.
-A SkyH5 file contains two primary HDF5 groups: the \texttt{Header} group, which contains the metadata, and
-the \texttt{Data} group, which contains the Stokes parameters representing the
-flux densities or temperatures of the sources (as well as some optional arrays the same size as the stokes parameters data).
+astrophysical radio sources, including the associated metadata necessary to interpret
+them. A SkyH5 file contains two primary HDF5 groups: the \texttt{Header} group,
+which contains the metadata, and the \texttt{Data} group, which contains the Stokes
+parameters representing the flux densities or brightness temperatures of the sources
+(as well as some optional arrays the same size as the stokes parameters data).
 Datasets in the \texttt{Data} group
 are can be passed through HDF5's compression
 pipeline, to reduce the amount of on-disk space required to store the data.
@@ -62,7 +65,8 @@ little that the user has to explicitly do when reading data. For users
 interested in creating new files, the use of compression is optional in the
 SkyH5 format, because the HDF5 file is self-documenting in this regard.
 
-Many of the datasets in SkyH5 files have units associated with them (represented as \texttt{astropy Quantity} objects on the \texttt{SkyModel} object).
+Many of the datasets in SkyH5 files have units associated with them (represented
+as \texttt{astropy Quantity} objects on the \texttt{SkyModel} object).
 The units are stored as attributes on the datasets with the name ``unit''.
 Datasets that derive from other \texttt{astropy} objects (e.g. \texttt{astropy Time,
 astropy EarthLocation, astropy Latitude, astropy Longitude})
@@ -86,42 +90,62 @@ results in 32-bit integers and double precision floating point numbers. Each
 entry in the list contains \textbf{(1)} the exact name of the dataset in the
 HDF5 file, in boldface, \textbf{(2)} the expected datatype of the dataset, in
 italics, \textbf{(3)} a brief description of the data, and \textbf{(4)} the name
-of the corresponding attribute on a \texttt{SkyModel} object.
+of the corresponding attribute on a \texttt{SkyModel} object, italicized and in
+parentheses at the end of the entry.
 
 Note that string datatypes should be handled with care. See
-the Appendix in the UVH5 memo (\url{https://github.com/RadioAstronomySoftwareGroup/pyuvdata/blob/main/docs/references/uvh5_memo.pdf})
-for appropriately defining them for interoperability between different HDF5 implementations.
+the Appendix in the UVH5 memo
+(\url{https://github.com/RadioAstronomySoftwareGroup/pyuvdata/blob/main/docs/references/uvh5_memo.pdf})
+for appropriately defining them for interoperability between different HDF5
+implementations.
 
 \subsection{Required Parameters}
 \label{sec:req_params}
 \begin{itemize}
 
-\item \textbf{component\_type}: \textit{string} The type of components in the sky model. The options are: ``healpix'' and ``point''.
-If component\_type is ``healpix'', the components are the pixels in a HEALPix map in units compatible with K or Jy/sr.
-If the component\_type is ``point'', the components are point-like sources, or point like components of extended sources,
-in units compatible with Jy or K sr. Some additional parameters are required depending on the component type. (\textit{component\_type})
+\item \textbf{component\_type}: \textit{string} The type of components in the sky model.
+The options are: ``healpix'' and ``point''. If component\_type is ``healpix'', the components
+are the pixels in a HEALPix map in units compatible with K or Jy/sr. If the
+component\_type is ``point'', the components are point-like sources, or point like
+components of extended sources, in units compatible with Jy or K sr. Some additional
+parameters are required depending on the component type. (\textit{component\_type})
 
-\item \textbf{Ncomponents}: \textit{int} The number of components in the sky model. This can be the number of individual
-compact sources, or it can include components of extended sources, or the number of pixels in a map. (\textit{Ncomponents})
+\item \textbf{Ncomponents}: \textit{int} The number of components in the sky model. This
+can be the number of individual compact sources, or it can include components of
+extended sources, or the number of pixels in a map. (\textit{Ncomponents})
 
-\item \textbf{spectral\_type}: \textit{string} This describes the type of spectral model for the components. The options are:
-``spectral\_index'', ``subband'', ``flat'', or ``full''. If the spectral model uses a spectral index, the reference\_frequency and
-spectral\_index parameters are required. The convention for the spectral index is $I=I_0 \frac{f}{f_0}^{\alpha}$, where
-$I_0$ is the stokes parameter at the reference\_frequency parameter $f_0$ and $\alpha$ is the spectral\_index parameter.
-Note that the spectral index is assumed to apply in the units of the stokes parameter (i.e. there is no additive factor of 2 applied
-to convert between temperature and flux density units).
-The subband spectral model is used for catalogs with multiple flux measurements at different frequencies (i.e. GLEAM
-\url{https://www.mwatelescope.org/science/galactic-science/gleam/}). For subband  spectral models, the freq\_array
-and freq\_edge\_array parameters are required to give the nominal (usually the central) frequency and the top and bottom of
-each subband respectively.
-The flat spectral model assumes no spectral flux dependence, which can be useful for testing.
-The full spectral model is used for catalogs with flux values at multiple frequencies that are not expected to have flux correlations as a function of frequency, so cannot not be interpolated to frequencies not included in the catalog. This is a good representation for e.g. Epoch of Reionization signal cubes.
-For full  spectral models, the freq\_array parameter is required to give the frequencies.
+\item \textbf{spectral\_type}: \textit{string} This describes the type of spectral model for
+the components. The options are:
+\begin{enumerate}
+	\item \textbf{spectral\_index} The convention for the spectral index is
+	$I=I_0 \frac{f}{f_0}^{\alpha}$, where $I_0$ is the stokes parameter at the
+	reference\_frequency parameter $f_0$ and $\alpha$ is the spectral\_index
+	parameter. Note that the spectral index is assumed to apply in the units of the
+	stokes parameter (i.e. there is no additive factor of 2 applied to convert between
+	brightness temperature and flux density units). If the spectral model uses a
+	spectral index, the reference\_frequency and spectral\_index parameters are
+	required.
+	\item \textbf{subband} The subband spectral model is used for catalogs with
+	multiple flux measurements at different frequencies (i.e. GLEAM
+	\url{https://www.mwatelescope.org/science/galactic-science/gleam/}). For subband
+	spectral models, the freq\_array and freq\_edge\_array parameters are required
+	to give the nominal (usually the central) frequency and the top and bottom of
+	each subband respectively.
+	\item \textbf{flat} The flat spectral model assumes no spectral flux dependence,
+	which can be useful for testing. Since the flux is assumed to be the same at all
+	frequencies it does not require any extra parameters to be defined.
+	\item \textbf{full} The full spectral model is used for catalogs with flux values at
+	multiple frequencies that are not expected to have flux correlations as a function
+	of frequency, so cannot not be interpolated to frequencies not included in the
+	catalog. This is a good representation for e.g. Epoch of Reionization signal cubes.
+	For full  spectral models, the freq\_array parameter is required to give the frequencies.
+\end{enumerate}
 (\textit{spectral\_type})
 
 \item \textbf{Nfreqs}: \textit{int}
-Number of frequencies if spectral\_type is ``full'' or ``subband'', 1 otherwise. (\textit{Nfreqs})
-astropy SkyCoord
+Number of frequencies if spectral\_type is ``full'' or ``subband'', 1 otherwise.
+(\textit{Nfreqs})
+
 \item \textbf{history}: \textit{string} The history of the catalog. (\textit{history})
 \end{itemize}
 
@@ -129,93 +153,134 @@ astropy SkyCoord
 \subsection{Optional Parameters}
 \label{sec:opt_params}
 \begin{itemize}
-\item \textbf{name}: \textit{string} The name for each component. This is a one-dimensional array of size (Ncomponents).
+\item \textbf{name}: \textit{string} The name for each component. This is a
+one-dimensional array of size (Ncomponents).
 Note this is \textbf{required} if the component\_type is ``point''. (\textit{name})
 
 \item \textbf{skycoord}:
-A nested dataset that contains the information to create an \texttt{astropy SkyCoord} object representing the component positions.
-Note this is \textbf{required} if the component\_type is ``point''. The keys must include:
+A nested dataset that contains the information to create an \texttt{astropy SkyCoord}
+object representing the component positions. Note this is \textbf{required} if the
+component\_type is ``point''. The keys must include:
 	\begin{itemize}
-	\item \textbf{frame}: \textit{string} The name of the coordinate frame (e.g. ``icrs'', ``fk5'', ``galactic''). Must be a frame supported by \texttt{astropy}.
-	\item \textbf{representation\_type}: \textit{string} The representation type, one of ``spherical'', ``cartesian'' or ``cylindrical''
-	\item Representation component names (e.g. \textbf{ra}, \textbf{dec}, \textbf{alt}, \textbf{az}): \textit{float} Two or three such components must be present, 	which ones are required depend on the frame. These are one-dimensional arrays of size (Ncomponents).
+	\item \textbf{frame}: \textit{string} The name of the coordinate frame
+	(e.g. ``icrs'', ``fk5'', ``galactic''). Must be a frame supported by \texttt{astropy}.
+	Note that only one frame is allowed, which applies to all the components.
+	\item \textbf{representation\_type}: \textit{string} The representation type, one
+	of ``spherical'', ``cartesian'' or ``cylindrical''. This sets what the coordinate
+	names can be. It is most common to set this to ``spherical" and
+	specify latitudinal and longitudinal coordinates (e.g. \textbf{ra}, \textbf{dec})
+	and optionally distance coordinates. It is also possible to use other
+	representations such as cartesian or cylindrical, e.g. for ``cartesian" the
+	coordinates would be specified in x, y, and z. See the \texttt{astropy SkyCoord}
+	docs for more details.
+	\item Coordinate names (e.g. \textbf{ra}, \textbf{dec}, \textbf{alt}, \textbf{az}):
+	\textit{float} Two or three such components must be present, which ones are
+	required depend on the frame and representation\_type. These are
+	one-dimensional arrays of size (Ncomponents).
 	\end{itemize}
-And may include any other attributes accepted as input parameters for an \texttt{astropy SkyCoord} object (e.g. obstime, equinox, location).
-Each of these datasets may have ``unit'' and ``object\_type'' attributes and may be either a scalar or a one-dimensional array of size (Ncomponents) as appropriate.
+And may include any other attributes accepted as input parameters for an
+\texttt{astropy SkyCoord} object (e.g. obstime, equinox, location).
+Each of these datasets may have ``unit'' and ``object\_type'' attributes and may
+be either a scalar or a one-dimensional array of size (Ncomponents) as
+appropriate.
 (\textit{skycoord})
 
 \item \textbf{nside}: \textit{int}
-The HEALPix nside parameter. Note this is \textbf{required} if the component\_type is ``healpix'' and should not be defined otherwise. (\textit{nside})
+The HEALPix nside parameter. Note this is \textbf{required} if the
+component\_type is ``healpix'' and should not be defined otherwise.
+(\textit{nside})
 
 \item \textbf{hpx\_order}: \textit{string}
 The HEALPix pixel ordering convention, either ``ring'' or ``nested''.
-Note this is \textbf{required} if the component\_type is ``healpix'' and should not be defined otherwise. (\textit{hpx\_order})
+Note this is \textbf{required} if the component\_type is ``healpix'' and should
+not be defined otherwise. (\textit{hpx\_order})
 
-\item \textbf{hpx\_frame}:  A nested dataset that contains the information to describe an \texttt{astropy} coordinate frame giving the HEALPix coordinate frame.
-This is similar to the skycoord dataset described above but it does not contain the representation\_type or the representation component names.
-Note this is \textbf{required} if the component\_type is ``healpix'' and should not be defined otherwise.
-The keys must include:
+\item \textbf{hpx\_frame}:  A nested dataset that contains the information to
+describe an \texttt{astropy} coordinate frame giving the HEALPix coordinate
+frame. This is similar to the skycoord dataset described above but it does not
+contain the representation\_type or the coordinate names.
+Note this is \textbf{required} if the component\_type is ``healpix'' and should
+not be defined otherwise. The keys must include:
 	\begin{itemize}
-	\item \textbf{frame}: \textit{string} The name of the coordinate frame (e.g. ``icrs'', ``fk5'', ``galactic''). Must be a frame supported by \texttt{astropy}.
+	\item \textbf{frame}: \textit{string} The name of the coordinate frame
+	(e.g. ``icrs'', ``fk5'', ``galactic''). Must be a frame supported by
+	\texttt{astropy}.
 	\end{itemize}
-And may include any other scalar attributes accepted as input parameters for an \texttt{astropy SkyCoord} object (e.g. obstime, equinox, location).
-Each of these datasets may have ``unit'' and ``object\_type'' attributes as appropriate.
+And may include any other scalar attributes accepted as input parameters
+for an \texttt{astropy SkyCoord} object (e.g. obstime, equinox, location). Each
+of these datasets may have ``unit'' and ``object\_type'' attributes as appropriate.
 (\textit{hpx\_frame})
 
 \item \textbf{hpx\_inds}: \textit{int}
-The HEALPix indices for the included components. Does not need to include all the HEALPix pixels in the map.
-This is a one-dimensional array of size (Ncomponents).
-Note this is \textbf{required} if the component\_type is ``healpix'' and should not be defined otherwise. (\textit{hpx\_inds})
+The HEALPix indices for the included components. Does not need to include
+all the HEALPix pixels in the map. This is a one-dimensional array of size
+(Ncomponents). Note this is \textbf{required} if the component\_type is
+``healpix'' and should not be defined otherwise. (\textit{hpx\_inds})
 
 \item \textbf{freq\_array}: \textit{float}
-Frequency array giving the nominal (or central) frequency in a unit that can be converted to Hz.
-Note this is \textbf{required} if the spectral\_type is ``full'' or ``subband'' and should not be defined otherwise. (\textit{freq\_array})
+Frequency array giving the nominal (or central) frequency in a unit that can be
+converted to Hz. Note this is \textbf{required} if the spectral\_type is ``full'' or
+``subband'' and should not be defined otherwise. (\textit{freq\_array})
 
 \item \textbf{freq\_edge\_array}: \textit{float}
-Array giving the frequency band edges in a unit that can be converted to Hz, only required if spectral\_type is ``subband''.
-This is a two dimensional array with shape (2, Nfreqs). The zeroth index in the first dimension holds the lower band edge
-and the first index holds the upper band edge.
-Note this is \textbf{required} if the spectral\_type is ``subband'' and should not be defined otherwise. (\textit{freq\_edge\_array})
+Array giving the frequency band edges in a unit that can be converted to Hz.
+This is a two dimensional array with shape (2, Nfreqs). The zeroth index in
+the first dimension holds the lower band edge and the first index holds the
+upper band edge. Note this is \textbf{required} if the spectral\_type is
+``subband'' and should not be defined otherwise. (\textit{freq\_edge\_array})
 
 \item \textbf{reference\_frequency}: \textit{float}
-Reference frequency giving the frequency at which the flux in the stokes parameter was measured in a unit that can be converted to Hz.
-This is a one-dimensional array of size (Ncomponents).
-Note this is \textbf{required} if the spectral\_type is ``spectral\_index'' and should not be defined if the spectral\_type is ``full'' or ``subband''.
+Reference frequency giving the frequency at which the flux in the stokes
+parameter was measured in a unit that can be converted to Hz. This is a
+one-dimensional array of size (Ncomponents). Note this is \textbf{required} if
+the spectral\_type is ``spectral\_index'' and should not be defined if the
+spectral\_type is ``full'' or ``subband''.
 (\textit{reference\_frequency})
 
 \item \textbf{spectral\_index}: \textit{float}
-The spectral index describing the flux evolution with frequency, see details in the spectral\_type description above.
-This is a one-dimensional array of size (Ncomponents).
-Note this is \textbf{required} if the spectral\_type is ``spectral\_index'' and should not be defined otherwise.
+The spectral index describing the flux evolution with frequency, see details
+in the spectral\_type description above. This is a one-dimensional array
+of size (Ncomponents). Note this is \textbf{required} if the spectral\_type is
+``spectral\_index'' and should not be defined otherwise.
 (\textit{spectral\_index})
 
 \item \textbf{extended\_model\_group}: \textit{string}
 Identifier that groups components of an extended source model.
-This is a one-dimensional array of size (Ncomponents), with empty strings for point sources that are not components of an extended source.
+This is a one-dimensional array of size (Ncomponents), with empty strings
+for point sources that are not components of an extended source.
 (\textit{extended\_model\_group})
 \end{itemize}
 
 \subsection{Extra Columns}
 \label{sec:extra-columns}
-\texttt{SkyModel} objects support ``extra columns'', which are additional arbitrary per-component arrays of metadata that are useful to carry
-around with the data but which are not formally supported as a reserved keyword in the \texttt{Header}. In a SkyH5 file,
-extra columns are handled by creating a datagroup called \textbf{extra\_columns} inside the \texttt{Data} datagroup.
-When possible, these quantities should be HDF5 datatypes, to support interoperability between UVH5 readers.
-Inside of the extra\_columns datagroup, each extra columns is saved as a key-value pair using a dataset, where the name of the
-extra columns is the name of the dataset and its corresponding array is saved in the dataset. The ``unit'' and ``object\_type'' HDF5 attributes
-are used in the same way as for the other header items (see \ref{sec:overview}), but it is not recommended to use other attribute names
-due to the lack of support inside of \texttt{pyradiosky} for ensuring the attributes are properly saved when reading and writing SkyH5 files.
+\texttt{SkyModel} objects support ``extra columns'', which are additional arbitrary
+per-component arrays of metadata that are useful to carryaround with the data but
+which are not formally supported as a reserved keyword in the \texttt{Header}. In a
+SkyH5 file, extra columns are handled by creating a datagroup called
+\textbf{extra\_columns} inside the \texttt{Data} datagroup. When possible, these
+quantities should be HDF5 datatypes, to support interoperability between SkyH5
+readers. Inside of the extra\_columns datagroup, each extra columns is saved as
+a key-value pair using a dataset, where the name of the extra columns is the name
+of the dataset and its corresponding array is saved in the dataset. The ``unit'' and
+``object\_type'' HDF5 attributes are used in the same way as for the other header
+items (see \ref{sec:overview}), but it is not recommended to use other attribute
+names due to the lack of support inside of \texttt{pyradiosky} for ensuring the
+attributes are properly saved when reading and writing SkyH5 files.
 
 \section{Data}
 \label{sec:data}
-In addition to the \texttt{Data} datagroup in the root namespace, there must be one called \texttt{Data}.
-This datagroup saves the Stokes parameters representing the flux densities or temperatures of the sources and
-some optional arrays that are the same size. They are also all expected to be the same shape: (4, Nfreqs, Ncomponents)
-where the first dimension indexes the polarization direction, ordered (I, Q, U, V).
-The \textbf{stokes} dataset must be present in this datagroup and it must have a ``unit'' attribute that is equivalent to Jy or K str if the
-component\_type is ``point'' or equivalent to Jy/str or K if the component\_type is ``healpix''.
-In addition, this datagroup may also contain a  \textbf{stokes\_error} dataset that gives the standard error on the stokes values and
-should have the same ``unit'' attribute as the stokes dataset and a  \textbf{beam\_amp} dataset that gives the beam amplitude at the
-source position for the instrument that made the measurement.
+In addition to the \texttt{Data} datagroup in the root namespace, there must be
+one called \texttt{Data}. This datagroup saves the Stokes parameters representing
+the flux densities or brightness temperatures of the sources and some optional
+arrays that are the same size. They are also all expected to be the same shape:
+(4, Nfreqs, Ncomponents) where the first dimension indexes the polarization
+direction, ordered (I, Q, U, V). The \textbf{stokes} dataset must be present in this
+datagroup and it must have a ``unit'' attribute that is equivalent to Jy or K str if the
+component\_type is ``point'' or equivalent to Jy/str or K if the component\_type is
+``healpix''. In addition, this datagroup may also contain a  \textbf{stokes\_error}
+dataset that gives the standard error on the stokes values and should have the
+same ``unit'' attribute as the stokes dataset and a  \textbf{beam\_amp} dataset
+that gives the beam amplitude at the source position for the instrument that made
+the measurement.
 
 \end{document}
