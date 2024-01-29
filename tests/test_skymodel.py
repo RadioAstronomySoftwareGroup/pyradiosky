@@ -1049,10 +1049,7 @@ def test_assign_to_healpix_fullsky(assign_hpx_data, spectral_type, frame):
     if spectral_type == "subband":
         assert np.allclose(
             sky_hpx.stokes_error[0, 0, pix_num],
-            np.sqrt(0.15**2 + 0.25**2)
-            * units.Jy
-            * jy_to_ksr_conv_factor
-            / hpx_area,
+            np.sqrt(0.15**2 + 0.25**2) * units.Jy * jy_to_ksr_conv_factor / hpx_area,
         )
         assert np.allclose(
             sky_hpx.stokes_error[1, 0, pix_num],
