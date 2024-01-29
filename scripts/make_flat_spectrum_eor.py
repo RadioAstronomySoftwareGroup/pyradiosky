@@ -86,9 +86,9 @@ def flat_spectrum_skymodel(
             * omega
         )
         voxvols[zi] = vol
-    voxvols[
-        nfreqs - 1
-    ] = vol  # Assume the last redshift bin is the same width as the next-to-last.
+    voxvols[nfreqs - 1] = (
+        vol  # Assume the last redshift bin is the same width as the next-to-last.
+    )
 
     scale = np.sqrt(voxvols / voxvols[ref_zbin])
     stokes /= scale

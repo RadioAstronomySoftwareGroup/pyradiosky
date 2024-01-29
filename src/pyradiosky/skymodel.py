@@ -2535,14 +2535,14 @@ class SkyModel(UVBase):
 
         coherency_rot_matrix = np.zeros((2, 2, n_inds), dtype=np.float64)
         for src_i in range(n_inds):
-            coherency_rot_matrix[
-                :, :, src_i
-            ] = sct.spherical_basis_vector_rotation_matrix(
-                theta_frame[src_i],
-                phi_frame[src_i],
-                basis_rotation_matrix[:, :, src_i],
-                theta_altaz[src_i],
-                phi_altaz[src_i],
+            coherency_rot_matrix[:, :, src_i] = (
+                sct.spherical_basis_vector_rotation_matrix(
+                    theta_frame[src_i],
+                    phi_frame[src_i],
+                    basis_rotation_matrix[:, :, src_i],
+                    theta_altaz[src_i],
+                    phi_altaz[src_i],
+                )
             )
 
         return coherency_rot_matrix
@@ -3471,9 +3471,9 @@ class SkyModel(UVBase):
                         # hpx_frame was stored as a string
                         frame_str = _get_value_hdf5_group(header, "hpx_frame", True)
                         dummy_coord = SkyCoord(0, 0, unit="rad", frame=frame_str)
-                        init_params[
-                            "hpx_frame"
-                        ] = dummy_coord.frame.replicate_without_data(copy=True)
+                        init_params["hpx_frame"] = (
+                            dummy_coord.frame.replicate_without_data(copy=True)
+                        )
                     else:
                         # hpx_frame was stored as a nested dset
                         skycoord_dict = {}
@@ -3486,9 +3486,9 @@ class SkyModel(UVBase):
                                 header["hpx_frame"], key, str_type
                             )
                         dummy_coord = SkyCoord(0, 0, unit="rad", **skycoord_dict)
-                        init_params[
-                            "hpx_frame"
-                        ] = dummy_coord.frame.replicate_without_data(copy=True)
+                        init_params["hpx_frame"] = (
+                            dummy_coord.frame.replicate_without_data(copy=True)
+                        )
                 elif "frame" in header:
                     # frame was stored as a string
                     frame_str = _get_value_hdf5_group(header, "frame", True)
@@ -3546,10 +3546,10 @@ class SkyModel(UVBase):
                 if init_params["spectral_type"] == "subband":
                     if "freq_edge_array" not in init_params.keys():
                         try:
-                            init_params[
-                                "freq_edge_array"
-                            ] = _get_freq_edges_from_centers(
-                                init_params["freq_array"], self._freq_array.tols
+                            init_params["freq_edge_array"] = (
+                                _get_freq_edges_from_centers(
+                                    init_params["freq_array"], self._freq_array.tols
+                                )
                             )
                         except ValueError:
                             warnings.warn(
