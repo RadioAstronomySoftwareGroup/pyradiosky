@@ -33,25 +33,26 @@ affiliations:
    index: 4
  - name: Department of Physics, Brown University, USA
    index: 5
-date: 25 January 2024
+date: 8 February 2024
 bibliography: paper.bib
 ---
 
 # Summary
 
 Pyradiosky is a package to fully and generally describe models of compact,
-extended and diffuse foregrounds with full polarization support. It
-emphasizes the provenance and metadata required to understand the errors and
-covariances associated with foreground models built from interferometric data.
+extended and diffuse radio sources with full polarization support. It is designed
+to support simulations and calibrations of radio interferometry data.
+It emphasizes the provenance and metadata required to understand the errors and
+covariances associated with sky models built from interferometric data.
 
 # Statement of need
 
 The original motivation for the development of pyradiosky was to support
 high-precision simulation of interferometric data for 21 cm cosmology, but was
-deliberately developed to support a broad range of radio astronmy applications.
-Foreground models are key to the future of 21 cm analyses because high-precision
+deliberately developed to support a broad range of radio astronomy applications.
+Sky models are key to the future of 21 cm analyses because high-precision
 foreground subtraction has the potential to dramatically increase the sensitivity
-of 21 cm instruments. High-quality foreground models are also extremely
+of 21 cm instruments. High-quality sky models are also extremely
 important for calibration of all radio astronomy data.
 
 Pyradiosky supports reading in catalogs in the widely used VOTable format as
@@ -59,12 +60,17 @@ well as an HDF5 based format we developed. It also supports some formats used by
 21 cm cosmology codes and is easily extensible to other formats. It provides an
 object interface and useful methods for downselecting and combining multiple
 catalogs, coordinate transformations (with polarization support) and calculating
-fluxes at specific frequencies.
+fluxes at specific frequencies. Pyradiosky uses astropy [@astropy] for most
+coordinate transforms and for VOTable support, it also interfaces with the
+lunarsky [@lunarsky] package to support moon-based coordinate systems.
 
 As part of the Radio Astronomy Software Group suite (along with pyuvdata
 [@pyuvdata2017] and pyuvsim [@pyuvsim2019]), pyradiosky provides software
 infrastructure for a broad range of radio astronomy applications including
 enabling rigorous, seamless testing of 21 cm cosmology analysis developments.
 
+# Acknowledgements
+
+Support for pyradiosky was provided by NSF awards #1835421 and #1835120.
 
 # References
