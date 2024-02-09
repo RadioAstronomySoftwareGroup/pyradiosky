@@ -4357,7 +4357,10 @@ class SkyModel(UVBase):
         elif "source_array" in catalog.keys():
             catalog = catalog["source_array"]
         else:
-            raise KeyError(f"File {filename_sav} does not contain a known catalog name")
+            raise KeyError(
+                f"File {filename_sav} does not contain a known catalog name. "
+                f"File variables include {list(catalog.keys())}"
+            )
         ids = catalog["id"].astype(str)
         ra = catalog["ra"]
         dec = catalog["dec"]
