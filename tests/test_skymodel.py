@@ -2941,21 +2941,21 @@ def test_read_votable_errors():
         )
 
 
-def test_fhd_catalog_reader():
-    for fname in ["catalog", "source_array"]:
-        catfile = os.path.join(SKY_DATA_PATH, f"fhd_{fname}.sav")
+@pytest.mark.parametrize("fname", ["catalog", "source_array"])
+def test_fhd_catalog_reader(fname):
+    catfile = os.path.join(SKY_DATA_PATH, f"fhd_{fname}.sav")
 
-        if fname == "catalog":
-            with uvtest.check_warnings(
-                UserWarning, match="Source IDs are not unique. Defining unique IDs."
-            ):
-                skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
-        else:
+    if fname == "catalog":
+        with uvtest.check_warnings(
+            UserWarning, match="Source IDs are not unique. Defining unique IDs."
+        ):
             skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
+    else:
+        skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
 
-        assert skyobj.filename == [f"fhd_{fname}.sav"]
-        catalog = scipy.io.readsav(catfile)[fname]
-        assert skyobj.Ncomponents == len(catalog)
+    assert skyobj.filename == [f"fhd_{fname}.sav"]
+    catalog = scipy.io.readsav(catfile)[fname]
+    assert skyobj.Ncomponents == len(catalog)
 
     assert np.all(skyobj.reference_frequency > 50 * units.MHz)
 
@@ -3040,6 +3040,19 @@ def test_fhd_catalog_reader_labeling_extended_sources():
     for comp in range(len(expected_ext_model_group)):
         assert skyobj.extended_model_group[comp] == expected_ext_model_group[comp]
         assert skyobj.name[comp] == expected_name[comp]
+
+
+def test_fhd_catalog_reader_errors():
+    catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog_bad.sav")
+
+    with pytest.raises(
+        KeyError,
+        match=re.escape(
+            f"File {catfile} does not contain a known catalog name. "
+            "File variables include ['src_arr']"
+        ),
+    ):
+        SkyModel.from_fhd_catalog(catfile)
 
 
 def test_point_catalog_reader():

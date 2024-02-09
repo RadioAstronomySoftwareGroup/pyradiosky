@@ -6,6 +6,7 @@
 - A memo describing the SkyH5 format in docs/references.
 
 ### Changed
+- Added support for more types of FHD catalog files and better error messages.
 - Added support (and testing) for python 3.12, dropped support for python 3.8
 - Moved the optional data-sized arrays (stokes_error and beam_amp) from the Header
 datagroup to the Data datagroup in SkyH5 files.
