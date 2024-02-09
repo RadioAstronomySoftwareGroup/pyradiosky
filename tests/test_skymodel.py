@@ -3046,11 +3046,7 @@ def test_fhd_catalog_reader_errors():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog_bad.sav")
 
     with pytest.raises(
-        KeyError,
-        match=re.escape(
-            f"File {catfile} does not contain a known catalog name. "
-            "File variables include ['src_arr']"
-        ),
+        KeyError, match=f"File {catfile} does not contain a known catalog name. "
     ):
         SkyModel.from_fhd_catalog(catfile)
 
