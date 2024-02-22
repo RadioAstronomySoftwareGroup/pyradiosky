@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.1] - 2024-02-22
+
 ### Added
 - A memo describing the SkyH5 format in docs/references.
 
