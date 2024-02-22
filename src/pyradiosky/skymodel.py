@@ -3602,7 +3602,7 @@ class SkyModel(UVBase):
                 else:
                     warnings.warn(
                         "No frame available in this file, assuming 'icrs'. "
-                        "Consider re-writing this file to ensure future compatility."
+                        "Consider re-writing this file to ensure future compatibility."
                     )
                     init_params["frame"] = "icrs"
 
@@ -3613,7 +3613,7 @@ class SkyModel(UVBase):
         if self.component_type == "healpix" and "frame" not in init_params:
             warnings.warn(
                 "No frame available in this file, assuming 'icrs'. "
-                "Consider re-writing this file to ensure future compatility."
+                "Consider re-writing this file to ensure future compatibility."
             )
             init_params["frame"] = "icrs"
 
