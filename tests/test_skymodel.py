@@ -3823,7 +3823,7 @@ def test_skyh5_backwards_compatibility(tmpdir, include_frame, cat_source):
             skymodel._add_value_hdf5_group(header, "ra", sky.ra, Longitude)
             err_msg.append(
                 "No frame available in this file, assuming 'icrs'. "
-                "Consider re-writing this file to ensure future compatility."
+                "Consider re-writing this file to ensure future compatibility."
             )
         if cat_source == "GLEAM":
             del h5f["/Data/stokes_error"]
@@ -3860,7 +3860,7 @@ def test_skyh5_backwards_compatibility_healpix(healpix_disk_new, tmpdir):
     with uvtest.check_warnings(
         UserWarning,
         match="No frame available in this file, assuming 'icrs'. Consider re-writing "
-        "this file to ensure future compatility.",
+        "this file to ensure future compatibility.",
     ):
         sky2 = SkyModel.from_file(testfile)
     assert sky == sky2
@@ -4183,7 +4183,7 @@ def test_skyh5_write_read_no_frame(healpix_disk_new, tmpdir):
     with uvtest.check_warnings(
         UserWarning,
         match="No frame available in this file, assuming 'icrs'. Consider re-writing "
-        "this file to ensure future compatility.",
+        "this file to ensure future compatibility.",
     ):
         new_sky = SkyModel.from_file(outfile)
 
