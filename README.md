@@ -5,14 +5,12 @@
 Python objects and interfaces for representing diffuse, extended and compact
 astrophysical radio sources.
 
-pyradiosky is currently in a very early development stage, interfaces are changing rapidly.
-
 The primary user class is `SkyModel`, which supports:
 
   - catalogs of point sources (read/write to hd5 and text files, read VOTables)
   - diffuse models as HEALPix maps (read/write to hd5 files)
-  - conversion between RA/Dec and Azimuth/Elevation including calculating full
-  polarization coherencies in Az/El.
+  - conversion between any astropy supported coordinates (e.g. J2000 RA/Dec) and
+  Azimuth/Elevation including calculating full polarization coherencies in Az/El.
 
 # File formats
 
@@ -30,11 +28,10 @@ Please see our [guide on contributing](.github/CONTRIBUTING.md)
 # Versioning
 We use a `generation.major.minor` version number format. We use the `generation`
 number for very significant improvements or major rewrites, the `major` number
-to indicate substantial package changes (intended to be released every ~6 months)
-and the `minor` number to release smaller incremental updates (intended to be
-released approximately monthly and which usually do not include breaking API
-changes). We do our best to provide a significant period (usually 2 major
-generations) of deprecation warnings for all breaking changes to the API.
+to indicate substantial package changes and the `minor` number to release smaller
+incremental updates (which do not include breaking API changes). We do our best
+to provide a significant period (usually 2 major generations) of deprecation
+warnings for all breaking changes to the API.
 We track all changes in our [changelog](https://github.com/RadioAstronomySoftwareGroup/pyradiosky/blob/main/CHANGELOG.md).
 
 # Documentation
@@ -120,7 +117,7 @@ you'll need to run `pre-commit install` in the top level `pyradiosky` directory.
 
 # Tests
 Uses the `pytest` package to execute test suite.
-From the source pyradiosky directory run ```pytest``` or ```python -m pytest```.
+From the pyradiosky directory run ```pytest``` or ```python -m pytest```.
 
 # Maintainers
 pyradiosky is maintained by the RASG Managers, which currently include:
