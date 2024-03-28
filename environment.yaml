@@ -2,20 +2,20 @@ name: pyradiosky
 channels:
   - conda-forge
 dependencies:
-  - astropy>=5.2
-  - astropy-healpix>=0.6
+  - astropy>=6.0
+  - astropy-healpix>=1.0.2
   - astroquery>=0.4.4
-  - h5py>=3.0
+  - h5py>=3.4
   - matplotlib
-  - numpy>=1.20
+  - numpy>=1.23
   - coverage
   - pip
   - pre-commit
   - pypandoc
   - pytest-cov
-  - pyuvdata>=2.4.1
-  - pyyaml
-  - scipy>=1.5
+  - pyuvdata>=2.4.3
+  - scipy>=1.7.3
+  - setuptools>=61
   - setuptools_scm>=7.0.3
   - sphinx
   - pip:
