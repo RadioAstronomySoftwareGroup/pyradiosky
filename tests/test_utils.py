@@ -77,11 +77,15 @@ def test_stokes_tofrom_coherency():
 @pytest.mark.parametrize("stype", ["subband", "spectral_index", "flat"])
 def test_download_gleam(tmp_path, stype):
     pytest.importorskip("astroquery")
+    import requests  # a dependency of astroquery
 
     fname = "gleam_cat.vot"
     filename = os.path.join(tmp_path, fname)
 
-    skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=10)
+    try:
+        skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=10)
+    except requests.exceptions.ConnectionError:
+        pytest.skip("Connection error w/ Vizier")
 
     sky = SkyModel()
     sky.read_gleam_catalog(filename, spectral_type=stype)
