@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 # Copyright (c) 2019 Radio Astronomy Software Group
-# Licensed under the 3-clause BSD License
+# Licensed under the 2-clause BSD License
 
 """Download the gleam catalog as a VOTable from Vizier."""
 

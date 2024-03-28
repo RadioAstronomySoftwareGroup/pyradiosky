@@ -1,6 +1,6 @@
 # -*- mode: python; coding: utf-8 -*
 # Copyright (c) 2019 Radio Astronomy Software Group
-# Licensed under the 3-clause BSD License
+# Licensed under the 2-clause BSD License
 """Define SkyModel class and helper functions."""
 
 import os

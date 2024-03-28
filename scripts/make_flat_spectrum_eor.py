@@ -1,4 +1,6 @@
-#!/bin/env python
+#! /usr/bin/env python
+# Copyright (c) 2024 Radio Astronomy Software Group
+# Licensed under the 2-clause BSD License
 
 """Utility function for making noiselike EoR models."""
 
