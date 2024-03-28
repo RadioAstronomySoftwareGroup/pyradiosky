@@ -2325,8 +2325,10 @@ class SkyModel(UVBase):
         ----------
         time : :class:`astropy.time.Time`
             Time to update positions for.
-        telescope_location : :class:`astropy.coordinates.EarthLocation`
-            Telescope location to update positions for.
+        telescope_location : EarthLocation or MoonLocation
+            Telescope location to update positions for, must be either an
+            :class:`astropy.coordinates.EarthLocation` or a
+            :class:`lunarsky.MoonLocation` object.
         """
         if not isinstance(time, Time):
             raise ValueError(
