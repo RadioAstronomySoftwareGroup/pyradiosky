@@ -99,6 +99,7 @@ def moonsky():
 
     from lunarsky import MoonLocation
     from lunarsky import SkyCoord as LunarSkyCoord
+    from spiceypy.utils.exceptions import SpiceUNKNOWNFRAME
 
     # Tranquility base
     array_location = MoonLocation(lat="00d41m15s", lon="23d26m00s", height=0.0)
@@ -119,8 +120,10 @@ def moonsky():
     zenith_source = SkyModel(
         name=names, skycoord=icrs_coord, stokes=stokes, spectral_type="flat"
     )
-
-    zenith_source.update_positions(time, array_location)
+    try:
+        zenith_source.update_positions(time, array_location)
+    except SpiceUNKNOWNFRAME as err:
+        pytest.skip("SpiceUNKNOWNFRAME error: " + str(err))
 
     yield zenith_source
 
