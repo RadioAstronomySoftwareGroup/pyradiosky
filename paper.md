@@ -64,6 +64,14 @@ fluxes at specific frequencies. Pyradiosky uses astropy [@astropy] for most
 coordinate transforms and for VOTable support, it also interfaces with the
 lunarsky [@lunarsky] package to support moon-based coordinate systems.
 
+Pyradiosky is different than other commonly used code to handle catalogs, like
+TOPCAT [@topcat] and astropy's VOTable sub-package [@astropy], which are
+primarily table interfaces that support table operations but not the more
+complicated astronomy-aware operations (e.g. polarization coordinate transformations)
+supported by pyradiosky. Pyradiosky also unifies the interface for catalogs with
+HEALPix [@healpix] sky maps, which in existing packages are handled through
+separate packages like astropy-healpix [@astropy-healpix].
+
 As part of the Radio Astronomy Software Group suite (along with pyuvdata
 [@pyuvdata2017] and pyuvsim [@pyuvsim2019]), pyradiosky provides software
 infrastructure for a broad range of radio astronomy applications including
