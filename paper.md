@@ -60,14 +60,15 @@ well as an HDF5 based format we developed. It also supports some formats used by
 21 cm cosmology codes and is easily extensible to other formats. It provides an
 object interface and useful methods for downselecting and combining multiple
 catalogs, coordinate transformations (with polarization support) and calculating
-fluxes at specific frequencies. Pyradiosky uses astropy [@astropy] for most
-coordinate transforms and for VOTable support, it also interfaces with the
-lunarsky [@lunarsky] package to support moon-based coordinate systems.
+fluxes at specific frequencies. Pyradiosky uses astropy [@astropy:2013;
+@astropy:2018; @astropy:2022] for most coordinate transforms and for VOTable
+support, it also interfaces with the lunarsky [@lunarsky] package to support
+moon-based coordinate systems.
 
 Pyradiosky is different than other commonly used code to handle catalogs, like
-TOPCAT [@topcat] and astropy's VOTable sub-package [@astropy], which are
-primarily table interfaces that support table operations but not the more
-complicated astronomy-aware operations (e.g. polarization coordinate transformations)
+TOPCAT [@topcat] and astropy's VOTable sub-package, which are primarily table
+interfaces that support table operations but not the more complicated
+astronomy-aware operations (e.g. polarization coordinate transformations)
 supported by pyradiosky. Pyradiosky also unifies the interface for catalogs with
 HEALPix [@healpix] sky maps, which in existing packages are handled through
 separate packages like astropy-healpix [@astropy-healpix].
