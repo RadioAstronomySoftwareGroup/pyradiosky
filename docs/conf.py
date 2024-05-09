@@ -163,4 +163,5 @@ intersphinx_mapping = {
     "astropy": ("https://docs.astropy.org/en/stable/", None),
     "astropy_healpix": ("https://astropy-healpix.readthedocs.io/en/latest/", None),
     "numpy": ("https://numpy.org/doc/stable/", None),
+    # "lunarsky": (None), lunarsky is not on RTD yet. Add it here when it is.
 }

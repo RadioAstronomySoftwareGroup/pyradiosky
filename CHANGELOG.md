@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.0.0] - 2024-05-09
+
 ### Changed
 - Updated minimum dependency versions: astropy>=6.0, h5py>=3.4, numpy>=1.23,
 pyuvdata>=2.4.3, scipy>=1.7.3, python>=3.10

@@ -51,6 +51,7 @@ setup_args = {
     "scripts": glob.glob("scripts/*"),
     "use_scm_version": {"local_scheme": branch_scheme},
     "include_package_data": True,
+    "python_requires": ">=3.10",
     "install_requires": [
         "astropy>=6.0",
         "h5py>=3.4",
