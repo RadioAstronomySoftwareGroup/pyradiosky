@@ -2088,8 +2088,6 @@ def test_healpix_positions(tmp_path, time_location):
 
     sky2 = SkyModel.from_file(filename)
 
-    time.location = array_location
-
     sky2.update_positions(time, array_location)
     src_alt_az = sky2.alt_az
     assert np.isclose(src_alt_az[0][ipix], src_alt.rad)
@@ -3102,11 +3100,13 @@ def test_catalog_file_writer(tmp_path, time_location, frame):
         location=array_location,
     )
     frame_coord = source_coord.transform_to(frame)
+    # make a new coord to get rid of obstime
+    input_coord = SkyCoord(ra=frame_coord.ra, dec=frame_coord.dec, frame=frame)
 
     names = "zen_source"
     stokes = [1.0, 0, 0, 0] * units.Jy
     zenith_source = SkyModel(
-        name=names, skycoord=frame_coord, stokes=stokes, spectral_type="flat"
+        name=names, skycoord=input_coord, stokes=stokes, spectral_type="flat"
     )
 
     fname = os.path.join(tmp_path, "temp_cat.txt")
