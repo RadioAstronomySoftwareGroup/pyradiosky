@@ -73,8 +73,8 @@ astronomy-aware operations (e.g. polarization coordinate transformations)
 supported by pyradiosky. Pyradiosky also provides a unified interface for
 catalogs and HEALPix sky maps.
 
-As part of the Radio Astronomy Software Group suite (along with pyuvdata
-[@pyuvdata2017] and pyuvsim [@pyuvsim2019]), pyradiosky provides software
+As part of the Radio Astronomy Software Group suite, along with pyuvdata
+[@pyuvdata2017] and pyuvsim [@pyuvsim2019], pyradiosky provides software
 infrastructure for a broad range of radio astronomy applications including
 enabling rigorous, seamless testing of 21 cm cosmology analysis developments.
 
