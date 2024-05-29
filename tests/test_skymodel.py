@@ -1603,14 +1603,23 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
         dtype=[float, int, str],
     )
     skyobj1 = skyobj_full.select(
-        component_inds=np.arange(skyobj_full.Ncomponents // 2), inplace=False
+        component_inds=np.arange(skyobj_full.Ncomponents // 3), inplace=False
     )
     skyobj2 = skyobj_full.select(
-        component_inds=np.arange(skyobj_full.Ncomponents // 2, skyobj_full.Ncomponents),
+        component_inds=np.arange(
+            skyobj_full.Ncomponents // 3, 2 * skyobj_full.Ncomponents // 3
+        ),
+        inplace=False,
+    )
+    skyobj3 = skyobj_full.select(
+        component_inds=np.arange(
+            2 * skyobj_full.Ncomponents // 3, skyobj_full.Ncomponents
+        ),
         inplace=False,
     )
 
     skyobj_new = skyobj1.concat(skyobj2, inplace=False)
+    skyobj_new.concat(skyobj3)
     # check that filename not duplicated if its the same on both objects
     assert skyobj_new.filename == [filebasename]
 
@@ -1618,6 +1627,7 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
     expected_history = (
         skyobj_full.history
         + "  Downselected to specific components using pyradiosky."
+        + " Combined skymodels along the component axis using pyradiosky."
         + " Combined skymodels along the component axis using pyradiosky."
     )
     assert uvutils._check_histories(skyobj_new.history, expected_history)
@@ -1638,11 +1648,14 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
         )
     else:
         skyobj2.history += " " + skyobj2.pyradiosky_version_str
+    expected_history += " Combined skymodels along the component axis using pyradiosky."
     skyobj_new = skyobj1.concat(skyobj2, inplace=False, run_check=False)
+    skyobj_new.concat(skyobj3)
     assert skyobj_new.history != skyobj_full.history
     assert uvutils._check_histories(skyobj_new.history, expected_history)
 
     skyobj_new = skyobj1.concat(skyobj2, inplace=False, verbose_history=True)
+    skyobj_new.concat(skyobj3, verbose_history=True)
     assert skyobj_new.history != skyobj_full.history
     expected_history = (
         skyobj_full.history
@@ -1650,6 +1663,9 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
         + " Combined skymodels along the component axis using pyradiosky. "
         + "Next object history follows. "
         + skyobj2.history
+        + " Combined skymodels along the component axis using pyradiosky. "
+        + "Next object history follows. "
+        + skyobj3.history
     )
     assert uvutils._check_histories(skyobj_new.history, expected_history)
 
