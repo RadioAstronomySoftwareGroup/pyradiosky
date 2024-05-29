@@ -20,9 +20,8 @@ from astropy.coordinates import (
     Latitude,
     Longitude,
     SkyCoord,
+    frame_transform_graph,
 )
-from astropy.coordinates import concatenate as sc_concatenate
-from astropy.coordinates import frame_transform_graph
 from astropy.io import votable
 from astropy.time import Time
 from astropy.units import Quantity
@@ -2791,9 +2790,7 @@ class SkyModel(UVBase):
                 param_name = this_param.name
                 if this_param.value is not None and other_param.value is not None:
                     if param == "_skycoord":
-                        final_val = sc_concatenate(
-                            (this_param.value, other_param.value)
-                        )
+                        final_val = SkyCoord([this_param.value, other_param.value])
                     else:
                         final_val = np.concatenate(
                             (this_param.value, other_param.value)
@@ -2806,7 +2803,7 @@ class SkyModel(UVBase):
                     )
                     setattr(this, param_name, None)
         else:
-            this.skycoord = sc_concatenate((this.skycoord, other.skycoord))
+            this.skycoord = SkyCoord([this.skycoord, other.skycoord])
 
         this.stokes = np.concatenate((this.stokes, other.stokes), axis=2)
 
