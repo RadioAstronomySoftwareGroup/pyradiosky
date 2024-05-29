@@ -45,7 +45,7 @@ Please cite pyradiosky by citing our JOSS paper:
 Hazelton et al., (2024). pyradiosky: A Python package for Radio Sky Models.
 Journal of Open Source Software, 9(97), 6503, https://doi.org/10.21105/joss.06503
 
-[ADS Link](https://ui.adsabs.harvard.edu/abs/2024JOSS....9.6503H);
+[ADS Link](https://ui.adsabs.harvard.edu/abs/2024JOSS....9.6503H)
 
 # Installation
 Simple installation via pip is available for users, developers should follow
