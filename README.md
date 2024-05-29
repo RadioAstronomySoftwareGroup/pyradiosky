@@ -1,6 +1,8 @@
 # pyradiosky
 ![](https://github.com/RadioAstronomySoftwareGroup/pyradiosky/workflows/Tests/badge.svg?branch=main)
 [![codecov](https://codecov.io/gh/RadioAstronomySoftwareGroup/pyradiosky/branch/main/graph/badge.svg)](https://codecov.io/gh/RadioAstronomySoftwareGroup/pyradiosky)
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.06503/status.svg)](https://doi.org/10.21105/joss.06503)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.11187469.svg)](https://doi.org/10.5281/zenodo.11187469)
 
 Python objects and interfaces for representing diffuse, extended and compact
 astrophysical radio sources.
@@ -36,6 +38,14 @@ We track all changes in our [changelog](https://github.com/RadioAstronomySoftwar
 
 # Documentation
 Developer API documentation is hosted [here](https://pyradiosky.readthedocs.io/en/latest/).
+
+# Citation
+Please cite pyradiosky by citing our JOSS paper:
+
+Hazelton et al., (2024). pyradiosky: A Python package for Radio Sky Models.
+Journal of Open Source Software, 9(97), 6503, https://doi.org/10.21105/joss.06503
+
+[ADS Link](https://ui.adsabs.harvard.edu/abs/2024JOSS....9.6503H);
 
 # Installation
 Simple installation via pip is available for users, developers should follow
