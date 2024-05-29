@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+- An error when Skymodel.concat was called serially.
+
+
 ## [1.0.0] - 2024-05-09
 
 ### Changed
