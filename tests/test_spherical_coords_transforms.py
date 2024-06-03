@@ -70,7 +70,7 @@ def test_rotate_points_3d():
             obstime=time,
             location=array_location,
             frame="icrs",
-            **rep_dict
+            **rep_dict,
         )
 
         axes_altaz = axes_icrs.transform_to("altaz")
