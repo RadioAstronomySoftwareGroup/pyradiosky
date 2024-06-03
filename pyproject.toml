@@ -1,6 +1,63 @@
 [build-system]
-requires = ["setuptools>=61", "wheel", "setuptools_scm>=7.0.3"]
+requires = ["setuptools>=64", "wheel", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyradiosky"
+authors = [
+    {name = "Bryna Hazelton", email = "brynah@phys.washington.edu"},
+    {name = "Matthew Kolopanis", email = "mjkolopa@asu.edu"},
+    {name = "Jonathan Pober", email = "jonathan_pober@brown.edu"},
+    {name = "Adam Lanman", email = "alanman@mit.edu"},
+]
+maintainers = [
+    {name = "Bryna Hazelton", email = "brynah@phys.washington.edu"},
+    {name = "Matthew Kolopanis", email = "mjkolopa@asu.edu"}
+]
+description = "Python objects and interfaces for representing diffuse, extended and compact astrophysical radio sources"
+readme = "README.md"
+dynamic = ["version"]
+dependencies = [
+    "astropy>=6.0",
+    "h5py>=3.4",
+    "numpy>=1.23",
+    "pyuvdata>=2.4.3",
+    "scipy>=1.7.3",
+    "setuptools>=61",
+    "setuptools_scm>=7.0.3",
+]
+requires-python = ">=3.10"
+keywords = ["radio astronomy"]
+classifiers = [
+    "License :: OSI Approved :: BSD License",
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Astronomy",
+]
+
+[project.optional-dependencies]
+healpix = ["astropy-healpix>=1.0.2"]
+astroquery = ["astroquery>=0.4.4"]
+lunarsky = ["lunarsky>=0.2.2"]
+all = ["pyradiosky[healpix,astroquery,lunarsky]"]
+test = ["coverage", "pre-commit", "pytest", "pytest-cov"]
+doc = ["matplotlib", "pypandoc", "sphinx"]
+dev = ["pyradiosky[all,test,doc]"]
+
+[project.urls]
+Repository = "https://github.com/RadioAstronomySoftwareGroup/pyradiosky"
+Documentation = "https://pyradiosky.readthedocs.io/"
+
+# Note that this approach is "discouraged" in favor of [project.scripts], but
+# that requires entry-point functions, which would require some refactoring.
+[tool.setuptools]
+script-files = ["scripts/download_gleam.py", "scripts/make_flat_spectrum_eor.py"]
+
+[tool.setuptools_scm]
 
 [tool.isort]
 profile = "black"
@@ -10,3 +67,6 @@ docstring_style = "numpy"
 
 [tool.black]
 skip_magic_trailing_comma = true
+
+[tool.pytest.ini_options]
+addopts = "--ignore=scripts"

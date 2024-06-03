@@ -1,9 +1,3 @@
-[metadata]
-description_file = README.md
-
-[tool:pytest]
-addopts = --ignore=scripts
-
 [flake8]
 # B905 is for using zip without the `strict` argument, which was introduced in
 # python 3.10. We should probably add this check (remove it from the ignore) when we
