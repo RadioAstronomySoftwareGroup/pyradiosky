@@ -23,8 +23,8 @@ dependencies = [
     "numpy>=1.23",
     "pyuvdata>=2.4.3",
     "scipy>=1.7.3",
-    "setuptools>=61",
-    "setuptools_scm>=7.0.3",
+    "setuptools>=64",
+    "setuptools_scm>=8",
 ]
 requires-python = ">=3.10"
 keywords = ["radio astronomy"]
