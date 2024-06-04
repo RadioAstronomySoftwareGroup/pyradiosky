@@ -55,6 +55,8 @@ jobs:
 
       - name: check setuptools_scm
         run: |
+          git describe --tags
+          git version
           python -m setuptools_scm
           python -m setuptools_scm ls
 
