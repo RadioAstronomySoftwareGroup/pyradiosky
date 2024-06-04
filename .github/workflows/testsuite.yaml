@@ -30,6 +30,7 @@ jobs:
       - name: check git
         run: |
           git describe
+          git version
 
       - name: Setup Minimamba
         uses: conda-incubator/setup-miniconda@v2
