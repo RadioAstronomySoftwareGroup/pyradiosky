@@ -53,6 +53,11 @@ jobs:
             exit 1;
           fi
 
+      - name: check setuptools_scm
+        run: |
+          python -m setuptools_scm
+          python -m setuptools_scm ls
+
       - name: Install
         run: |
           SETUPTOOLS_SCM_DEBUG=1 pip install --no-deps .
