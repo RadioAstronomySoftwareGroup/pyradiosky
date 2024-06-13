@@ -12,15 +12,13 @@ import h5py
 import numpy as np
 import pytest
 
-with warnings.catch_warnings():
-    # This filter can be removed when pyuvdata
-    # is updated to use importlib.metadata rather than pkg_resources
-    warnings.filterwarnings(
-        "ignore", "Deprecated call to `pkg_resources.declare_namespace"
-    )
-    warnings.filterwarnings("ignore", "pkg_resources is deprecated as an API")
-    import pyuvdata.tests as uvtest
-    import pyuvdata.utils as uvutils
+try:
+    from pyuvdata.testing import check_warnings
+except ImportError:
+    # this can be removed once we require pyuvdata >= v3.0
+    from pyuvdata.tests import check_warnings
+
+import pyuvdata.utils as uvutils
 import scipy.io
 from astropy import units
 from astropy.coordinates import (
@@ -377,7 +375,7 @@ def test_init_error(zenith_skycoord):
         match="Cannot calculate frequency edges from frequency center array because "
         "there is only one frequency center.",
     ):
-        with uvtest.check_warnings(
+        with check_warnings(
             UserWarning,
             match="freq_edge_array not set, calculating it from the freq_array.",
         ):
@@ -453,7 +451,7 @@ def test_check_errors():
 
     skyobj2 = skyobj.copy()
     skyobj2.freq_edge_array = None
-    with uvtest.check_warnings(
+    with check_warnings(
         DeprecationWarning,
         match="freq_edge_array is not set. Cannot calculate it from the freq_array "
         "because freq_array spacing is not constant. This will become an error in "
@@ -463,7 +461,7 @@ def test_check_errors():
 
     skyobj2.freq_array = (np.arange(skyobj2.Nfreqs) * 1e7 + 1e8) * units.Hz
     skyobj2.freq_edge_array = None
-    with uvtest.check_warnings(
+    with check_warnings(
         DeprecationWarning,
         match="freq_edge_array is not set. Calculating it from the freq_array. This "
         "will become an error in version 0.5",
@@ -1215,7 +1213,7 @@ def test_coherency_calc_errors():
         name="test", skycoord=coord, stokes=stokes_radec, spectral_type="flat"
     )
 
-    with uvtest.check_warnings(UserWarning, match="Horizon cutoff undefined"):
+    with check_warnings(UserWarning, match="Horizon cutoff undefined"):
         with pytest.raises(ValueError, match="telescope_location must be an"):
             source.coherency_calc().squeeze()
 
@@ -1335,7 +1333,7 @@ def test_pol_rotator(time_location, spectral_type, unpolarized, below_horizon):
         warn_msg = "Horizon cutoff undefined"
         warn_type = UserWarning
 
-    with uvtest.check_warnings(warn_type, match=warn_msg):
+    with check_warnings(warn_type, match=warn_msg):
         local_coherency = source.coherency_calc()
 
     if below_horizon:
@@ -1727,7 +1725,7 @@ def test_concat_optional_params(param, healpix_disk_new):
     assert skyobj_new == skyobj_full
 
     setattr(skyobj1, param, None)
-    with uvtest.check_warnings(UserWarning, f"Only one object has {param}"):
+    with check_warnings(UserWarning, f"Only one object has {param}"):
         skyobj_new = skyobj1.concat(skyobj2, inplace=False)
 
     assert skyobj_new.filename == [input_filename + "_1", input_filename + "_2"]
@@ -1789,7 +1787,7 @@ def test_concat_optional_params(param, healpix_disk_new):
         component_inds=np.arange(skyobj_full.Ncomponents // 2), inplace=False
     )
     setattr(skyobj2, param, None)
-    with uvtest.check_warnings(UserWarning, f"Only one object has {param}"):
+    with check_warnings(UserWarning, f"Only one object has {param}"):
         skyobj_new = skyobj1.concat(skyobj2, inplace=False)
 
     if param not in ["skycoord", "name", "frame_coherency"]:
@@ -2963,7 +2961,7 @@ def test_fhd_catalog_reader(fname):
     catfile = os.path.join(SKY_DATA_PATH, f"fhd_{fname}.sav")
 
     if fname == "catalog":
-        with uvtest.check_warnings(
+        with check_warnings(
             UserWarning, match="Source IDs are not unique. Defining unique IDs."
         ):
             skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
@@ -2986,7 +2984,7 @@ def test_fhd_catalog_reader_extended_sources(extended):
     catfile = os.path.join(SKY_DATA_PATH, filename)
 
     skyobj = SkyModel()
-    with uvtest.check_warnings(
+    with check_warnings(
         UserWarning, match="Source IDs are not unique. Defining unique IDs."
     ):
         skyobj.read_fhd_catalog(catfile, expand_extended=True, run_check=False)
@@ -3047,7 +3045,7 @@ def test_fhd_catalog_reader_beam_values_extended():
 def test_fhd_catalog_reader_labeling_extended_sources():
     catfile = os.path.join(SKY_DATA_PATH, "extended_source_test.sav")
     skyobj = SkyModel()
-    with uvtest.check_warnings(
+    with check_warnings(
         UserWarning, match="Source IDs are not unique. Defining unique IDs."
     ):
         skyobj.read_fhd_catalog(catfile, expand_extended=True)
@@ -3172,7 +3170,7 @@ def test_text_catalog_loop(
         warn_type = None
         msg = ""
 
-    with uvtest.check_warnings(warn_type, match=msg):
+    with check_warnings(warn_type, match=msg):
         skyobj.write_text_catalog(fname)
     skyobj2 = SkyModel.from_file(fname)
     if spec_type == "subband":
@@ -3507,7 +3505,7 @@ def test_at_frequencies_nan_handling(nan_handling):
     message[
         0
     ] += " You can change the way NaNs are handled using the `nan_handling` keyword."
-    with uvtest.check_warnings(UserWarning, match=message):
+    with check_warnings(UserWarning, match=message):
         skyobj2_interp = skyobj2.at_frequencies(
             interp_freqs, inplace=False, nan_handling=nan_handling
         )
@@ -3637,7 +3635,7 @@ def test_at_frequencies_nan_handling_allsrc(nan_handling):
     message[
         0
     ] += " You can change the way NaNs are handled using the `nan_handling` keyword."
-    with uvtest.check_warnings(UserWarning, match=message):
+    with check_warnings(UserWarning, match=message):
         skyobj2_interp = skyobj2.at_frequencies(
             interp_freqs, inplace=False, nan_handling=nan_handling
         )
@@ -3855,7 +3853,7 @@ def test_skyh5_backwards_compatibility(tmpdir, include_frame, cat_source):
             header = h5f["/Header"]
             skymodel._add_value_hdf5_group(header, "beam_amp", sky.beam_amp, float)
 
-    with uvtest.check_warnings(UserWarning, match=err_msg):
+    with check_warnings(UserWarning, match=err_msg):
         sky2 = SkyModel.from_file(testfile)
     assert sky == sky2
 
@@ -3876,7 +3874,7 @@ def test_skyh5_backwards_compatibility_healpix(healpix_disk_new, tmpdir):
     with h5py.File(testfile, "r+") as h5f:
         del h5f["/Header/hpx_frame"]
 
-    with uvtest.check_warnings(
+    with check_warnings(
         UserWarning,
         match="No frame available in this file, assuming 'icrs'. Consider re-writing "
         "this file to ensure future compatibility.",
@@ -4104,7 +4102,7 @@ def test_skymodel_init_with_frame(coord_kwds, err_msg, exp_frame):
                 "this will become an error in version 0.3 and later."
             )
 
-        with uvtest.check_warnings(exp_warning, match=msg):
+        with check_warnings(exp_warning, match=msg):
             sky = SkyModel(**coord_kwds)
         assert sky.frame == exp_frame
         lon, lat = sky.get_lon_lat()
@@ -4119,7 +4117,7 @@ def test_skymodel_init_with_frame(coord_kwds, err_msg, exp_frame):
             exp_warning = None
             msg = ""
 
-        with uvtest.check_warnings(exp_warning, match=msg):
+        with check_warnings(exp_warning, match=msg):
             if exp_frame == "galactic":
                 assert lon == sky.l
                 assert lat == sky.b
@@ -4199,7 +4197,7 @@ def test_skyh5_write_read_no_frame(healpix_disk_new, tmpdir):
         assert header["hpx_frame"]["frame"][()].tobytes().decode("utf-8") == "icrs"
         del header["hpx_frame"]
 
-    with uvtest.check_warnings(
+    with check_warnings(
         UserWarning,
         match="No frame available in this file, assuming 'icrs'. Consider re-writing "
         "this file to ensure future compatibility.",
@@ -4294,7 +4292,7 @@ def test_healpix_transform_full_sky(healpix_disk_new):
 
 def test_old_skyh5_reading_ra_dec():
     testfile = os.path.join(SKY_DATA_PATH, "old_skyh5_point_sources.skyh5")
-    with uvtest.check_warnings(
+    with check_warnings(
         UserWarning,
         match=[
             "Parameter skycoord not found in skyh5 file.",
