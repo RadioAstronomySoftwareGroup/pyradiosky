@@ -13,12 +13,13 @@ import numpy as np
 import pytest
 
 try:
+    import pyuvdata.utils.history as history_utils
     from pyuvdata.testing import check_warnings
 except ImportError:
     # this can be removed once we require pyuvdata >= v3.0
     from pyuvdata.tests import check_warnings
+    import pyuvdata.utils as history_utils
 
-import pyuvdata.utils as uvutils
 import scipy.io
 from astropy import units
 from astropy.coordinates import (
@@ -1628,7 +1629,7 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
         + " Combined skymodels along the component axis using pyradiosky."
         + " Combined skymodels along the component axis using pyradiosky."
     )
-    assert uvutils._check_histories(skyobj_new.history, expected_history)
+    assert history_utils._check_histories(skyobj_new.history, expected_history)
 
     skyobj_new.history = skyobj_full.history
     assert skyobj_new == skyobj_full
@@ -1650,7 +1651,7 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
     skyobj_new = skyobj1.concat(skyobj2, inplace=False, run_check=False)
     skyobj_new.concat(skyobj3)
     assert skyobj_new.history != skyobj_full.history
-    assert uvutils._check_histories(skyobj_new.history, expected_history)
+    assert history_utils._check_histories(skyobj_new.history, expected_history)
 
     skyobj_new = skyobj1.concat(skyobj2, inplace=False, verbose_history=True)
     skyobj_new.concat(skyobj3, verbose_history=True)
@@ -1665,7 +1666,7 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
         + "Next object history follows. "
         + skyobj3.history
     )
-    assert uvutils._check_histories(skyobj_new.history, expected_history)
+    assert history_utils._check_histories(skyobj_new.history, expected_history)
 
 
 @pytest.mark.parametrize(
@@ -2135,12 +2136,12 @@ def test_flux_source_cuts():
     expected_history2 = (
         skyobj.history + "  Downselected to specific components using pyradiosky."
     )
-    assert uvutils._check_histories(skyobj2.history, expected_history2)
+    assert history_utils._check_histories(skyobj2.history, expected_history2)
 
     expected_history3 = (
         skyobj.history + "  Downselected to specific components using pyradiosky."
     )
-    assert uvutils._check_histories(skyobj3.history, expected_history3)
+    assert history_utils._check_histories(skyobj3.history, expected_history3)
 
     skyobj2.history = skyobj3.history
 
