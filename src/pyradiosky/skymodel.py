@@ -10,7 +10,6 @@ import warnings
 import astropy.units as units
 import h5py
 import numpy as np
-import pyuvdata.utils as uvutils
 import scipy.io
 from astropy.coordinates import (
     AltAz,
@@ -33,6 +32,15 @@ from scipy.linalg import orthogonal_procrustes as ortho_procr
 from . import __version__
 from . import spherical_coords_transforms as sct
 from . import utils as skyutils
+
+try:
+    import pyuvdata.utils.history as history_utils
+    import pyuvdata.utils.tools as uvutils
+except ImportError:
+    # this can be removed once we require pyuvdata >= v3.0
+    import pyuvdata.utils as uvutils
+    import pyuvdata.utils as history_utils
+
 
 __all__ = ["hasmoon", "SkyModel"]
 
@@ -1049,7 +1057,7 @@ class SkyModel(UVBase):
                 self._filename.form = (len(filename_use),)
 
             self.history = history
-            if not uvutils._check_history_version(
+            if not history_utils._check_history_version(
                 self.history, self.pyradiosky_version_str
             ):
                 self.history += self.pyradiosky_version_str
@@ -2897,14 +2905,14 @@ class SkyModel(UVBase):
         history_update_string = (
             " Combined skymodels along the component axis using pyradiosky."
         )
-        histories_match = uvutils._check_histories(this.history, other.history)
+        histories_match = history_utils._check_histories(this.history, other.history)
 
         this.history += history_update_string
         if not histories_match:
             if verbose_history:
                 this.history += " Next object history follows. " + other.history
             else:
-                extra_history = uvutils._combine_history_addition(
+                extra_history = history_utils._combine_history_addition(
                     this.history, other.history
                 )
                 if extra_history is not None:
@@ -4906,7 +4914,7 @@ class SkyModel(UVBase):
         if self.history is None:
             self.history = self.pyradiosky_version_str
         else:
-            if not uvutils._check_history_version(
+            if not history_utils._check_history_version(
                 self.history, self.pyradiosky_version_str
             ):
                 self.history += self.pyradiosky_version_str
