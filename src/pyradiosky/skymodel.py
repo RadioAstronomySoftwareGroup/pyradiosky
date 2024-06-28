@@ -33,7 +33,7 @@ from . import __version__
 from . import spherical_coords_transforms as sct
 from . import utils as skyutils
 
-try:
+try:  # pragma: no cover  # This pragma can be removed once pyuvdata v3 is released.
     import pyuvdata.utils.history as history_utils
     import pyuvdata.utils.tools as uvutils
 except ImportError:
