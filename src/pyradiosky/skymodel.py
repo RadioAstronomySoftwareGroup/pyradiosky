@@ -271,7 +271,7 @@ def _add_value_hdf5_group(group, name, value, expected_type):
         if isinstance(value, (list, np.ndarray)):
             group[name] = np.asarray(value, dtype="bytes")
         else:
-            group[name] = np.string_(value)
+            group[name] = np.bytes_(value)
     else:
         group[name] = value
 
@@ -2165,7 +2165,7 @@ class SkyModel(UVBase):
                     new_stokes[:, :, wh_non_nan] = finterp(at_freq_arr)
 
                 if nan_handling == "propagate":
-                    new_stokes[:, :, wh_nan] = np.NaN
+                    new_stokes[:, :, wh_nan] = np.nan
                 else:
                     wh_all_nan = []
                     wh_nan_high = []
@@ -2176,7 +2176,7 @@ class SkyModel(UVBase):
                             np.all(~np.isnan(stokes_arr[:, :, comp]), axis=0)
                         )[0]
                         if freq_inds_use.size == 0:
-                            new_stokes[:, :, comp] = np.NaN
+                            new_stokes[:, :, comp] = np.nan
                             wh_all_nan.append(comp)
                             continue
                         at_freq_inds_use = np.arange(freqs.size)
@@ -2190,7 +2190,7 @@ class SkyModel(UVBase):
                             )[0]
                             wh_nan_high.append(comp)
                             if nan_handling == "interp":
-                                new_stokes[:, at_freqs_large, comp] = np.NaN
+                                new_stokes[:, at_freqs_large, comp] = np.nan
                             else:  # clip
                                 large_inds_use = np.full(
                                     (at_freqs_large.size), freq_inds_use[-1]
@@ -2211,7 +2211,7 @@ class SkyModel(UVBase):
                             )[0]
                             wh_nan_low.append(comp)
                             if nan_handling == "interp":
-                                new_stokes[:, at_freqs_small, comp] = np.NaN
+                                new_stokes[:, at_freqs_small, comp] = np.nan
                             else:  # clip
                                 small_inds_use = np.full(
                                     (at_freqs_small.size), freq_inds_use[0]
@@ -2611,7 +2611,7 @@ class SkyModel(UVBase):
 
             # This is a boolean array of length len(above_horizon)
             # that identifies polarized sources above the horizon.
-            pol_over_hor = np.in1d(
+            pol_over_hor = np.isin(
                 np.arange(self.Ncomponents)[above_horizon], self._polarized
             )
 
