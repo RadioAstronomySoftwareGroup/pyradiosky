@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- pyuvdata utils imports to ensure compatibility with version 3.0.
+
 ### Fixed
 - An error when Skymodel.concat was called serially.
 
