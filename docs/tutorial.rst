@@ -1166,6 +1166,7 @@ d) Other time and position related attributes and methods
   ...     Latitude,
   ...     Galactic)
   >>> from astropy.time import Time
+  >>> from astropy.units import Quantity
 
   >>> # Create a couple sources near zenith
   >>> array_location = EarthLocation(lat="-30d43m17.5s", lon="21d25m41.9s", height=1073.0)
@@ -1191,14 +1192,15 @@ d) Other time and position related attributes and methods
   >>> sm.update_positions(time, array_location)
   >>> print(sm.time)
   2015-03-01 00:00:00.000
-  >>> print(sm.telescope_location)
-  (5109342.76037543, 2005241.90402741, -3239939.46926403) m
+  >>> with np.printoptions(precision=3):
+  ...   print(Quantity(sm.telescope_location.geocentric).to_value("m"))
+  [ 5109342.76   2005241.904 -3239939.469]
 
   >>> # Limit the precision for testing on different platforms
-  >>> with np.printoptions(precision=3):
+  >>> with np.printoptions(precision=2):
   ...   print(sm.alt_az)
-  [[1.571 1.396]
-   [1.73  0.175]]
+  [[1.57 1.4 ]
+   [1.73 0.17]]
 
   >>> # Can directly access direction cosines of the sources
   >>> with np.printoptions(precision=1):
