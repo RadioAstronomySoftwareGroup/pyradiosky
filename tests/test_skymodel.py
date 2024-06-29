@@ -3074,7 +3074,7 @@ def test_point_catalog_reader():
     with open(catfile, "r") as fileobj:
         header = fileobj.readline()
     header = [h.strip() for h in header.split()]
-    dt = np.format_parser(
+    dt = np.rec.format_parser(
         ["U10", "f8", "f8", "f8", "f8"],
         ["source_id", "ra_j2000", "dec_j2000", "flux_density", "frequency"],
         header,
@@ -3434,7 +3434,7 @@ def test_at_frequencies_interp_errors(mock_point_skies):
     ):
         sky.at_frequencies(sky.freq_array - 10 * units.Hz)
 
-    sky.stokes[0, 0, 0] = np.NaN
+    sky.stokes[0, 0, 0] = np.nan
     with pytest.raises(ValueError, match="nan_handling must be one of "):
         sky.at_frequencies(sky.freq_array, nan_handling="foo")
 
@@ -3466,14 +3466,14 @@ def test_at_frequencies_nan_handling(nan_handling):
 
     skyobj2 = skyobj.copy()
     # add some NaNs. These exist in full GLEAM catalog but not in our small test file
-    skyobj2.stokes[0, 0:2, 0] = np.NaN  # no low freq support
-    skyobj2.stokes[0, 10:11, 1] = np.NaN  # missing freqs in middle
-    skyobj2.stokes[0, -2:, 2] = np.NaN  # no high freq support
-    skyobj2.stokes[0, :, 3] = np.NaN  # all NaNs
-    skyobj2.stokes[0, 1:-2, 4] = np.NaN  # only 2 good freqs
-    skyobj2.stokes[0, 0, 5] = np.NaN  # no low or high frequency support
-    skyobj2.stokes[0, -1, 5] = np.NaN  # no low or high frequency support
-    skyobj2.stokes[0, 1:, 6] = np.NaN  # only 1 good freqs
+    skyobj2.stokes[0, 0:2, 0] = np.nan  # no low freq support
+    skyobj2.stokes[0, 10:11, 1] = np.nan  # missing freqs in middle
+    skyobj2.stokes[0, -2:, 2] = np.nan  # no high freq support
+    skyobj2.stokes[0, :, 3] = np.nan  # all NaNs
+    skyobj2.stokes[0, 1:-2, 4] = np.nan  # only 2 good freqs
+    skyobj2.stokes[0, 0, 5] = np.nan  # no low or high frequency support
+    skyobj2.stokes[0, -1, 5] = np.nan  # no low or high frequency support
+    skyobj2.stokes[0, 1:, 6] = np.nan  # only 1 good freqs
 
     message = ["Some stokes values are NaNs."]
     if nan_handling == "propagate":
@@ -3625,7 +3625,7 @@ def test_at_frequencies_nan_handling_allsrc(nan_handling):
 
     skyobj2 = skyobj.copy()
     # add some NaNs to all sources
-    skyobj2.stokes[0, 10:11, :] = np.NaN
+    skyobj2.stokes[0, 10:11, :] = np.nan
     message = ["Some stokes values are NaNs."]
     if nan_handling == "propagate":
         message[
@@ -3867,7 +3867,7 @@ def test_skyh5_backwards_compatibility_healpix(healpix_disk_new, tmpdir):
 
     with h5py.File(testfile, "r+") as h5f:
         del h5f["/Header/hpx_frame"]
-        h5f["/Header/hpx_frame"] = np.string_(sky.hpx_frame.name)
+        h5f["/Header/hpx_frame"] = np.bytes_(sky.hpx_frame.name)
 
     sky2 = SkyModel.from_file(testfile)
     assert sky == sky2
