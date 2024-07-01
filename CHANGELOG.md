@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.0.1] - 2024-07-01
+
 ### Changed
 - Updated minimum dependency versions: setuptools_scm>=8.0
 - pyuvdata utils imports to ensure compatibility with version 3.0.
