@@ -7,10 +7,10 @@ dependencies:
   - astroquery==0.4.4
   - h5py==3.4.0
   - numpy==1.23
-  - scipy==1.7.3
+  - scipy==1.8.*
   - coverage
   - pytest-cov
-  - setuptools_scm==8.0.*
+  - setuptools_scm==8.1
   - pyuvdata==2.4.3
   - pip
   - pip:

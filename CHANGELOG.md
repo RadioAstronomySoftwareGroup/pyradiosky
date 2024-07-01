@@ -5,7 +5,7 @@
 ## [1.0.1] - 2024-07-01
 
 ### Changed
-- Updated minimum dependency versions: setuptools_scm>=8.0
+- Updated minimum dependency versions: setuptools_scm>=8.1, scipy>=1.8
 - pyuvdata utils imports to ensure compatibility with version 3.0.
 - `numpy.string_` calls to `numpy.bytes_`, `np.in1d` to `np.isin` and a few other
 changes for numpy 2.0 compatibility.

@@ -14,8 +14,8 @@ dependencies:
   - pypandoc
   - pytest-cov
   - pyuvdata>=2.4.3
-  - scipy>=1.7.3
-  - setuptools_scm>=8.0
+  - scipy>=1.8
+  - setuptools_scm>=8.1
   - sphinx
   - pip:
       - lunarsky>=0.2.2
