@@ -96,7 +96,12 @@ def test_download_gleam(tmp_path, stype):
     assert sky.Ncomponents == 10
 
     # check that the file is replaced if overwrite is True
-    skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=5, overwrite=True)
+    try:
+        skyutils.download_gleam(
+            path=tmp_path, filename=fname, row_limit=5, overwrite=True
+        )
+    except requests.exceptions.ConnectionError:
+        pytest.skip("Connection error w/ Vizier")
     sky2 = SkyModel()
     sky2.read_gleam_catalog(filename, spectral_type=stype)
     assert sky2.Ncomponents == 5
