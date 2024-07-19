@@ -69,6 +69,6 @@ def write_skymodel_rst(write_file=None):
     if write_file is None:
         write_path = os.path.dirname(os.path.abspath(inspect.stack()[0][1]))
         write_file = os.path.join(write_path, "skymodel.rst")
-    with (write_file, "w") as F:
+    with open(write_file, "w") as F:
         F.write(out)
     print("wrote " + write_file)
