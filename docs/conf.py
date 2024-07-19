@@ -1,4 +1,3 @@
-# -*- mode: python; coding: utf-8 -*-
 #
 # Configuration file for the Sphinx documentation builder.
 #
@@ -6,13 +5,12 @@
 # list see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-import sys
 import os
-
+import sys
 from io import StringIO
 
-from sphinx.util.docutils import SphinxDirective
 from docutils import nodes, statemachine
+from sphinx.util.docutils import SphinxDirective
 
 import pyradiosky
 
@@ -138,9 +136,7 @@ class ExecDirective(SphinxDirective):
                     None,
                     nodes.paragraph(
                         text="Unable to execute python "
-                        "code at {file}:{line}".format(
-                            file=os.path.basename(source), line=self.lineno
-                        )
+                        f"code at {os.path.basename(source)}:{self.lineno}"
                     ),
                     nodes.paragraph(text=str(sys.exc_info()[1])),
                 )

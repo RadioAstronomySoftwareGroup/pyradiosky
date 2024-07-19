@@ -1,4 +1,3 @@
-# -*- mode: python; coding: utf-8 -*
 # Copyright (c) 2020 Radio Astronomy Software Group
 # Licensed under the 2-clause BSD License
 
@@ -18,7 +17,7 @@ def setup_and_teardown_package():
     # completed (done by extending auto_max_age).
     try:
         t1 = Time.now()
-        t1.ut1
+        t1.ut1  # noqa
     except Exception:
         iers.conf.auto_max_age = None
 

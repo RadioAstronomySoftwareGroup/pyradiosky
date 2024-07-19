@@ -59,14 +59,69 @@ script-files = ["scripts/download_gleam.py", "scripts/make_flat_spectrum_eor.py"
 
 [tool.setuptools_scm]
 
-[tool.isort]
-profile = "black"
-
 [darglint]
 docstring_style = "numpy"
 
-[tool.black]
-skip_magic_trailing_comma = true
-
 [tool.pytest.ini_options]
 addopts = "--ignore=scripts"
+
+[tool.ruff.lint]
+select = [
+    # pycodestyle
+    "E",
+    # pycodestyle warnings
+    "W",
+    # Pyflakes
+    "F",
+    # pydocstyle
+    "D",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-builtins
+    "A",
+    # flake8-comprehensions
+    "C4",
+    # pep8-naming
+    "N",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+    # McCabe complexity. Consider for the future
+    # "C90"
+]
+ignore = [
+    "E203",
+    "D107",
+    "N803",
+    "N806",
+    "B028",
+    "SIM108",
+    "D203",
+    "D212",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/*" = ["D"]
+"docs/*.py" = ["D", "A"]
+"setup.py" = ["D"]
+
+[tool.ruff.format]
+skip-magic-trailing-comma = true
+
+[tool.ruff.lint.pycodestyle]
+max-line-length = 88
+
+# consider setting this in the future
+# [tool.ruff.lint.mccabe]
+# max-complexity = 30
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+known-first-party = ["pyradiosky"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"

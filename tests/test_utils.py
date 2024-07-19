@@ -1,4 +1,3 @@
-# -*- mode: python; coding: utf-8 -*
 # Copyright (c) 2019 Radio Astronomy Software Group
 # Licensed under the 2-clause BSD License
 import os
@@ -9,8 +8,7 @@ import pytest
 from astropy.coordinates import Angle
 from astropy.time import Time
 
-from pyradiosky import SkyModel
-from pyradiosky import utils as skyutils
+from pyradiosky import SkyModel, utils as skyutils
 
 
 def test_tee_ra_loop():
@@ -114,7 +112,8 @@ def test_astroquery_missing_error(tmp_path):
     except ImportError:
         with pytest.raises(
             ImportError,
-            match="The astroquery module is required to use the download_gleam function.",
+            match="The astroquery module is required to use the download_gleam "
+            "function.",
         ):
             skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=10)
 

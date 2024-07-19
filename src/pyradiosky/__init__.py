@@ -1,5 +1,6 @@
 """Define namespace."""
 
+import contextlib
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
@@ -32,12 +33,8 @@ try:
     __version__ = version_str
 
 except (LookupError, ImportError):
-    try:
+    with contextlib.suppress(PackageNotFoundError):
         # Set the version automatically from the package details.
         __version__ = version("pyradiosky")
-
-    except PackageNotFoundError:  # pragma: nocover
-        # package is not installed
-        pass
 
 from .skymodel import SkyModel  # noqa

@@ -1,4 +1,3 @@
-# -*- mode: python; coding: utf-8 -*
 # Copyright (c) 2019 Radio Astronomy Software Group
 # Licensed under the 2-clause BSD License
 
@@ -17,8 +16,8 @@ try:
     from pyuvdata.testing import check_warnings
 except ImportError:
     # this can be removed once we require pyuvdata >= v3.0
-    from pyuvdata.tests import check_warnings
     import pyuvdata.utils as history_utils
+    from pyuvdata.tests import check_warnings
 
 import scipy.io
 from astropy import units
@@ -34,8 +33,7 @@ from astropy.coordinates import (
 from astropy.time import Time, TimeDelta
 from astropy.units import Quantity
 
-from pyradiosky import SkyModel, skymodel
-from pyradiosky import utils as skyutils
+from pyradiosky import SkyModel, skymodel, utils as skyutils
 from pyradiosky.data import DATA_PATH as SKY_DATA_PATH
 
 GLEAM_vot = os.path.join(SKY_DATA_PATH, "gleam_50srcs.vot")
@@ -57,8 +55,7 @@ def time_location():
 def moon_time_location():
     pytest.importorskip("lunarsky")
 
-    from lunarsky import MoonLocation
-    from lunarsky import Time as LTime
+    from lunarsky import MoonLocation, Time as LTime
 
     array_location = MoonLocation.from_selenodetic(0.6875, 24.433, 0)
 
@@ -96,8 +93,7 @@ def zenith_skymodel(zenith_skycoord):
 def moonsky():
     pytest.importorskip("lunarsky")
 
-    from lunarsky import MoonLocation
-    from lunarsky import SkyCoord as LunarSkyCoord
+    from lunarsky import MoonLocation, SkyCoord as LunarSkyCoord
     from spiceypy.utils.exceptions import SpiceUNKNOWNFRAME
 
     # Tranquility base
@@ -371,22 +367,24 @@ def test_init_error(zenith_skycoord):
             stokes=[1.0, 0, 0, 0] * units.Jy,
             spectral_type="foo",
         )
-    with pytest.raises(
-        ValueError,
-        match="Cannot calculate frequency edges from frequency center array because "
-        "there is only one frequency center.",
-    ):
-        with check_warnings(
+    with (
+        pytest.raises(
+            ValueError,
+            match="Cannot calculate frequency edges from frequency center array "
+            "because there is only one frequency center.",
+        ),
+        check_warnings(
             UserWarning,
             match="freq_edge_array not set, calculating it from the freq_array.",
-        ):
-            SkyModel(
-                skycoord=zenith_skycoord,
-                name=["zen"],
-                stokes=[1.0, 0, 0, 0] * units.Jy,
-                spectral_type="subband",
-                freq_array=100e6 * units.Hz,
-            )
+        ),
+    ):
+        SkyModel(
+            skycoord=zenith_skycoord,
+            name=["zen"],
+            stokes=[1.0, 0, 0, 0] * units.Jy,
+            spectral_type="subband",
+            freq_array=100e6 * units.Hz,
+        )
 
     with pytest.raises(ValueError, match="component_type must be one of:"):
         SkyModel(
@@ -1214,9 +1212,11 @@ def test_coherency_calc_errors():
         name="test", skycoord=coord, stokes=stokes_radec, spectral_type="flat"
     )
 
-    with check_warnings(UserWarning, match="Horizon cutoff undefined"):
-        with pytest.raises(ValueError, match="telescope_location must be an"):
-            source.coherency_calc().squeeze()
+    with (
+        check_warnings(UserWarning, match="Horizon cutoff undefined"),
+        pytest.raises(ValueError, match="telescope_location must be an"),
+    ):
+        source.coherency_calc().squeeze()
 
 
 @pytest.mark.parametrize("telescope_frame", ["itrs", "mcmf"])
@@ -2215,7 +2215,7 @@ def test_select_flux(spec_type, init_kwargs, cut_kwargs, cut_type):
     minflux = 0.5
     maxflux = 3.0
 
-    ids = ["src{}".format(i) for i in range(Nsrcs)]
+    ids = [f"src{i}" for i in range(Nsrcs)]
     ras = Longitude(np.linspace(0, 360.0, Nsrcs), units.deg)
     decs = Latitude(np.linspace(-90, 90, Nsrcs), units.deg)
     stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
@@ -2249,10 +2249,7 @@ def test_select_flux(spec_type, init_kwargs, cut_kwargs, cut_type):
         maxI_cut = 2.3 * units.Jy
     else:
         maxI_cut = None
-    if "freq_range" in cut_kwargs:
-        freq_range = cut_kwargs["freq_range"]
-    else:
-        freq_range = None
+    freq_range = cut_kwargs.get("freq_range", None)
     skyobj.select(
         min_brightness=minI_cut,
         max_brightness=maxI_cut,
@@ -2318,7 +2315,7 @@ def test_select_flux_cut_error(
     minflux = 0.5
     maxflux = 3.0
 
-    ids = ["src{}".format(i) for i in range(Nsrcs)]
+    ids = [f"src{i}" for i in range(Nsrcs)]
     ras = Longitude(np.linspace(0, 360.0, Nsrcs), units.deg)
     decs = Latitude(np.linspace(-90, 90, Nsrcs), units.deg)
     stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
@@ -2353,10 +2350,7 @@ def test_select_flux_cut_error(
 
     minI_cut *= units.Jy
     maxI_cut *= units.Jy
-    if "freq_range" in cut_kwargs:
-        freq_range = cut_kwargs["freq_range"]
-    else:
-        freq_range = None
+    freq_range = cut_kwargs.get("freq_range", None)
     with pytest.raises(error_category, match=error_message):
         skyobj.select(
             min_brightness=minI_cut,
@@ -2371,7 +2365,7 @@ def test_select_flux_error():
     minflux = 0.5
     maxflux = 3.0
 
-    ids = ["src{}".format(i) for i in range(Nsrcs)]
+    ids = [f"src{i}" for i in range(Nsrcs)]
     ras = Longitude(np.linspace(0, 360.0, Nsrcs), units.deg)
     decs = Latitude(np.linspace(-90, 90, Nsrcs), units.deg)
     stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
@@ -2414,7 +2408,7 @@ def test_select_field(spec_type, init_kwargs):
     minflux = 0.5
     maxflux = 3.0
 
-    ids = ["src{}".format(i) for i in range(Nsrcs)]
+    ids = [f"src{i}" for i in range(Nsrcs)]
     ras = Longitude(np.linspace(0, 360.0, Nsrcs), units.deg)
     decs = Latitude(np.linspace(-90, 90, Nsrcs), units.deg)
     skycoord = SkyCoord(ras, decs, frame="icrs")
@@ -2449,7 +2443,7 @@ def test_select_field(spec_type, init_kwargs):
 
     # check error if ask for galactic coords b/c this skymodel.frame doesn't have them
     with pytest.raises(AttributeError, match="'SkyModel' object has no attribute 'b'"):
-        skyobj2.b
+        skyobj2.b  # noqa
 
     lat_range = Latitude([-45, 45], units.deg)
     skyobj2 = skyobj.copy()
@@ -2485,7 +2479,7 @@ def test_select_field_error():
     minflux = 0.5
     maxflux = 3.0
 
-    ids = ["src{}".format(i) for i in range(Nsrcs)]
+    ids = [f"src{i}" for i in range(Nsrcs)]
     ras = Longitude(np.linspace(0, 360.0, Nsrcs), units.deg)
     decs = Latitude(np.linspace(-90, 90, Nsrcs), units.deg)
     stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
@@ -2559,7 +2553,7 @@ def test_circumpolar_nonrising(time_location):
     ra = Longitude(ra, units.deg)
     dec = Latitude(dec, units.deg)
 
-    names = ["src{}".format(i) for i in range(Nsrcs)]
+    names = [f"src{i}" for i in range(Nsrcs)]
     stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
     stokes[0, ...] = 1.0 * units.Jy
 
@@ -2635,7 +2629,7 @@ def test_cut_nonrising_error(time_location):
     ra = Longitude(ra, units.deg)
     dec = Latitude(dec, units.deg)
 
-    names = ["src{}".format(i) for i in range(Nsrcs)]
+    names = [f"src{i}" for i in range(Nsrcs)]
     stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
     stokes[0, ...] = 1.0 * units.Jy
 
@@ -3071,7 +3065,7 @@ def test_point_catalog_reader():
 
     assert skyobj.filename == ["pointsource_catalog.txt"]
 
-    with open(catfile, "r") as fileobj:
+    with open(catfile) as fileobj:
         header = fileobj.readline()
     header = [h.strip() for h in header.split()]
     dt = np.rec.format_parser(
@@ -3262,7 +3256,7 @@ def test_read_text_catalog_error(tmp_path, time_location, old_str, new_str, err_
 
     zenith_source.write_text_catalog(fname)
 
-    with open(fname, "r") as cfile:
+    with open(fname) as cfile:
         header = cfile.readline()
         header = header.replace(old_str, new_str)
 
@@ -3477,9 +3471,9 @@ def test_at_frequencies_nan_handling(nan_handling):
 
     message = ["Some stokes values are NaNs."]
     if nan_handling == "propagate":
-        message[
-            0
-        ] += " All output stokes values for sources with any NaN values will be NaN."
+        message[0] += (
+            " All output stokes values for sources with any NaN values will be NaN."
+        )
     else:
         message[0] += " Interpolating using the non-NaN values only."
         message.extend(
@@ -3490,22 +3484,23 @@ def test_at_frequencies_nan_handling(nan_handling):
                 "2 components had all NaN stokes values below one or more of the "
                 "requested frequencies. ",
                 "1 components had too few non-NaN stokes values for chosen "
-                "interpolation. Using linear interpolation for these components instead.",
+                "interpolation. Using linear interpolation for these components "
+                "instead.",
             ]
         )
         if nan_handling == "interp":
-            message[
-                2
-            ] += "The stokes for these components at these frequencies will be NaN."
-            message[
-                3
-            ] += "The stokes for these components at these frequencies will be NaN."
+            message[2] += (
+                "The stokes for these components at these frequencies will be NaN."
+            )
+            message[3] += (
+                "The stokes for these components at these frequencies will be NaN."
+            )
         else:
             message[2] += "Using the stokes value at the highest frequency "
             message[3] += "Using the stokes value at the lowest frequency "
-    message[
-        0
-    ] += " You can change the way NaNs are handled using the `nan_handling` keyword."
+    message[0] += (
+        " You can change the way NaNs are handled using the `nan_handling` keyword."
+    )
     with check_warnings(UserWarning, match=message):
         skyobj2_interp = skyobj2.at_frequencies(
             interp_freqs, inplace=False, nan_handling=nan_handling
@@ -3628,14 +3623,14 @@ def test_at_frequencies_nan_handling_allsrc(nan_handling):
     skyobj2.stokes[0, 10:11, :] = np.nan
     message = ["Some stokes values are NaNs."]
     if nan_handling == "propagate":
-        message[
-            0
-        ] += " All output stokes values for sources with any NaN values will be NaN."
+        message[0] += (
+            " All output stokes values for sources with any NaN values will be NaN."
+        )
     else:
         message[0] += " Interpolating using the non-NaN values only."
-    message[
-        0
-    ] += " You can change the way NaNs are handled using the `nan_handling` keyword."
+    message[0] += (
+        " You can change the way NaNs are handled using the `nan_handling` keyword."
+    )
     with check_warnings(UserWarning, match=message):
         skyobj2_interp = skyobj2.at_frequencies(
             interp_freqs, inplace=False, nan_handling=nan_handling
@@ -4069,9 +4064,9 @@ def test_write_clobber(mock_point_skies, tmpdir):
         ),
         (
             {"nside": 4, "hpx_inds": np.arange(1)},
-            "If initializing with values, all of ['nside', 'frame', 'hpx_inds', 'stokes', "
-            "'spectral_type'] must be set. Received: ['nside', 'hpx_inds', 'stokes', "
-            "'spectral_type']",
+            "If initializing with values, all of ['nside', 'frame', 'hpx_inds', "
+            "'stokes', 'spectral_type'] must be set. Received: ['nside', "
+            "'hpx_inds', 'stokes', 'spectral_type']",
             "icrs",
         ),
         ({"nside": 4, "hpx_inds": np.arange(1), "frame": "icrs"}, None, "icrs"),
@@ -4080,7 +4075,7 @@ def test_write_clobber(mock_point_skies, tmpdir):
 def test_skymodel_init_with_frame(coord_kwds, err_msg, exp_frame):
     stokes = np.zeros((4, 1, 1)) * units.Jy
 
-    if "nside" in coord_kwds.keys():
+    if "nside" in coord_kwds:
         pytest.importorskip("astropy_healpix")
         stokes = stokes / units.sr
     names = ["src"]
@@ -4093,11 +4088,11 @@ def test_skymodel_init_with_frame(coord_kwds, err_msg, exp_frame):
             SkyModel(**coord_kwds)
     else:
         msg = ""
-        if "frame" not in coord_kwds.keys():
+        if "frame" not in coord_kwds:
             exp_warning = DeprecationWarning
         else:
             exp_warning = None
-        if "ra" in coord_kwds.keys():
+        if "ra" in coord_kwds:
             msg = (
                 "No frame was specified for RA and Dec. Defaulting to ICRS, but "
                 "this will become an error in version 0.3 and later."
@@ -4108,7 +4103,7 @@ def test_skymodel_init_with_frame(coord_kwds, err_msg, exp_frame):
         assert sky.frame == exp_frame
         lon, lat = sky.get_lon_lat()
 
-        if "nside" in coord_kwds.keys():
+        if "nside" in coord_kwds:
             exp_warning = UserWarning
             msg = [
                 "It is more efficient to use the `get_lon_lat` method to get "
@@ -4130,7 +4125,7 @@ def test_skymodel_init_with_frame(coord_kwds, err_msg, exp_frame):
             with pytest.raises(
                 AttributeError, match="'SkyModel' object has no attribute 'ra'"
             ):
-                sky.ra
+                sky.ra  # noqa
             with pytest.raises(
                 ValueError, match="Required UVParameter _hpx_frame has not been set."
             ):
