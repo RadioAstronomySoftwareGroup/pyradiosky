@@ -4,7 +4,6 @@
 
 """Utility function for making noiselike EoR models."""
 
-
 import argparse
 
 import numpy as np
@@ -22,9 +21,9 @@ def flat_spectrum_skymodel(
     """
     Generate a full-frequency SkyModel of a flat-spectrum (noiselike) EoR signal.
 
-    The amplitude of this signal is variance * vol(ref_chan), where vol() gives the voxel
-    volume and ref_chan is a chosen reference point. The generated SkyModel has healpix
-    component type.
+    The amplitude of this signal is variance * vol(ref_chan), where vol() gives
+    the voxel volume and ref_chan is a chosen reference point. The generated
+    SkyModel has healpix component type.
 
     Parameters
     ----------
@@ -123,7 +122,8 @@ def flat_spectrum_skymodel(
 
 
 if __name__ == "__main__":
-    # When run as a script, construct a noiselike skymodel for the MWA frequency channels.
+    # When run as a script, construct a noiselike skymodel for the MWA frequency
+    # channels.
 
     parser = argparse.ArgumentParser(
         description="A command-line script to generate a SkyModel containing a "

@@ -1,4 +1,3 @@
-# -*- mode: python; coding: utf-8 -*
 # Copyright (c) 2019 Radio Astronomy Software Group
 # Licensed under the 2-clause BSD License
 """Define SkyModel class and helper functions."""
@@ -29,24 +28,21 @@ from pyuvdata.uvbase import UVBase
 from pyuvdata.uvbeam.cst_beam import CSTBeam
 from scipy.linalg import orthogonal_procrustes as ortho_procr
 
-from . import __version__
-from . import spherical_coords_transforms as sct
-from . import utils as skyutils
+from . import __version__, spherical_coords_transforms as sct, utils as skyutils
 
 try:  # pragma: no cover  # This pragma can be removed once pyuvdata v3 is released.
     import pyuvdata.utils.history as history_utils
     import pyuvdata.utils.tools as uvutils
 except ImportError:
     # this can be removed once we require pyuvdata >= v3.0
-    import pyuvdata.utils as uvutils
     import pyuvdata.utils as history_utils
+    import pyuvdata.utils as uvutils
 
 
 __all__ = ["hasmoon", "SkyModel"]
 
 try:
-    from lunarsky import LunarTopo, MoonLocation
-    from lunarsky import SkyCoord as LunarSkyCoord
+    from lunarsky import LunarTopo, MoonLocation, SkyCoord as LunarSkyCoord
 
     hasmoon = True
 except ImportError:
@@ -267,8 +263,8 @@ def _add_value_hdf5_group(group, name, value, expected_type):
         dtype = np.dtype(type(value))
 
     # Strings and arrays of strings require special handling.
-    if dtype.kind == "U" or expected_type == str:
-        if isinstance(value, (list, np.ndarray)):
+    if dtype.kind == "U" or expected_type is str:
+        if isinstance(value, list | np.ndarray):
             group[name] = np.asarray(value, dtype="bytes")
         else:
             group[name] = np.bytes_(value)
@@ -301,11 +297,11 @@ def _get_value_hdf5_group(group, name, str_type=None):
     elif object_type == "time":
         value = Time(value)
 
-    if str_type is None:
-        if isinstance(value, bytes) or (
-            isinstance(value, np.ndarray) and isinstance(value[0], bytes)
-        ):
-            str_type = True
+    if str_type is None and (
+        isinstance(value, bytes)
+        or (isinstance(value, np.ndarray) and isinstance(value[0], bytes))
+    ):
+        str_type = True
 
     if str_type:
         if isinstance(value, np.ndarray):
@@ -370,8 +366,8 @@ class SkyModel(UVBase):
         Source RA in the frame specified in the `frame` parameter, shape (Ncomponents,).
         Not needed if the `skycoord` is passed.
     dec : :class:`astropy.coordinates.Latitude`
-        Source Dec in the frame specified in the `frame` parameter, shape (Ncomponents,).
-        Not needed if the `skycoord` is passed.
+        Source Dec in the frame specified in the `frame` parameter, shape
+        (Ncomponents,). Not needed if the `skycoord` is passed.
     gl : :class:`astropy.coordinates.Longitude`
         source longitude in Galactic coordinates, shape (Ncomponents,). Not needed if
         the `skycoord` is passed.
@@ -680,8 +676,8 @@ class SkyModel(UVBase):
         self._beam_amp = UVParameter(
             "beam_amp",
             description=(
-                "Beam amplitude at the source position as a function "
-                "of instrument polarization and frequency. shape (4, Nfreqs, Ncomponents)"
+                "Beam amplitude at the source position as a function of instrument "
+                "polarization and frequency. shape (4, Nfreqs, Ncomponents)"
             ),
             form=(4, "Nfreqs", "Ncomponents"),
             expected_type=float,
@@ -691,8 +687,8 @@ class SkyModel(UVBase):
         self._extended_model_group = UVParameter(
             "extended_model_group",
             description=(
-                "Identifier that groups components of an extended "
-                "source model. Set to an empty string for point sources. shape (Ncomponents,)"
+                "Identifier that groups components of an extended source model. "
+                "Set to an empty string for point sources. shape (Ncomponents,)"
             ),
             form=("Ncomponents",),
             expected_type=str,
@@ -714,8 +710,8 @@ class SkyModel(UVBase):
         )
 
         desc = (
-            "List of strings containing the unique basenames (not the full path) of "
-            "input files."
+            "List of strings containing the unique basenames (not the full path) "
+            "of input files."
         )
         self._filename = UVParameter(
             "filename", required=False, description=desc, expected_type=str
@@ -736,7 +732,10 @@ class SkyModel(UVBase):
         if hasmoon:
             self._telescope_location.expected_type = (EarthLocation, MoonLocation)
 
-        desc = "Altitude and Azimuth of components in local coordinates. shape (2, Ncomponents)"
+        desc = (
+            "Altitude and Azimuth of components in local coordinates. shape "
+            "(2, Ncomponents)"
+        )
         self._alt_az = UVParameter(
             "alt_az",
             description=desc,
@@ -746,7 +745,10 @@ class SkyModel(UVBase):
             required=False,
         )
 
-        desc = "Position cosines of components in local coordinates. shape (3, Ncomponents)"
+        desc = (
+            "Position cosines of components in local coordinates. shape "
+            "(3, Ncomponents)"
+        )
         self._pos_lmn = UVParameter(
             "pos_lmn",
             description=desc,
@@ -770,7 +772,7 @@ class SkyModel(UVBase):
         )
 
         # initialize the underlying UVBase properties
-        super(SkyModel, self).__init__()
+        super().__init__()
 
         # String to add to history of any files written with this version of pyradiosky
         self.pyradiosky_version_str = (
@@ -835,7 +837,8 @@ class SkyModel(UVBase):
 
                 if len(input_combo) > 0 and frame is None:
                     raise ValueError(
-                        "The 'frame' keyword must be set to initialize from coordinates."
+                        "The 'frame' keyword must be set to initialize from "
+                        "coordinates."
                     )
 
                 frame = _get_frame_obj(frame)
@@ -847,8 +850,8 @@ class SkyModel(UVBase):
                     comp_names = _get_lon_lat_component_names(dummy_skycoord)
                     if comp_names[0] != "ra" or comp_names[1] != "dec":
                         raise ValueError(
-                            f"ra or dec supplied but specified frame {frame.name} does "
-                            "not support ra and dec coordinates."
+                            f"ra or dec supplied but specified frame {frame.name} "
+                            "does not support ra and dec coordinates."
                         )
                 elif (gl is not None) and (gb is not None):
                     lon = gl
@@ -857,17 +860,17 @@ class SkyModel(UVBase):
                     comp_names = _get_lon_lat_component_names(dummy_skycoord)
                     if comp_names[0] != "l" or comp_names[1] != "b":
                         raise ValueError(
-                            f"gl or gb supplied but specified frame {frame.name} does "
-                            "not support gl and gb coordinates."
+                            f"gl or gb supplied but specified frame {frame.name} "
+                            "does not support gl and gb coordinates."
                         )
 
                 if lon is not None:
                     if not isinstance(lon, Longitude):
-                        if not isinstance(lon, (list, np.ndarray, tuple)):
+                        if not isinstance(lon, list | np.ndarray | tuple):
                             lon = [lon]
-                        # Cannot just try converting to Longitude because if the values are
-                        # Latitudes they are silently converted to Longitude rather than
-                        # throwing an error.
+                        # Cannot just try converting to Longitude because if the
+                        # values are Latitudes they are silently converted to
+                        # Longitude rather than throwing an error.
                         for val in lon:
                             if not isinstance(val, (Longitude)):
                                 lon_name = [
@@ -878,11 +881,11 @@ class SkyModel(UVBase):
                                 )
                         lon = Longitude(lon)
                     if not isinstance(lat, Latitude):
-                        if not isinstance(lat, (list, np.ndarray, tuple)):
+                        if not isinstance(lat, list | np.ndarray | tuple):
                             lat = [lat]
-                        # Cannot just try converting to Latitude because if the values are
-                        # Longitude they are silently converted to Longitude rather than
-                        # throwing an error.
+                        # Cannot just try converting to Latitude because if the
+                        # values are Longitude they are silently converted to
+                        # Longitude rather than throwing an error.
                         for val in lat:
                             if not isinstance(val, (Latitude)):
                                 lat_name = [
@@ -932,7 +935,7 @@ class SkyModel(UVBase):
 
         if np.any(np.concatenate((args_set_req, arg_set_opt))):
             if not np.all(args_set_req):
-                isset = [k for k, v in zip(req_args, args_set_req) if v]
+                isset = [k for k, v in zip(req_args, args_set_req, strict=False) if v]
                 raise ValueError(
                     f"If initializing with values, all of {req_args} must be set."
                     f" Received: {isset}"
@@ -1072,20 +1075,21 @@ class SkyModel(UVBase):
             else:
                 return self.hpx_frame.name
 
-        if not name.startswith("_"):
-            if self.skycoord is not None or self.hpx_frame is not None:
-                # Naming for galactic is different from astropy:
-                comp_names = self._get_lon_lat_component_names()
-                if name in comp_names:
-                    if self.skycoord is not None:
-                        return getattr(self.skycoord, name)
-                    warnings.warn(
-                        "It is more efficient to use the `get_lon_lat` method to get "
-                        "longitudinal and latitudinal coordinates for HEALPix maps."
-                    )
-                    comp_ind = np.nonzero(np.array(comp_names) == name)[0][0]
-                    lon_lat = self.get_lon_lat()
-                    return lon_lat[comp_ind]
+        if not name.startswith("_") and (
+            self.skycoord is not None or self.hpx_frame is not None
+        ):
+            # Naming for galactic is different from astropy:
+            comp_names = self._get_lon_lat_component_names()
+            if name in comp_names:
+                if self.skycoord is not None:
+                    return getattr(self.skycoord, name)
+                warnings.warn(
+                    "It is more efficient to use the `get_lon_lat` method to get "
+                    "longitudinal and latitudinal coordinates for HEALPix maps."
+                )
+                comp_ind = np.nonzero(np.array(comp_names) == name)[0][0]
+                lon_lat = self.get_lon_lat()
+                return lon_lat[comp_ind]
 
         # Error if attribute not found
         return super().__getattribute__(name)
@@ -1126,8 +1130,7 @@ class SkyModel(UVBase):
         param_list = (
             param for param in self if getattr(self, param).form == ("Ncomponents",)
         )
-        for param in param_list:
-            yield param
+        yield from param_list
 
     @property
     def _time_position_params(self):
@@ -1143,8 +1146,8 @@ class SkyModel(UVBase):
         name : str or list of str
             The name(s) of the column(s).
         value : np.ndarray or list of np.ndarray
-            The value(s) of the data or metadata, each must be a 1D array of length
-            Ncomponents. Note: Quantities are not supported.
+            The value(s) of the data or metadata, each must be a 1D array of
+            length Ncomponents. Note: Quantities are not supported.
         dtype : str or list of str
             The type(s) that the data or metadata should be. If not set, use the
             dtype(s) of `value`.
@@ -1157,7 +1160,7 @@ class SkyModel(UVBase):
         if len(names) != len(values):
             raise ValueError("Must provide the same number of names and values.")
         if dtype is not None:
-            if isinstance(dtype, (list, tuple, np.ndarray)):
+            if isinstance(dtype, list | tuple | np.ndarray):
                 if len(dtype) != len(names):
                     raise ValueError(
                         "If dtype is set, it must be the same length as `name`."
@@ -1167,12 +1170,12 @@ class SkyModel(UVBase):
         for index, val in enumerate(values):
             if val.shape != (self.Ncomponents,):
                 raise ValueError(
-                    "value array(s) must be 1D, Ncomponents length array(s). The value "
-                    f"array in index {index} is not the right shape."
+                    "value array(s) must be 1D, Ncomponents length array(s). "
+                    f"The value array in index {index} is not the right shape."
                 )
         if dtype is None:
             dtype = [val.dtype for val in values]
-        dtype_obj = np.dtype(list(zip(names, dtype)))
+        dtype_obj = np.dtype(list(zip(names, dtype, strict=False)))
         new_recarray = np.rec.fromarrays(values, dtype=dtype_obj)
         if self.extra_columns is None:
             self.extra_columns = new_recarray
@@ -1216,7 +1219,8 @@ class SkyModel(UVBase):
         # make sure only one of freq_array and reference_frequency is defined
         if self.freq_array is not None and self.reference_frequency is not None:
             raise ValueError(
-                "Only one of freq_array and reference_frequency can be specified, not both."
+                "Only one of freq_array and reference_frequency can be "
+                "specified, not both."
             )
 
         if self.freq_edge_array is None and self.spectral_type == "subband":
@@ -1236,7 +1240,7 @@ class SkyModel(UVBase):
             )
 
         # Run the basic check from UVBase
-        super(SkyModel, self).check(
+        super().check(
             check_extra=check_extra, run_check_acceptability=run_check_acceptability
         )
 
@@ -1258,12 +1262,13 @@ class SkyModel(UVBase):
                     f"Currently units are {self.stokes.unit}"
                 )
 
-        if self.stokes_error is not None:
-            if not self.stokes_error.unit.is_equivalent(self.stokes.unit):
-                raise ValueError(
-                    "stokes_error parameter must have units that are equivalent to the "
-                    "units of the stokes parameter."
-                )
+        if self.stokes_error is not None and not self.stokes_error.unit.is_equivalent(
+            self.stokes.unit
+        ):
+            raise ValueError(
+                "stokes_error parameter must have units that are equivalent to "
+                "the units of the stokes parameter."
+            )
 
         # make sure freq_array or reference_frequency if present is compatible with Hz
         if not (self.freq_array is None or self.freq_array.unit.is_equivalent("Hz")):
@@ -1284,7 +1289,7 @@ class SkyModel(UVBase):
     ):
         """Check for equality, check for future equality."""
         # Run the basic __eq__ from UVBase
-        equal = super(SkyModel, self).__eq__(
+        equal = super().__eq__(
             other,
             check_extra=check_extra,
             allowed_failures=allowed_failures,
@@ -1296,8 +1301,9 @@ class SkyModel(UVBase):
     def transform_to(self, frame):
         """Transform to a different skycoord coordinate frame.
 
-        This function is a thin wrapper on :meth:`astropy.coordinates.SkyCoord.transform_to`
-        please refer to that function for full documentation.
+        This function is a thin wrapper on
+        :meth:`astropy.coordinates.SkyCoord.transform_to` please refer to that
+        function for full documentation.
 
         Parameters
         ----------
@@ -1309,10 +1315,11 @@ class SkyModel(UVBase):
         if self.component_type == "healpix":
             raise ValueError(
                 "Direct coordinate transformation between frames is not valid "
-                "for `healpix` type catalogs. Please use the `healpix_interp_transform` "
-                "to transform to a new frame and interpolate to the new pixel centers. "
-                "Alternatively, you can call `healpix_to_point` to convert the healpix map "
-                "to a point source catalog before calling this function."
+                "for `healpix` type catalogs. Please use the "
+                "`healpix_interp_transform` to transform to a new frame and "
+                "interpolate to the new pixel centers. Alternatively, you can "
+                "call `healpix_to_point` to convert the healpix map to a point "
+                "source catalog before calling this function."
             )
 
         new_skycoord = self.skycoord.transform_to(frame)
@@ -1344,9 +1351,9 @@ class SkyModel(UVBase):
         As a result, it does not support transformations for polarized catalogs
         since this would induce a Q <--> U rotation.
 
-        Current implementation is equal to using a healpy.Rotator class to 1 part in 10^-5
-        (e.g :func:`numpy.allclose(healpy_rotated_map, interpolate_bilinear_skycoord,
-        rtol=1e-5) is True`).
+        Current implementation is equal to using a healpy.Rotator class to 1
+        part in 10^-5 (e.g :func:`numpy.allclose(healpy_rotated_map,
+        interpolate_bilinear_skycoord, rtol=1e-5) is True`).
 
 
         Parameters
@@ -1396,10 +1403,11 @@ class SkyModel(UVBase):
 
         if np.any(this.stokes[1:] != units.Quantity(0, unit=this.stokes.unit)):
             raise NotImplementedError(
-                "Healpix map transformations are currently not implemented for catalogs "
-                "with polarization information."
+                "Healpix map transformations are currently not implemented for "
+                "catalogs with polarization information."
             )
-        #  quickly check the validity of the transformation using a dummy SkyCoord object.
+        # quickly check the validity of the transformation using a dummy
+        # SkyCoord object.
         coords = SkyCoord(0, 0, unit="rad", frame=this.hpx_frame)
 
         # we will need the starting frame object for some interpolation later
@@ -1836,7 +1844,7 @@ class SkyModel(UVBase):
             ind_dict = {}
             first_inds = []
             for ind in hpx_inds:
-                if ind in ind_dict.keys():
+                if ind in ind_dict:
                     continue
                 ind_dict[ind] = np.nonzero(hpx_inds == ind)[0]
                 first_inds.append(ind_dict[ind][0])
@@ -1844,22 +1852,24 @@ class SkyModel(UVBase):
                     if param == "_skycoord":
                         continue
                     attr = getattr(sky, param)
-                    if attr.value is not None:
-                        if np.unique(attr.value[ind_dict[ind]]).size > 1:
-                            param_name = attr.name
-                            if param in ["_spectral_index", "_reference_frequency"]:
-                                raise ValueError(
-                                    "Multiple components map to a single healpix pixel "
-                                    f"and the {param_name} varies among them. Consider "
-                                    "using the `at_frequencies` method first or a "
-                                    "larger nside."
-                                )
-                            elif param != "_name":
-                                raise ValueError(
-                                    "Multiple components map to a single healpix pixel "
-                                    f"and the {param_name} varies among them."
-                                    "Consider using a larger nside."
-                                )
+                    if (
+                        attr.value is not None
+                        and np.unique(attr.value[ind_dict[ind]]).size > 1
+                    ):
+                        param_name = attr.name
+                        if param in ["_spectral_index", "_reference_frequency"]:
+                            raise ValueError(
+                                "Multiple components map to a single healpix pixel "
+                                f"and the {param_name} varies among them. Consider "
+                                "using the `at_frequencies` method first or a "
+                                "larger nside."
+                            )
+                        elif param != "_name":
+                            raise ValueError(
+                                "Multiple components map to a single healpix pixel "
+                                f"and the {param_name} varies among them."
+                                "Consider using a larger nside."
+                            )
                 if sky.beam_amp is not None:
                     test_beam_amp = sky.beam_amp[:, :, ind_dict[ind]] - np.broadcast_to(
                         sky.beam_amp[:, :, ind_dict[ind][0], np.newaxis],
@@ -2030,8 +2040,8 @@ class SkyModel(UVBase):
         """
         Evaluate the stokes array at the specified frequencies.
 
-        Produces a SkyModel object that is in the `full` frequency spectral type, based on
-        the current spectral type:
+        Produces a SkyModel object that is in the `full` frequency spectral type,
+        based on the current spectral type:
 
             - full: Extract a subset of existing frequencies.
             - subband: Interpolate to new frequencies.
@@ -2046,7 +2056,8 @@ class SkyModel(UVBase):
             If True, modify the current SkyModel object.
             Otherwise, returns a new instance. Default True.
         freq_interp_kind: str or int
-            Spline interpolation order, as can be understood by scipy.interpolate.interp1d.
+            Spline interpolation order, as can be understood by
+            `scipy.interpolate.interp1d`.
             Only used if the spectral_type is "subband".
         nan_handling : str
             Choice of how to handle nans in the stokes when interpolating, only used if
@@ -2105,7 +2116,8 @@ class SkyModel(UVBase):
 
             if np.sum(matches) != freqs.size:
                 raise ValueError(
-                    "Some requested frequencies are not present in the current SkyModel."
+                    "Some requested frequencies are not present in the current "
+                    "SkyModel."
                 )
             sky.stokes = self.stokes[:, matches, :]
             if sky.freq_edge_array is not None:
@@ -2113,11 +2125,13 @@ class SkyModel(UVBase):
         elif self.spectral_type == "subband":
             if np.max(freqs.to("Hz")) > np.max(self.freq_array.to("Hz")):
                 raise ValueError(
-                    "A requested frequency is larger than the highest subband frequency."
+                    "A requested frequency is larger than the highest subband "
+                    "frequency."
                 )
             if np.min(freqs.to("Hz")) < np.min(self.freq_array.to("Hz")):
                 raise ValueError(
-                    "A requested frequency is smaller than the lowest subband frequency."
+                    "A requested frequency is smaller than the lowest subband "
+                    "frequency."
                 )
             # Interpolate. Need to be careful if there are NaNs -- they spoil the
             # interpolation even for sources that do not have any NaNs.
@@ -2265,8 +2279,8 @@ class SkyModel(UVBase):
                         warnings.warn(message)
                     if len(wh_nan_low) > 0:
                         message = (
-                            f"{len(wh_nan_low)} components had all NaN stokes values below "
-                            "one or more of the requested frequencies. "
+                            f"{len(wh_nan_low)} components had all NaN stokes "
+                            "values below one or more of the requested frequencies. "
                         )
                         if nan_handling == "interp":
                             message += (
@@ -2276,7 +2290,8 @@ class SkyModel(UVBase):
                         else:
                             message += (
                                 "Using the stokes value at the lowest frequency "
-                                "without a NaN for these components at these frequencies."
+                                "without a NaN for these components at these "
+                                "frequencies."
                             )
                         warnings.warn(message)
                     if len(wh_nan_many) > 0:
@@ -2338,9 +2353,7 @@ class SkyModel(UVBase):
             :class:`lunarsky.MoonLocation` object.
         """
         if not isinstance(time, Time):
-            raise ValueError(
-                "time must be an astropy Time object. value was: {t}".format(t=time)
-            )
+            raise ValueError(f"time must be an astropy Time object. value was: {time}")
 
         if not (
             isinstance(telescope_location, EarthLocation)
@@ -2350,9 +2363,7 @@ class SkyModel(UVBase):
             if hasmoon:
                 errm += " or a :class:`lunarsky.MoonLocation` object "
             errm += ". "
-            raise ValueError(
-                errm + "value was: {al}".format(al=str(telescope_location))
-            )
+            raise ValueError(errm + f"value was: {str(telescope_location)}")
 
         # Don't repeat calculations
         if self.time == time and self.telescope_location == telescope_location:
@@ -2513,7 +2524,7 @@ class SkyModel(UVBase):
 
     def _calc_coherency_rotation(self, inds=None):
         """
-        Calculate the rotation matrix to apply to the frame coherency to get it into alt/az.
+        Calculate the rotation matrix to take frame coherency to alt/az.
 
         Parameters
         ----------
@@ -2595,9 +2606,7 @@ class SkyModel(UVBase):
             if hasmoon:
                 errm += " or a :class:`lunarsky.MoonLocation` object "
             errm += ". "
-            raise ValueError(
-                errm + "value was: {al}".format(al=str(self.telescope_location))
-            )
+            raise ValueError(errm + f"value was: {str(self.telescope_location)}")
 
         if self.frame_coherency is None:
             self.calc_frame_coherency(store=store_frame_coherency)
@@ -2973,9 +2982,11 @@ class SkyModel(UVBase):
                 "Flux cuts with spectral index type objects is not supported yet."
             )
 
-        if brightness_freq_range is not None:
-            if not np.atleast_1d(brightness_freq_range).size == 2:
-                raise ValueError("brightness_freq_range must have 2 elements.")
+        if (
+            brightness_freq_range is not None
+            and np.atleast_1d(brightness_freq_range).size != 2
+        ):
+            raise ValueError("brightness_freq_range must have 2 elements.")
 
         freq_inds_use = None
 
@@ -3172,9 +3183,9 @@ class SkyModel(UVBase):
         """
         Calculate the rise & set LSTs given a telescope latitude.
 
-        Sets the `_rise_lst` and `_set_lst` attributes on the object. These values can
-        be NaNs for sources that never rise or never set. Call :meth:`cut_nonrising` to remove
-        sources that never rise from the object.
+        Sets the `_rise_lst` and `_set_lst` attributes on the object. These
+        values can be NaNs for sources that never rise or never set. Call
+        :meth:`cut_nonrising` to remove sources that never rise from the object.
 
         Parameters
         ----------
@@ -3350,7 +3361,7 @@ class SkyModel(UVBase):
             fieldtypes.append("f8")
             fieldshapes.append(())
 
-        dt = np.dtype(list(zip(fieldnames, fieldtypes, fieldshapes)))
+        dt = np.dtype(list(zip(fieldnames, fieldtypes, fieldshapes, strict=False)))
 
         arr = np.empty(self.Ncomponents, dtype=dt)
         arr["source_id"] = self.name
@@ -3467,8 +3478,9 @@ class SkyModel(UVBase):
                         )
                     warnings.warn(
                         "Parameter skycoord not found in skyh5 file. "
-                        "This skyh5 file was written by an older version of pyradiosky. "
-                        "Consider re-writing this file to ensure future compatibility"
+                        "This skyh5 file was written by an older version of "
+                        "pyradiosky. Consider re-writing this file to ensure "
+                        "future compatibility"
                     )
             else:
                 optional_params.append("_name")
@@ -3520,9 +3532,8 @@ class SkyModel(UVBase):
                         str_type = False
 
                 # skip optional params if not present
-                if par in optional_params:
-                    if parname not in header:
-                        continue
+                if par in optional_params and parname not in header:
+                    continue
 
                 if parname not in header:
                     raise ValueError(
@@ -3546,25 +3557,25 @@ class SkyModel(UVBase):
                 if init_params["Ncomponents"] != init_params["name"].size:
                     raise ValueError("Ncomponents is not equal to the size of 'name'.")
 
-            if "freq_array" in init_params.keys():
+            if "freq_array" in init_params:
                 if init_params["Nfreqs"] != init_params["freq_array"].size:
                     raise ValueError("Nfreqs is not equal to the size of 'freq_array'.")
 
-                if init_params["spectral_type"] == "subband":
-                    if "freq_edge_array" not in init_params.keys():
-                        try:
-                            init_params["freq_edge_array"] = (
-                                _get_freq_edges_from_centers(
-                                    init_params["freq_array"], self._freq_array.tols
-                                )
-                            )
-                        except ValueError:
-                            warnings.warn(
-                                "No freq_edge_array in this file and frequencies are "
-                                "not evenly spaced, so spectral_type will be set to "
-                                "'full' rather than 'subband'."
-                            )
-                            init_params["spectral_type"] = "full"
+                if (
+                    init_params["spectral_type"] == "subband"
+                    and "freq_edge_array" not in init_params
+                ):
+                    try:
+                        init_params["freq_edge_array"] = _get_freq_edges_from_centers(
+                            init_params["freq_array"], self._freq_array.tols
+                        )
+                    except ValueError:
+                        warnings.warn(
+                            "No freq_edge_array in this file and frequencies are "
+                            "not evenly spaced, so spectral_type will be set to "
+                            "'full' rather than 'subband'."
+                        )
+                        init_params["spectral_type"] = "full"
 
             # remove parameters not needed in __init__
             init_params.pop("Ncomponents")
@@ -3613,7 +3624,7 @@ class SkyModel(UVBase):
                     )
                     init_params["frame"] = "icrs"
 
-        if self.component_type == "healpix" and "hpx_frame" in init_params.keys():
+        if self.component_type == "healpix" and "hpx_frame" in init_params:
             init_params["frame"] = init_params["hpx_frame"]
             del init_params["hpx_frame"]
 
@@ -3697,33 +3708,40 @@ class SkyModel(UVBase):
         votable_file : str
             Path to votable catalog file.
         table_name : str
-            Part of expected table name. Should match only one table name in votable_file.
+            Part of expected table name. Should match only one table name in
+            votable_file.
         id_column : str
             Part of expected ID column. Should match only one column in the table.
         lon_column : str
-            Part of expected longitudinal coordinate (e.g. RA) column. Should match
-            only one column in the table.
+            Part of expected longitudinal coordinate (e.g. RA) column. Should
+            match only one column in the table.
         lat_column : str
-            Part of expected latitudinal coordinate (e.g. Dec) column. Should match
-            only one column in the table.
+            Part of expected latitudinal coordinate (e.g. Dec) column. Should
+            match only one column in the table.
         flux_columns : str or list of str
-            Part of expected Flux column(s). Each one should match only one column in the table.
+            Part of expected Flux column(s). Each one should match only one
+            column in the table.
         frame : str
             Name of coordinate frame of source positions (lon/lat columns).
-            Must be interpretable by `astropy.coordinates.frame_transform_graph.lookup_name()`.
+            Must be interpretable by
+            `astropy.coordinates.frame_transform_graph.lookup_name()`.
         reference_frequency : :class:`astropy.units.Quantity`
-            Reference frequency for flux values, assumed to be the same value for all rows.
+            Reference frequency for flux values, assumed to be the same value
+            for all rows.
         freq_array : :class:`astropy.units.Quantity`
-            Frequency band centers corresponding to flux_columns (should be same length).
+            Frequency band centers corresponding to flux_columns (should be same
+            length).
             Required for multiple flux columns.
         freq_edge_array : :class:`astropy.units.Quantity`
-            Frequency sub-band edges for each flux_columns, shape (2, len(flux_columns)).
-            Required for multiple flux columns if `freq_array` is not regularly spaced.
-            If `freq_array` is regularly spaced and `freq_edge_array` is not passed,
-            `freq_edge_array` will be calculated from the freq_array assuming the
-            band edges are directly between the band centers.
+            Frequency sub-band edges for each flux_columns, shape
+            (2, len(flux_columns)). Required for multiple flux columns if
+            `freq_array` is not regularly spaced. If `freq_array` is regularly
+            spaced and `freq_edge_array` is not passed, `freq_edge_array` will
+            be calculated from the freq_array assuming the band edges are directly
+            between the band centers.
         spectral_index_column : str
-            Part of expected spectral index column. Should match only one column in the table.
+            Part of expected spectral index column. Should match only one column
+            in the table.
         flux_error_columns : str or list of str
             Part of expected Flux error column(s). Each one should match only one
             column in the table.
@@ -3753,7 +3771,7 @@ class SkyModel(UVBase):
 
         try:
             table_name_use = _get_matching_fields(table_name, table_ids)
-            table_match = [table for table in tables if table._ID == table_name_use][0]
+            table_match = [table for table in tables if table_name_use == table._ID][0]
         except ValueError:
             table_name_use = _get_matching_fields(table_name, table_names)
             table_match = [table for table in tables if table.name == table_name_use][0]
@@ -4132,7 +4150,8 @@ class SkyModel(UVBase):
 
             If flux is specified at multiple frequencies (must be the same set for all
             components), the frequencies must be included in each column name,
-            e.g. `Flux at 150 MHz [Jy]`. Recognized units are ('Hz', 'kHz', 'MHz' or 'GHz'):
+            e.g. `Flux at 150 MHz [Jy]`. Recognized units are ('Hz', 'kHz',
+            'MHz' or 'GHz'):
 
             If flux is only specified at one reference frequency (can be different per
             component), a frequency column should be added (note: assumed to be in Hz):
@@ -4154,10 +4173,10 @@ class SkyModel(UVBase):
             acceptable range check will be done).
 
         """
-        with open(catalog_csv, "r") as cfile:
+        with open(catalog_csv) as cfile:
             header = cfile.readline()
         header = [
-            h.strip() for h in header.split() if not h[0] == "["
+            h.strip() for h in header.split() if h[0] != "["
         ]  # Ignore units in header
 
         frame_use, lon_col, lat_col = _get_frame_comp_cols(header)
@@ -4213,7 +4232,8 @@ class SkyModel(UVBase):
                 else:
                     if len(flux_fields) > 1:
                         raise ValueError(
-                            "Multiple flux fields, but they do not all contain a frequency."
+                            "Multiple flux fields, but they do not all contain "
+                            "a frequency."
                         )
             if len(frequencies) > 0:
                 n_freqs = len(frequencies)
@@ -4359,9 +4379,9 @@ class SkyModel(UVBase):
 
         """
         catalog = scipy.io.readsav(filename_sav)
-        if "catalog" in catalog.keys():
+        if "catalog" in catalog:
             catalog = catalog["catalog"]
-        elif "source_array" in catalog.keys():
+        elif "source_array" in catalog:
             catalog = catalog["source_array"]
         else:
             raise KeyError(
@@ -4400,7 +4420,7 @@ class SkyModel(UVBase):
             for repeat_id in unique_ids[np.where(counts > 1)[0]]:
                 fix_id_inds = np.where(np.array(ids) == repeat_id)[0]
                 for append_val, id_ind in enumerate(fix_id_inds):
-                    ids[id_ind] = "{}-{}".format(ids[id_ind], append_val + 1)
+                    ids[id_ind] = f"{ids[id_ind]}-{append_val + 1}"
 
         if expand_extended:
             ext_inds = np.where(
@@ -4425,10 +4445,7 @@ class SkyModel(UVBase):
                     src = catalog[catalog_index]["extend"]
                     Ncomps = len(src)
                     comp_ids = np.array(
-                        [
-                            "{}_{}".format(source_id, comp_ind)
-                            for comp_ind in range(1, Ncomps + 1)
-                        ]
+                        [f"{source_id}_{comp_ind}" for comp_ind in range(1, Ncomps + 1)]
                     )
                     ids = np.insert(ids, use_index, comp_ids)
                     extended_model_group = np.insert(
@@ -4599,9 +4616,11 @@ class SkyModel(UVBase):
         VOTable
         -------
         table_name : str
-            Part of expected VOTable name. Should match only one table name in the file.
+            Part of expected VOTable name. Should match only one table name in
+            the file.
         id_column : str
-            Part of expected VOTable ID column. Should match only one column in the file.
+            Part of expected VOTable ID column. Should match only one column in
+            the file.
         lon_column : str
             Part of expected VOTable longitudinal coordinate column. Should match only
             one column in the file.
@@ -4623,11 +4642,12 @@ class SkyModel(UVBase):
             Frequencies corresponding to VOTable flux_columns (should be same length).
             Required for multiple flux columns.
         freq_edge_array : :class:`astropy.units.Quantity`
-            Frequency sub-band edges for each flux_columns, shape (2, len(flux_columns)).
-            Required for multiple flux columns if `freq_array` is not regularly spaced.
-            If `freq_array` is regularly spaced and `freq_edge_array` is not passed,
-            `freq_edge_array` will be calculated from the freq_array assuming the
-            band edges are directly between the band centers.
+            Frequency sub-band edges for each flux_columns, shape
+            (2, len(flux_columns)). Required for multiple flux columns if
+            `freq_array` is not regularly spaced. If `freq_array` is regularly
+            spaced and `freq_edge_array` is not passed, `freq_edge_array` will
+            be calculated from the freq_array assuming the band edges are directly
+            between the band centers.
         spectral_index_column : str
             Part of expected VOTable spectral index column. Should match only one
             column in the file.
@@ -4713,7 +4733,8 @@ class SkyModel(UVBase):
             )
         else:
             raise ValueError(
-                "Cannot determine the file type. Please specify using the filetype parameter."
+                "Cannot determine the file type. Please specify using the "
+                "filetype parameter."
             )
 
     @classmethod
@@ -4804,9 +4825,11 @@ class SkyModel(UVBase):
         VOTable
         -------
         table_name : str
-            Part of expected VOTable name. Should match only one table name in the file.
+            Part of expected VOTable name. Should match only one table name in
+            the file.
         id_column : str
-            Part of expected VOTable ID column. Should match only one column in the file.
+            Part of expected VOTable ID column. Should match only one column in
+            the file.
         lon_column : str
             Part of expected VOTable longitudinal coordinate column. Should match only
             one column in the file.
@@ -4828,11 +4851,12 @@ class SkyModel(UVBase):
             Frequencies corresponding to VOTable flux_columns (should be same length).
             Required for multiple flux columns.
         freq_edge_array : :class:`astropy.units.Quantity`
-            Frequency sub-band edges for each flux_columns, shape (2, len(flux_columns)).
-            Required for multiple flux columns if `freq_array` is not regularly spaced.
-            If `freq_array` is regularly spaced and `freq_edge_array` is not passed,
-            `freq_edge_array` will be calculated from the freq_array assuming the
-            band edges are directly between the band centers.
+            Frequency sub-band edges for each flux_columns, shape
+            (2, len(flux_columns)). Required for multiple flux columns if
+            `freq_array` is not regularly spaced. If `freq_array` is regularly
+            spaced and `freq_edge_array` is not passed, `freq_edge_array` will
+            be calculated from the freq_array assuming the band edges are
+            directly between the band centers.
         spectral_index_column : str
             Part of expected VOTable spectral index column. Should match only one
             column in the file.
@@ -4921,8 +4945,9 @@ class SkyModel(UVBase):
 
         if os.path.exists(filename):
             if not clobber:
-                raise IOError(
-                    "File exists; If overwriting is desired set the clobber keyword to True."
+                raise OSError(
+                    "File exists; If overwriting is desired set the clobber "
+                    "keyword to True."
                 )
             else:
                 print("File exists; clobbering.")
@@ -5006,7 +5031,8 @@ class SkyModel(UVBase):
                 dtype=self.stokes.dtype,
                 chunks=True,
             )
-            # Use `str` to ensure this works for Composite units (e.g. Jy/sr) as well.
+            # Use `str` to ensure this works for Composite units (e.g. Jy/sr)
+            # as well.
             dgrp["stokes"].attrs["unit"] = str(self.stokes.unit)
 
             if self.stokes_error is not None:
@@ -5017,7 +5043,8 @@ class SkyModel(UVBase):
                     dtype=self.stokes_error.dtype,
                     chunks=True,
                 )
-                # Use `str` to ensure this works for Composite units (e.g. Jy/sr) as well.
+                # Use `str` to ensure this works for Composite units (e.g. Jy/sr)
+                # as well.
                 dgrp["stokes_error"].attrs["unit"] = str(self.stokes_error.unit)
 
             if self.beam_amp is not None:
@@ -5082,13 +5109,13 @@ class SkyModel(UVBase):
             for freq in self.freq_array:
                 freq_hz_val = freq.to(units.Hz).value
                 if freq_hz_val > 1e9:
-                    freq_str = "{:g}_GHz".format(freq_hz_val * 1e-9)
+                    freq_str = f"{freq_hz_val * 1e-9:g}_GHz"
                 elif freq_hz_val > 1e6:
-                    freq_str = "{:g}_MHz".format(freq_hz_val * 1e-6)
+                    freq_str = f"{freq_hz_val * 1e-6:g}_MHz"
                 elif freq_hz_val > 1e3:
-                    freq_str = "{:g}_kHz".format(freq_hz_val * 1e-3)
+                    freq_str = f"{freq_hz_val * 1e-3:g}_kHz"
                 else:
-                    freq_str = "{:g}_Hz".format(freq_hz_val)
+                    freq_str = f"{freq_hz_val:g}_Hz"
 
                 format_str += "\t{:0.8f}"
                 header += f"\tFlux_{freq_str} [Jy]"
@@ -5123,7 +5150,7 @@ class SkyModel(UVBase):
             ]
             for src in arr:
                 fieldvals = src
-                entry = dict(zip(fieldnames, fieldvals))
+                entry = dict(zip(fieldnames, fieldvals, strict=False))
                 srcid = entry["source_id"]
                 lon = entry[lon_name]
                 lat = entry[lat_name]

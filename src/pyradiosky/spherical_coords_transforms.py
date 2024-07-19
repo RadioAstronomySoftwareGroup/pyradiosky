@@ -1,4 +1,3 @@
-# -*- mode: python; coding: utf-8 -*
 # Copyright (c) 2019 Radio Astronomy Software Group
 # Licensed under the 2-clause BSD License
 """Methods for doing spherical coordinate transformations on vectors."""
@@ -142,7 +141,7 @@ def spherical_basis_vector_rotation_matrix(
     theta, phi, rot_matrix, beta=None, alpha=None
 ):
     """
-    Get the rotation matrix to take vectors in the theta/phi basis to a new reference frame.
+    Get the rotation matrix for vectors in theta/phi basis to a new reference frame.
 
     Given a position (`theta`, `phi`) in “standard mathematical” coordinates
     (0 < `theta` < pi, 0 < `phi` < 2 pi) which will typically be an ICRS RA/Dec

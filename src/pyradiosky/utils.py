@@ -1,7 +1,7 @@
-# -*- mode: python; coding: utf-8 -*
 # Copyright (c) 2019 Radio Astronomy Software Group
 # Licensed under the 2-clause BSD License
 """Utility methods."""
+
 import os
 
 import astropy.units as units
@@ -81,7 +81,8 @@ def stokes_to_coherency(stokes_arr):
     Parameters
     ----------
     stokes_arr : Quantity
-        Array of stokes parameters in order [I, Q, U, V], shape(4,) or (4, Nfreqs, Ncomponents).
+        Array of stokes parameters in order [I, Q, U, V], shape(4,) or
+        (4, Nfreqs, Ncomponents).
 
     Returns
     -------
@@ -200,7 +201,8 @@ def download_gleam(
     overwrite : bool
         Option to download the file even if it already exists.
     row_limit : int, optional
-        Max number of rows (sources) to download, default is None meaning download all rows.
+        Max number of rows (sources) to download, default is None meaning download
+        all rows.
     for_testing : bool
         Download a file to use for unit tests. If True, some additional columns are
         included, the rows are limited to 50, the path and filename are set to put
@@ -227,7 +229,8 @@ def download_gleam(
     opath = os.path.join(path, filename)
     if os.path.exists(opath) and not overwrite:
         print(
-            f"GLEAM already downloaded to {opath}. Set overwrite=True to re-download it."
+            f"GLEAM already downloaded to {opath}. Set overwrite=True to "
+            "re-download it."
         )
         return
 

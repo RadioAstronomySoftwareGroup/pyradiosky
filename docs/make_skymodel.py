@@ -1,6 +1,5 @@
-# -*- mode: python; coding: utf-8 -*-
-
 """Format the SkyModel object parameters into a sphinx rst file."""
+
 import inspect
 import os
 
@@ -33,7 +32,8 @@ def write_skymodel_rst(write_file=None):
         "the object. Some of these attributes are `required`_ to be set to have a\n"
         "fully defined data set while others are `optional`_. The\n"
         ":meth:`pyradiosky.SkyModel.check` method can be called on the object to\n"
-        "verify that all of the required attributes have been set in a consistent way.\n\n"
+        "verify that all of the required attributes have been set in a consistent\n"
+        "way.\n\n"
     )
     out += "Required\n********\n"
     out += (
@@ -43,8 +43,8 @@ def write_skymodel_rst(write_file=None):
     out += "\n\n"
     for thing in UV.required():
         obj = getattr(UV, thing)
-        out += "**{name}**\n".format(name=obj.name)
-        out += "     {desc}\n".format(desc=obj.description)
+        out += f"**{obj.name}**\n"
+        out += f"     {obj.description}\n"
         out += "\n"
 
     out += "Optional\n********\n"
@@ -56,8 +56,8 @@ def write_skymodel_rst(write_file=None):
     out += "\n\n"
     for thing in UV.extra():
         obj = getattr(UV, thing)
-        out += "**{name}**\n".format(name=obj.name)
-        out += "     {desc}\n".format(desc=obj.description)
+        out += f"**{obj.name}**\n"
+        out += f"     {obj.description}\n"
         out += "\n"
 
     out += "Methods\n-------\n.. autoclass:: pyradiosky.SkyModel\n  :members:\n\n"
@@ -65,10 +65,10 @@ def write_skymodel_rst(write_file=None):
     t = Time.now()
     t.format = "iso"
     t.out_subfmt = "date"
-    out += "last updated: {date}".format(date=t.iso)
+    out += f"last updated: {t.iso}"
     if write_file is None:
         write_path = os.path.dirname(os.path.abspath(inspect.stack()[0][1]))
         write_file = os.path.join(write_path, "skymodel.rst")
-    F = open(write_file, "w")
-    F.write(out)
+    with (write_file, "w") as F:
+        F.write(out)
     print("wrote " + write_file)
