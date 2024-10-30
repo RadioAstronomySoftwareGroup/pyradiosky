@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Changed
+- Use the new pyuvdata analytic short dipole beam for polarized source testing.
+- Updated minimum dependency versions: pyuvdata>=3.1.0
+- Updated minimum optional dependency versions: lunarsky>=0.2.5
+
 ## [1.0.1] - 2024-07-01
 
 ### Changed
