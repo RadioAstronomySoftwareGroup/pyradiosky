@@ -10,15 +10,7 @@ import warnings
 import h5py
 import numpy as np
 import pytest
-
-try:
-    import pyuvdata.utils.history as history_utils
-    from pyuvdata.testing import check_warnings
-except ImportError:
-    # this can be removed once we require pyuvdata >= v3.0
-    import pyuvdata.utils as history_utils
-    from pyuvdata.tests import check_warnings
-
+import pyuvdata.utils.history as history_utils
 import scipy.io
 from astropy import units
 from astropy.coordinates import (
@@ -32,6 +24,8 @@ from astropy.coordinates import (
 )
 from astropy.time import Time, TimeDelta
 from astropy.units import Quantity
+from pyuvdata import ShortDipoleBeam
+from pyuvdata.testing import check_warnings
 
 from pyradiosky import SkyModel, skymodel, utils as skyutils
 from pyradiosky.data import DATA_PATH as SKY_DATA_PATH
@@ -1355,22 +1349,6 @@ def test_pol_rotator(time_location, spectral_type, unpolarized, below_horizon):
             )
 
 
-def analytic_beam_jones(za, az, sigma=0.3):
-    """
-    Analytic beam with sensible polarization response.
-
-    Required for testing polarized sources.
-    """
-    # B = np.exp(-np.tan(za/2.)**2. / 2. / sigma**2.)
-    B = 1
-    # J alone gives you the dipole beam.
-    # B can be used to add another envelope in addition.
-    J = np.array(
-        [[np.cos(za) * np.sin(az), np.cos(az)], [np.cos(az) * np.cos(za), -np.sin(az)]]
-    )
-    return B * J
-
-
 def test_polarized_source_visibilities(time_location):
     """Test that visibilities of a polarized source match prior calculations."""
     time0, array_location = time_location
@@ -1428,7 +1406,25 @@ def test_polarized_source_visibilities(time_location):
         coherency_matrix_local[:, :, ti] = coherency_tmp
 
     zas = np.pi / 2.0 - alts
-    Jbeam = analytic_beam_jones(zas, azs)
+
+    # use pyuvdata ShortDipoleBeam for a sensible polarized response
+    dipole_beam = ShortDipoleBeam()
+    Jbeam = dipole_beam.efield_eval(
+        az_array=np.asarray(azs),
+        za_array=np.asarray(zas),
+        freq_array=np.asarray([150e6]),
+    )
+
+    # swap axes to put feed axis first then basis vector axis to match what is
+    # done in pyuvsim
+    Jbeam = np.transpose(Jbeam[:, :, 0].real, axes=[1, 0, 2])
+
+    # put ZA response first, then Az response to match what is done in pyuvsim
+    Jbeam = np.flip(Jbeam, axis=1)
+
+    # put north dipole first, then east to match test data
+    Jbeam = np.flip(Jbeam, axis=0)
+
     coherency_instr_local = np.einsum(
         "ab...,bc...,dc...->ad...", Jbeam, coherency_matrix_local, np.conj(Jbeam)
     )
@@ -1538,7 +1534,25 @@ def test_polarized_source_smooth_visibilities(
         coherency_matrix_local[:, :, ti] = coherency_tmp
 
     zas = np.pi / 2.0 - alts
-    Jbeam = analytic_beam_jones(zas, azs)
+
+    # use pyuvdata ShortDipoleBeam for a sensible polarized response
+    dipole_beam = ShortDipoleBeam()
+    Jbeam = dipole_beam.efield_eval(
+        az_array=np.asarray(azs),
+        za_array=np.asarray(zas),
+        freq_array=np.asarray([150e6]),
+    )
+
+    # swap axes to put feed axis first then basis vector axis to match what is
+    # done in pyuvsim
+    Jbeam = np.transpose(Jbeam[:, :, 0].real, axes=[1, 0, 2])
+
+    # put ZA response first, then Az response to match what is done in pyuvsim
+    Jbeam = np.flip(Jbeam, axis=1)
+
+    # put north dipole first, then east to match test data
+    Jbeam = np.flip(Jbeam, axis=0)
+
     coherency_instr_local = np.einsum(
         "ab...,bc...,dc...->ad...", Jbeam, coherency_matrix_local, np.conj(Jbeam)
     )

@@ -21,7 +21,7 @@ dependencies = [
     "astropy>=6.0",
     "h5py>=3.4",
     "numpy>=1.23",
-    "pyuvdata>=2.4.3",
+    "pyuvdata>=3.1.0",
     "scipy>=1.8",
     "setuptools>=64",
     "setuptools_scm>=8.1",
@@ -42,7 +42,7 @@ classifiers = [
 [project.optional-dependencies]
 healpix = ["astropy-healpix>=1.0.2"]
 astroquery = ["astroquery>=0.4.4"]
-lunarsky = ["lunarsky>=0.2.2"]
+lunarsky = ["lunarsky>=0.2.5"]
 all = ["pyradiosky[healpix,astroquery,lunarsky]"]
 test = ["coverage", "pre-commit", "pytest", "pytest-cov"]
 doc = ["matplotlib", "pypandoc", "sphinx"]

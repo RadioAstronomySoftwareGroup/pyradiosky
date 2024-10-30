@@ -9,6 +9,8 @@ import warnings
 import astropy.units as units
 import h5py
 import numpy as np
+import pyuvdata.utils.history as history_utils
+import pyuvdata.utils.tools as uvutils
 import scipy.io
 from astropy.coordinates import (
     AltAz,
@@ -29,15 +31,6 @@ from pyuvdata.uvbeam.cst_beam import CSTBeam
 from scipy.linalg import orthogonal_procrustes as ortho_procr
 
 from . import __version__, spherical_coords_transforms as sct, utils as skyutils
-
-try:  # pragma: no cover  # This pragma can be removed once pyuvdata v3 is released.
-    import pyuvdata.utils.history as history_utils
-    import pyuvdata.utils.tools as uvutils
-except ImportError:
-    # this can be removed once we require pyuvdata >= v3.0
-    import pyuvdata.utils as history_utils
-    import pyuvdata.utils as uvutils
-
 
 __all__ = ["hasmoon", "SkyModel"]
 
