@@ -28,12 +28,10 @@ jobs:
           git clone https://github.com/RadioAstronomySoftwareGroup/pyuvsim.git
           cd pyradiosky
 
-      - name: Setup Minimamba
-        uses: conda-incubator/setup-miniconda@v2
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
         with:
-          miniforge-variant: Mambaforge
           miniforge-version: latest
-          use-mamba: true
           python-version: ${{ env.PYTHON }}
           environment-file: ../pyuvsim/ci/${{ env.ENV_NAME }}.yaml
           activate-environment: ${{ env.ENV_NAME }}
