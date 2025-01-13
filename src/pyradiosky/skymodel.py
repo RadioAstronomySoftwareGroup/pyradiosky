@@ -1091,9 +1091,9 @@ class SkyModel(UVBase):
         """Set parameters depending on spectral_type."""
         self.spectral_type = spectral_type
 
-        assert (
-            spectral_type in self._spectral_type.acceptable_vals
-        ), f"spectral_type must be one of: {self._spectral_type.acceptable_vals}"
+        assert spectral_type in self._spectral_type.acceptable_vals, (
+            f"spectral_type must be one of: {self._spectral_type.acceptable_vals}"
+        )
         if spectral_type == "spectral_index":
             self._spectral_index.required = True
             self._reference_frequency.required = True
