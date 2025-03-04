@@ -3386,7 +3386,12 @@ class SkyModel(UVBase):
         return arr
 
     def read_skyh5(
-        self, filename, run_check=True, check_extra=True, run_check_acceptability=True
+        self,
+        filename: str,
+        skip_params: list[str] | None = None,
+        run_check: bool = True,
+        check_extra: bool = True,
+        run_check_acceptability: bool = True,
     ):
         """
         Read a skyh5 file (our flavor of hdf5) into this object.
@@ -3395,6 +3400,9 @@ class SkyModel(UVBase):
         ----------
         filename : str
             Path and name of the skyh5 file to read.
+        skip_params : list of str or bool
+            A list of optional parameters to skip on read. If set to True, skip
+            all optional parameters.
         run_check : bool
             Option to check for the existence and proper shapes of parameters
             after downselecting data on this object (the default is True,
@@ -3509,6 +3517,12 @@ class SkyModel(UVBase):
                         copy=True
                     )
 
+            if isinstance(skip_params, bool) or skip_params is None:
+                if skip_params:
+                    skip_params = optional_params
+                else:
+                    skip_params = []
+
             for par in header_params:
                 if par in ["lat", "lon", "frame", "ra", "dec"]:
                     parname = par
@@ -3524,8 +3538,10 @@ class SkyModel(UVBase):
                     else:
                         str_type = False
 
-                # skip optional params if not present
-                if par in optional_params and parname not in header:
+                # skip optional params if not present or if in skip params
+                if par in optional_params and (
+                    parname in skip_params or parname not in header
+                ):
                     continue
 
                 if parname not in header:
