@@ -990,44 +990,26 @@ converted to temperature units.
   [4704.91299386 3864.90157423 3933.76949248 4258.30083558 6520.16612935] K
 
 
-SkyModel: Convenience methods
--------------------------------------
+SkyModel: Calculations at a particular time and place
+-----------------------------------------------------
 
-SkyModel has several other useful convenience methods.
+SkyModel has several methods and attributes that can be used to calculate
+positions and other information in local frames. In order to use any of these,
+you must first set the time and location using the :meth:`pyradiosky.SkyModel.update_positions`
+method. Once that has been called, the following attributes are set on the object:
 
-a) Converting between kelvin and Jansky units
-*********************************************
-.. code-block:: python
+  - time
+  - telescope_location
+  - alt_az
+  - pos_lmn
+  - above_horizon
 
-  >>> import os
-  >>> import numpy as np
-  >>> from pyradiosky import SkyModel
-  >>> from pyradiosky.data import DATA_PATH
+In addition, the :meth:`pyradiosky.SkyModel.calculate_rise_set_lsts` and
+:meth:`pyradiosky.SkyModel.coherency_calc` methods can be used.
 
-  >>> filename = os.path.join(DATA_PATH, "gleam_50srcs.vot")
-  >>> sm = SkyModel.from_file(filename)
-  >>> print(sm.stokes[0,0,0:5])
-  [ 0.528997 -0.032702  0.463359  2.686571  0.393777] Jy
+Below are some examples related to using local frame attributes and methods.
 
-  >>> # Convert from Jy to K sr
-  >>> sm.jansky_to_kelvin()
-  >>> print(sm.stokes[0,0,0:5])
-  [ 0.00298095 -0.00018428  0.00261107  0.01513907  0.00221897] K sr
-
-  >>> # Read in the GSM Healpix map
-  >>> gsm_file = os.path.join(DATA_PATH, "gsm_icrs.skyh5")
-  >>> gsm = SkyModel.from_file(gsm_file)
-  >>> print(gsm.stokes[0,0,0:5])
-  [4704.91299386 3864.90157423 3933.76949248 4258.30083558 6520.16612935] K
-
-  >>> # Convert from K to Jy / sr
-  >>> gsm.kelvin_to_jansky()
-  >>> print(gsm.stokes[0,0,0:5])
-  [361379.47094723 296859.06795353 302148.74108755 327075.65583124
-   500807.17526256] Jy / sr
-
-
-b) Calculating rise and set LSTs
+a) Calculating rise and set LSTs
 ********************************
 .. code-block:: python
 
@@ -1095,7 +1077,7 @@ b) Calculating rise and set LSTs
    False False False  True  True False False False False False False False
    False]
 
-c) Calculating coherencies
+b) Calculating coherencies
 **************************
 .. code-block:: python
 
@@ -1149,7 +1131,7 @@ c) Calculating coherencies
    [-1.20482720e-05+0.j  4.00000001e-01+0.j]] Jy
 
 
-d) Other time and position related attributes and methods
+c) Other time and position related attributes and methods
 *********************************************************
 .. code-block:: python
 
@@ -1222,3 +1204,40 @@ d) Other time and position related attributes and methods
   None
   >>> print(sm.above_horizon)
   None
+
+
+SkyModel: Convenience methods
+-----------------------------
+
+SkyModel has several other useful convenience methods.
+
+a) Converting between kelvin and Jansky units
+*********************************************
+.. code-block:: python
+
+  >>> import os
+  >>> import numpy as np
+  >>> from pyradiosky import SkyModel
+  >>> from pyradiosky.data import DATA_PATH
+
+  >>> filename = os.path.join(DATA_PATH, "gleam_50srcs.vot")
+  >>> sm = SkyModel.from_file(filename)
+  >>> print(sm.stokes[0,0,0:5])
+  [ 0.528997 -0.032702  0.463359  2.686571  0.393777] Jy
+
+  >>> # Convert from Jy to K sr
+  >>> sm.jansky_to_kelvin()
+  >>> print(sm.stokes[0,0,0:5])
+  [ 0.00298095 -0.00018428  0.00261107  0.01513907  0.00221897] K sr
+
+  >>> # Read in the GSM Healpix map
+  >>> gsm_file = os.path.join(DATA_PATH, "gsm_icrs.skyh5")
+  >>> gsm = SkyModel.from_file(gsm_file)
+  >>> print(gsm.stokes[0,0,0:5])
+  [4704.91299386 3864.90157423 3933.76949248 4258.30083558 6520.16612935] K
+
+  >>> # Convert from K to Jy / sr
+  >>> gsm.kelvin_to_jansky()
+  >>> print(gsm.stokes[0,0,0:5])
+  [361379.47094723 296859.06795353 302148.74108755 327075.65583124
+   500807.17526256] Jy / sr
