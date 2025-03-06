@@ -25,6 +25,8 @@ from astropy.coordinates import (
 from astropy.io import votable
 from astropy.time import Time
 from astropy.units import Quantity
+from docstring_parser import DocstringStyle
+from pyuvdata.docstrings import copy_replace_short_description
 from pyuvdata.parameter import SkyCoordParameter, UVParameter
 from pyuvdata.uvbase import UVBase
 from pyuvdata.uvbeam.cst_beam import CSTBeam
@@ -3388,7 +3390,7 @@ class SkyModel(UVBase):
     def read_skyh5(
         self,
         filename: str,
-        skip_params: list[str] | None = None,
+        skip_params: str | list[str] | bool = False,
         run_check: bool = True,
         check_extra: bool = True,
         run_check_acceptability: bool = True,
@@ -3400,9 +3402,10 @@ class SkyModel(UVBase):
         ----------
         filename : str
             Path and name of the skyh5 file to read.
-        skip_params : list of str or bool
+        skip_params : str or list of str or bool
             A list of optional parameters to skip on read. If set to True, skip
-            all optional parameters.
+            all truly optional parameters. The default is False, so by default all
+            optional parameters will be read.
         run_check : bool
             Option to check for the existence and proper shapes of parameters
             after downselecting data on this object (the default is True,
@@ -3451,10 +3454,15 @@ class SkyModel(UVBase):
                 "_extended_model_group",
             ]
 
+            # define parameters that are allowed to be skipped so that using
+            # True doesn't result in errors in the initialize step.
+            skippable_params = ["extended_model_group"]
+
             self.component_type = header["component_type"][()].tobytes().decode("utf-8")
 
             if self.component_type != "healpix":
                 optional_params.extend(["_nside", "_hpx_inds"])
+                skippable_params.extend(["nside", "hpx_inds", "hpx_order"])
                 if "skycoord" in header:
                     skycoord_dict = {}
                     for key in header["skycoord"]:
@@ -3485,6 +3493,7 @@ class SkyModel(UVBase):
                     )
             else:
                 optional_params.append("_name")
+                skippable_params.append("name")
 
                 if "hpx_frame" in header:
                     if isinstance(header["hpx_frame"], h5py.Dataset):
@@ -3517,11 +3526,13 @@ class SkyModel(UVBase):
                         copy=True
                     )
 
-            if isinstance(skip_params, bool) or skip_params is None:
+            if isinstance(skip_params, bool):
                 if skip_params:
-                    skip_params = optional_params
+                    skip_params = skippable_params
                 else:
                     skip_params = []
+            if isinstance(skip_params, str):
+                skip_params = [skip_params]
 
             for par in header_params:
                 if par in ["lat", "lon", "frame", "ra", "dec"]:
@@ -3652,37 +3663,12 @@ class SkyModel(UVBase):
             )
 
     @classmethod
-    def from_skyh5(
-        cls, filename, run_check=True, check_extra=True, run_check_acceptability=True
-    ):
-        """
-        Create a new :class:`SkyModel` from skyh5 file (our flavor of hdf5).
-
-        Parameters
-        ----------
-        filename : str
-            Path and name of the skyh5 file to read.
-        run_check : bool
-            Option to check for the existence and proper shapes of parameters
-            after downselecting data on this object (the default is True,
-            meaning the check will be run).
-        check_extra : bool
-            Option to check optional parameters as well as required ones (the
-            default is True, meaning the optional parameters will be checked).
-        run_check_acceptability : bool
-            Option to check acceptable range of the values of parameters after
-            downselecting data on this object (the default is True, meaning the
-            acceptable range check will be done).
-
-        """
-        self = cls()
-        self.read_skyh5(
-            filename,
-            run_check=run_check,
-            check_extra=check_extra,
-            run_check_acceptability=run_check_acceptability,
-        )
-        return self
+    @copy_replace_short_description(read_skyh5, style=DocstringStyle.NUMPYDOC)
+    def from_skyh5(cls, filename: str, **kwargs):
+        """Create a new :class:`SkyModel` from skyh5 file (our flavor of hdf5)."""
+        sm = cls()
+        sm.read_skyh5(filename, **kwargs)
+        return sm
 
     @units.quantity_input(
         freq_array=units.Hz, freq_edge_array=units.Hz, reference_frequency=units.Hz
@@ -3936,22 +3922,12 @@ class SkyModel(UVBase):
         return
 
     @classmethod
-    def from_votable_catalog(cls, votable_file, *args, **kwargs):
-        """Create a :class:`SkyModel` from a votable catalog.
-
-        Parameters
-        ----------
-        kwargs :
-            All parameters are sent through to :meth:`read_votable_catalog`.
-
-        Returns
-        -------
-        sky_model : :class:`SkyModel`
-            The object instantiated using the votable catalog.
-        """
-        self = cls()
-        self.read_votable_catalog(votable_file, *args, **kwargs)
-        return self
+    @copy_replace_short_description(read_votable_catalog, style=DocstringStyle.NUMPYDOC)
+    def from_votable_catalog(cls, votable_file: str, *args, **kwargs):
+        """Create a new :class:`SkyModel` from a votable catalog."""
+        sm = cls()
+        sm.read_votable_catalog(votable_file, *args, **kwargs)
+        return sm
 
     def read_gleam_catalog(
         self,
@@ -4113,22 +4089,12 @@ class SkyModel(UVBase):
         return
 
     @classmethod
-    def from_gleam_catalog(cls, gleam_file, **kwargs):
-        """Create a :class:`SkyModel` from a GLEAM catalog.
-
-        Parameters
-        ----------
-        kwargs :
-            All parameters are sent through to :meth:`read_gleam_catalog`.
-
-        Returns
-        -------
-        sky_model : :class:`SkyModel`
-            The object instantiated using the GLEAM catalog.
-        """
-        self = cls()
-        self.read_gleam_catalog(gleam_file, **kwargs)
-        return self
+    @copy_replace_short_description(read_gleam_catalog, style=DocstringStyle.NUMPYDOC)
+    def from_gleam_catalog(cls, gleam_file: str, **kwargs):
+        """Create a :class:`SkyModel` from a GLEAM catalog."""
+        sm = cls()
+        sm.read_gleam_catalog(gleam_file, **kwargs)
+        return sm
 
     def read_text_catalog(
         self,
@@ -4336,22 +4302,12 @@ class SkyModel(UVBase):
         return
 
     @classmethod
-    def from_text_catalog(cls, catalog_csv, **kwargs):
-        """Create a :class:`SkyModel` from a text catalog.
-
-        Parameters
-        ----------
-        kwargs :
-            All parameters are sent through to :meth:`read_text_catalog`.
-
-        Returns
-        -------
-        sky_model : :class:`SkyModel`
-            The object instantiated using the text catalog.
-        """
-        self = cls()
-        self.read_text_catalog(catalog_csv, **kwargs)
-        return self
+    @copy_replace_short_description(read_text_catalog, style=DocstringStyle.NUMPYDOC)
+    def from_text_catalog(cls, catalog_csv: str, **kwargs):
+        """Create a :class:`SkyModel` from a text catalog."""
+        sm = cls()
+        sm.read_text_catalog(catalog_csv, **kwargs)
+        return sm
 
     def read_fhd_catalog(
         self,
@@ -4521,52 +4477,44 @@ class SkyModel(UVBase):
         return
 
     @classmethod
-    def from_fhd_catalog(cls, filename_sav, **kwargs):
-        """Create a :class:`SkyModel` from an FHD catalog.
-
-        Parameters
-        ----------
-        kwargs :
-            All parameters are sent through to :meth:`read_fhd_catalog`.
-
-        Returns
-        -------
-        sky_model : :class:`SkyModel`
-            The object instantiated using the FHD catalog.
-        """
-        self = cls()
-        self.read_fhd_catalog(filename_sav, **kwargs)
-        return self
+    @copy_replace_short_description(read_fhd_catalog, style=DocstringStyle.NUMPYDOC)
+    def from_fhd_catalog(cls, filename_sav: str, **kwargs):
+        """Create a :class:`SkyModel` from an FHD catalog."""
+        sm = cls()
+        sm.read_fhd_catalog(filename_sav, **kwargs)
+        return sm
 
     @units.quantity_input(
         freq_array=units.Hz, freq_edge_array=units.Hz, reference_frequency=units.Hz
     )
     def read(
         self,
-        filename,
-        filetype=None,
-        run_check=True,
-        check_extra=True,
-        run_check_acceptability=True,
+        filename: str,
+        filetype: str | None = None,
+        run_check: bool = True,
+        check_extra: bool = True,
+        run_check_acceptability: bool = True,
         # Gleam vot
-        spectral_type=None,
-        with_error=False,
-        use_paper_freqs=False,
+        spectral_type: str | None = None,
+        with_error: bool = False,
+        use_paper_freqs: bool = False,
         # fhd
-        expand_extended=True,
+        expand_extended: bool = True,
+        # skyH5
+        skip_params: str | list[str] | bool = False,
         # VOTable
-        table_name=None,
-        id_column=None,
-        lon_column=None,
-        lat_column=None,
-        frame=None,
-        flux_columns=None,
-        reference_frequency=None,
-        freq_array=None,
-        freq_edge_array=None,
-        spectral_index_column=None,
-        flux_error_columns=None,
-        history="",
+        table_name: str | None = None,
+        id_column: str | None = None,
+        lon_column: str | None = None,
+        lat_column: str | None = None,
+        frame: str | None = None,
+        flux_columns: str | list[str] | None = None,
+        reference_frequency: Quantity | None = None,
+        freq_array: Quantity | None = None,
+        freq_edge_array: Quantity | None = None,
+        spectral_index_column: str | None = None,
+        flux_error_columns: str | list[str] | None = None,
+        history: str = "",
     ):
         """
         Read in any file supported by :class:`SkyModel`.
@@ -4621,6 +4569,13 @@ class SkyModel(UVBase):
         ---
         expand_extended: bool
             If True, include the extended source components in FHD files.
+
+        SkyH5
+        -----
+        skip_params : str or list of str or bool
+            A list of optional parameters to skip on read. If set to True, skip
+            all optional parameters. The default is False, so by default all
+            optional parameters will be read.
 
         VOTable
         -------
@@ -4728,6 +4683,7 @@ class SkyModel(UVBase):
         elif filetype == "skyh5":
             self.read_skyh5(
                 filename,
+                skip_params=skip_params,
                 run_check=run_check,
                 check_extra=check_extra,
                 run_check_acceptability=run_check_acceptability,
@@ -4747,163 +4703,12 @@ class SkyModel(UVBase):
             )
 
     @classmethod
-    @units.quantity_input(
-        freq_array=units.Hz, freq_edge_array=units.Hz, reference_frequency=units.Hz
-    )
-    def from_file(
-        cls,
-        filename,
-        filetype=None,
-        run_check=True,
-        check_extra=True,
-        run_check_acceptability=True,
-        # Gleam vot
-        spectral_type=None,
-        with_error=False,
-        use_paper_freqs=False,
-        # fhd
-        expand_extended=True,
-        # VOTable
-        table_name=None,
-        id_column=None,
-        lon_column=None,
-        lat_column=None,
-        flux_columns=None,
-        frame=None,
-        reference_frequency=None,
-        freq_array=None,
-        freq_edge_array=None,
-        spectral_index_column=None,
-        flux_error_columns=None,
-        history="",
-    ):
-        """
-        Create a :class:`SkyModel` from any file supported by SkyModel.
-
-        This method supports a number of different types of files.
-        Universal parameters (required and optional) are listed directly below,
-        followed by parameters specific to each file type.
-
-        Parameters
-        ----------
-        filename : str
-            File to read in.
-        filetype : str, optional
-            One of ['skyh5', 'gleam', 'vot', 'text', 'fhd'] or None.
-            If None, the code attempts to guess what the file type is.
-        run_check : bool
-            Option to check for the existence and proper shapes of parameters
-            after downselecting data on this object (the default is True,
-            meaning the check will be run).
-        check_extra : bool
-            Option to check optional parameters as well as required ones (the
-            default is True, meaning the optional parameters will be checked).
-        run_check_acceptability : bool
-            Option to check acceptable range of the values of parameters after
-            downselecting data on this object (the default is True, meaning the
-            acceptable range check will be done).
-
-        GLEAM
-        -----
-        spectral_type : str
-            Option to specify the GLEAM spectral_type to read in. Default is 'subband'.
-        with_error : bool
-            Option to include the errors on the stokes array on the object in the
-            `stokes_error` parameter. Note that the values assigned to this parameter
-            are the flux fitting errors. The GLEAM paper (Hurley-Walker et al., 2019)
-            specifies that flux scale errors should be added in quadrature to these
-            fitting errors, but that the size of the flux scale errors depends on
-            whether the comparison is between GLEAM sub-bands or with another catalog.
-            Between GLEAM sub-bands, the flux scale error is 2-3% of the component flux
-            (depending on declination), while flux scale errors between GLEAM and other
-            catalogs is 8-80% of the component flux (depending on declination).
-        use_paper_freqs : bool
-            Use our best guess of the frequencies based on the GLEAM paper and what we
-            know about the MWA. This option exists because the GLEAM paper specifies
-            that the 30.72 MHz bandwidth is subdivided into four 7.68 MHz sub-channels.
-            But the frequencies and edges listed in the catalog documentation are spaced
-            by exactly 8MHz rather than 7.68 MHz. Our calculated band centers are
-            different from the catalog values by at most 0.6 MHz, the band edges are
-            different by at most 1.08 MHz. Only used if spectral_type="subband".
-
-        FHD
-        ---
-        expand_extended: bool
-            If True, include the extended source components in FHD files.
-
-        VOTable
-        -------
-        table_name : str
-            Part of expected VOTable name. Should match only one table name in
-            the file.
-        id_column : str
-            Part of expected VOTable ID column. Should match only one column in
-            the file.
-        lon_column : str
-            Part of expected VOTable longitudinal coordinate column. Should match only
-            one column in the file.
-        lat_column : str
-            Part of expected VOTable latitudinal coordinate column. Should match only
-            one column in the file.
-        flux_columns : str or list of str
-            Part of expected vot Flux column(s). Each one should match only one column
-            in the file. Only used for vot files.
-        frame : str
-            Name of coordinate frame for VOTable source positions (lon/lat columns).
-            Defaults to "icrs". Must be interpretable by
-            `astropy.coordinates.frame_transform_graph.lookup_name()`. Only used for
-            vot files.
-        reference_frequency : :class:`astropy.units.Quantity`
-            Reference frequency for VOTable flux values, assumed to be the same value
-            for all components.
-        freq_array : :class:`astropy.units.Quantity`
-            Frequencies corresponding to VOTable flux_columns (should be same length).
-            Required for multiple flux columns.
-        freq_edge_array : :class:`astropy.units.Quantity`
-            Frequency sub-band edges for each flux_columns, shape
-            (2, len(flux_columns)). Required for multiple flux columns if
-            `freq_array` is not regularly spaced. If `freq_array` is regularly
-            spaced and `freq_edge_array` is not passed, `freq_edge_array` will
-            be calculated from the freq_array assuming the band edges are
-            directly between the band centers.
-        spectral_index_column : str
-            Part of expected VOTable spectral index column. Should match only one
-            column in the file.
-        flux_error_columns : str or list of str
-            Part of expected VOTable flux error column(s). Each one should match only
-            one column in the file.
-        history : str
-            History to add to object for VOTable files.
-
-        """
-        self = cls()
-        self.read(
-            filename,
-            filetype=filetype,
-            run_check=run_check,
-            check_extra=check_extra,
-            run_check_acceptability=run_check_acceptability,
-            # Gleam vot
-            spectral_type=spectral_type,
-            with_error=with_error,
-            use_paper_freqs=use_paper_freqs,
-            # fhd
-            expand_extended=expand_extended,
-            # vot
-            table_name=table_name,
-            id_column=id_column,
-            lon_column=lon_column,
-            lat_column=lat_column,
-            flux_columns=flux_columns,
-            frame=frame,
-            reference_frequency=reference_frequency,
-            freq_array=freq_array,
-            freq_edge_array=freq_edge_array,
-            spectral_index_column=spectral_index_column,
-            flux_error_columns=flux_error_columns,
-            history=history,
-        )
-        return self
+    @copy_replace_short_description(read, style=DocstringStyle.NUMPYDOC)
+    def from_file(cls, filename: str, **kwargs):
+        """Initialize a new :class:`SkyModel` from any file supported by SkyModel."""
+        sm = cls()
+        sm.read(filename, **kwargs)
+        return sm
 
     def write_skyh5(
         self,
