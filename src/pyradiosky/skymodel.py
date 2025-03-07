@@ -3405,7 +3405,9 @@ class SkyModel(UVBase):
         skip_params : str or list of str or bool
             A list of optional parameters to skip on read. If set to True, skip
             all truly optional parameters. The default is False, so by default all
-            optional parameters will be read.
+            optional parameters will be read. Note that this only applies to
+            truly optional parameters that are saved in the file, any optional
+            parameters not saved in the file are always skipped.
         run_check : bool
             Option to check for the existence and proper shapes of parameters
             after downselecting data on this object (the default is True,
@@ -4575,7 +4577,9 @@ class SkyModel(UVBase):
         skip_params : str or list of str or bool
             A list of optional parameters to skip on read. If set to True, skip
             all optional parameters. The default is False, so by default all
-            optional parameters will be read.
+            optional parameters will be read. Note that this only applies to
+            truly optional parameters that are saved in the file, any optional
+            parameters not saved in the file are always skipped.
 
         VOTable
         -------
