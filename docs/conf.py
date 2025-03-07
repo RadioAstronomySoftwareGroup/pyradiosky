@@ -72,6 +72,7 @@ napoleon_custom_sections = [
     ("GLEAM", "params_style"),
     ("FHD", "params_style"),
     ("VOTable", "params_style"),
+    ("SkyH5", "params_style")
 ]
 
 # turn off alphabetical ordering in autodoc

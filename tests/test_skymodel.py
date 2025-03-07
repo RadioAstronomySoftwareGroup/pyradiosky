@@ -3741,8 +3741,20 @@ def test_skyh5_file_loop_fhd(file_file, tmpdir):
     assert sky2 == sky
 
 
-@pytest.mark.parametrize("history", [None, "test"])
-def test_skyh5_file_loop_healpix(healpix_disk_new, history, tmpdir):
+@pytest.mark.parametrize(
+    ("skip_params", "add_params", "history"),
+    [
+        (False, False, "test"),
+        (False, ["name"], None),
+        ("name", ["name"], None),
+        (["name", "extended_model_group"], ["name", "extended_model_group"], None),
+        ("name", ["name", "extended_model_group"], None),
+        (True, ["name", "extended_model_group"], None),
+    ],
+)
+def test_skyh5_file_loop_healpix(
+    healpix_disk_new, tmpdir, history, add_params, skip_params
+):
     sky = healpix_disk_new
 
     run_check = True
@@ -3752,12 +3764,32 @@ def test_skyh5_file_loop_healpix(healpix_disk_new, history, tmpdir):
     else:
         sky.history = history
 
+    if add_params:
+        name_use = [
+            "nside" + str(sky.nside) + "_" + sky.hpx_order + "_" + str(ind)
+            for ind in sky.hpx_inds
+        ]
+        if "name" in add_params:
+            sky.name = name_use
+        if "extended_model_group" in add_params:
+            sky.extended_model_group = name_use
+
     testfile = str(tmpdir.join("testfile.skyh5"))
     sky.write_skyh5(testfile, run_check=run_check)
 
-    sky2 = SkyModel.from_file(testfile)
+    sky2 = SkyModel.from_file(testfile, skip_params=skip_params)
 
-    assert sky2 == sky
+    if skip_params:
+        if isinstance(skip_params, str):
+            skip_params = [skip_params]
+        elif isinstance(skip_params, bool):
+            skip_params = add_params
+        for param in skip_params:
+            assert getattr(sky2, param) is None
+            assert getattr(sky, param) is not None
+            setattr(sky, param, None)
+
+    assert sky == sky2
 
 
 def test_skyh5_file_loop_healpix_cut_sky(healpix_disk_new, tmpdir):

@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- An option to skip optional parameters when reading in skyh5 files.
+
 ### Changed
 - Use the new pyuvdata analytic short dipole beam for polarized source testing.
 - Updated minimum dependency versions: pyuvdata>=3.1.0
