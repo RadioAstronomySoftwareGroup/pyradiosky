@@ -6,6 +6,7 @@
 - An option to skip optional parameters when reading in skyh5 files.
 
 ### Changed
+- Only import lunarsky if needed.
 - Use the new pyuvdata analytic short dipole beam for polarized source testing.
 - Updated minimum dependency versions: pyuvdata>=3.1.0
 - Updated minimum optional dependency versions: lunarsky>=0.2.5

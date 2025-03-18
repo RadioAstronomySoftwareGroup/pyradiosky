@@ -34,14 +34,7 @@ from scipy.linalg import orthogonal_procrustes as ortho_procr
 
 from . import __version__, spherical_coords_transforms as sct, utils as skyutils
 
-__all__ = ["hasmoon", "SkyModel"]
-
-try:
-    from lunarsky import LunarTopo, MoonLocation, SkyCoord as LunarSkyCoord
-
-    hasmoon = True
-except ImportError:
-    hasmoon = False
+__all__ = ["SkyModel"]
 
 
 class TelescopeLocationParameter(UVParameter):
@@ -724,8 +717,6 @@ class SkyModel(UVBase):
             expected_type=EarthLocation,
             required=False,
         )
-        if hasmoon:
-            self._telescope_location.expected_type = (EarthLocation, MoonLocation)
 
         desc = (
             "Altitude and Azimuth of components in local coordinates. shape "
@@ -2326,6 +2317,28 @@ class SkyModel(UVBase):
         if not inplace:
             return sky
 
+    def _check_tel_location(self, telescope_location):
+        if not isinstance(telescope_location, EarthLocation):
+            try:
+                from lunarsky import MoonLocation
+
+                if isinstance(telescope_location, MoonLocation):
+                    self._telescope_location.expected_type = (
+                        EarthLocation,
+                        MoonLocation,
+                    )
+                else:
+                    raise ValueError(
+                        "telescope_location must be an :class:`astropy.EarthLocation` "
+                        "object or a :class:`lunarsky.MoonLocation` object. "
+                        f"value was: {str(telescope_location)}"
+                    )
+            except ImportError:
+                raise ValueError(
+                    "telescope_location must be an :class:`astropy.EarthLocation` "
+                    f"object. value was: {str(telescope_location)}"
+                ) from None
+
     def update_positions(self, time, telescope_location):
         """
         Calculate the altitude/azimuth positions for source components.
@@ -2350,15 +2363,7 @@ class SkyModel(UVBase):
         if not isinstance(time, Time):
             raise ValueError(f"time must be an astropy Time object. value was: {time}")
 
-        if not (
-            isinstance(telescope_location, EarthLocation)
-            or (hasmoon and isinstance(telescope_location, MoonLocation))
-        ):
-            errm = "telescope_location must be an :class:`astropy.EarthLocation` object"
-            if hasmoon:
-                errm += " or a :class:`lunarsky.MoonLocation` object "
-            errm += ". "
-            raise ValueError(errm + f"value was: {str(telescope_location)}")
+        self._check_tel_location(telescope_location)
 
         # Don't repeat calculations
         if self.time == time and self.telescope_location == telescope_location:
@@ -2377,6 +2382,9 @@ class SkyModel(UVBase):
                 AltAz(obstime=self.time, location=self.telescope_location)
             )
         else:
+            # can only get here if we've already checked that lunarsky is installed
+            from lunarsky import LunarTopo, SkyCoord as LunarSkyCoord
+
             skycoord_use = LunarSkyCoord(skycoord_use)
             source_altaz = skycoord_use.transform_to(
                 LunarTopo(obstime=self.time, location=self.telescope_location)
@@ -2447,6 +2455,9 @@ class SkyModel(UVBase):
             )
             axes_altaz = axes_icrs.transform_to("altaz")
         else:
+            # can only get here if we've already checked that lunarsky is installed
+            from lunarsky import SkyCoord as LunarSkyCoord
+
             axes_icrs = LunarSkyCoord(
                 x=x_c,
                 y=y_c,
@@ -2593,15 +2604,7 @@ class SkyModel(UVBase):
         else:
             above_horizon = self.above_horizon
 
-        if not (
-            isinstance(self.telescope_location, EarthLocation)
-            or (hasmoon and isinstance(self.telescope_location, MoonLocation))
-        ):
-            errm = "telescope_location must be an :class:`astropy.EarthLocation` object"
-            if hasmoon:
-                errm += " or a :class:`lunarsky.MoonLocation` object "
-            errm += ". "
-            raise ValueError(errm + f"value was: {str(self.telescope_location)}")
+        self._check_tel_location(self.telescope_location)
 
         if self.frame_coherency is None:
             self.calc_frame_coherency(store=store_frame_coherency)
