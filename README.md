@@ -1,6 +1,7 @@
 # pyradiosky
-![](https://github.com/RadioAstronomySoftwareGroup/pyradiosky/workflows/Tests/badge.svg?branch=main)
+![](https://github.com/RadioAstronomySoftwareGroup/pyradiosky/actions/workflows/testsuite.yaml/badge.svg?branch=main)
 [![codecov](https://codecov.io/gh/RadioAstronomySoftwareGroup/pyradiosky/branch/main/graph/badge.svg)](https://codecov.io/gh/RadioAstronomySoftwareGroup/pyradiosky)
+[![](https://readthedocs.org/projects/pyradiosky/badge/?version=latest)](https://app.readthedocs.org/projects/pyradiosky/)
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.06503/status.svg)](https://doi.org/10.21105/joss.06503)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.11187469.svg)](https://doi.org/10.5281/zenodo.11187469)
 
