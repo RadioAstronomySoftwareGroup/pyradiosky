@@ -3331,10 +3331,7 @@ class SkyModel(UVBase):
         assert n_stokes >= 1, "No components with nonzero flux."
 
         if self.freq_array is not None:
-            if self.spectral_type == "subband":
-                fieldnames.append("subband_frequency")
-            else:
-                fieldnames.append("frequency")
+            fieldnames.append("frequency")
             fieldtypes.append("f8")
             fieldshapes.extend([(self.Nfreqs,)])
         elif self.reference_frequency is not None:
@@ -3371,10 +3368,7 @@ class SkyModel(UVBase):
                     arr[stokes_error_names[ii]] = self.stokes_error[ii].T.to("Jy").value
 
         if self.freq_array is not None:
-            if self.spectral_type == "subband":
-                arr["subband_frequency"] = self.freq_array.to("Hz").value
-            else:
-                arr["frequency"] = self.freq_array.to("Hz").value
+            arr["frequency"] = self.freq_array.to("Hz").value
         elif self.reference_frequency is not None:
             arr["reference_frequency"] = self.reference_frequency.to("Hz").value
             if self.spectral_index is not None:
@@ -4878,6 +4872,10 @@ class SkyModel(UVBase):
         """
         Write out this object to a text file.
 
+        Note that text files have limited functionality compared to skyh5 files.
+        They do not support diffuse maps or subband type catalogs or catalogs
+        with extended_model_groups or catalogs with units other than Jy.
+
         Readable with :meth:`~skymodel.SkyModel.read_text_catalog()`.
 
         Parameters
@@ -4895,9 +4893,18 @@ class SkyModel(UVBase):
             )
 
         if self.spectral_type == "subband":
-            warnings.warn(
-                "Text files do not support subband types, this will be written as a "
-                "'full' spectral type (losing the frequency edge array information)."
+            raise ValueError(
+                "Text files do not support subband types, use write_skyh5. If you "
+                "really need to get this into a text file, you could convert this "
+                "to a 'full' spectral type (losing the frequency edge array "
+                "information)."
+            )
+
+        if self.extended_model_group is not None:
+            raise ValueError(
+                "Text files do not support catalogs with extended_model_group, "
+                "use write_skyh5. If you really need to get this into a text file, "
+                "you could remove the extended_model_group information."
             )
 
         self.check()

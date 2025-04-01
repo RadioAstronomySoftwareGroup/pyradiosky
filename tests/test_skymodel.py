@@ -3148,7 +3148,7 @@ def test_catalog_file_writer(tmp_path, time_location, frame):
 
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 @pytest.mark.filterwarnings("ignore:The reference_frequency is aliased as `frequency`")
-@pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index", "full"])
+@pytest.mark.parametrize("spec_type", ["flat", "spectral_index", "full"])
 @pytest.mark.parametrize("with_error", [False, True])
 @pytest.mark.parametrize("rise_set_lsts", [False, True])
 def test_text_catalog_loop(
@@ -3169,18 +3169,7 @@ def test_text_catalog_loop(
 
     fname = os.path.join(tmp_path, "temp_cat.txt")
 
-    if spec_type == "subband":
-        msg = (
-            "Text files do not support subband types, this will be written as a "
-            "'full' spectral type (losing the frequency edge array information)."
-        )
-        warn_type = UserWarning
-    else:
-        warn_type = None
-        msg = ""
-
-    with check_warnings(warn_type, match=msg):
-        skyobj.write_text_catalog(fname)
+    skyobj.write_text_catalog(fname)
     skyobj2 = SkyModel.from_file(fname)
     if spec_type == "subband":
         assert skyobj2.spectral_type == "full"
@@ -3233,6 +3222,28 @@ def test_write_text_catalog_errors(tmp_path, healpix_disk_new):
 
     with pytest.raises(
         ValueError, match="Stokes units must be equivalent to Jy to use this method."
+    ):
+        skyobj.write_text_catalog(fname)
+
+    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot)
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Text files do not support subband types, use write_skyh5. If you "
+            "really need to get this into a text file, you could convert this "
+            "to a 'full' spectral type (losing the frequency edge array "
+            "information)."
+        ),
+    ):
+        skyobj.write_text_catalog(fname)
+
+    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type="flat")
+    skyobj.extended_model_group = np.asarray(["foo"] * skyobj.Ncomponents)
+    with pytest.raises(
+        ValueError,
+        match="Text files do not support catalogs with extended_model_group, "
+        "use write_skyh5. If you really need to get this into a text file, "
+        "you could remove the extended_model_group information.",
     ):
         skyobj.write_text_catalog(fname)
 
