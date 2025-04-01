@@ -2456,6 +2456,7 @@ class SkyModel(UVBase):
             axes_altaz = axes_icrs.transform_to("altaz")
         else:
             # can only get here if we've already checked that lunarsky is installed
+            self._check_tel_location(self.telescope_location)
             from lunarsky import SkyCoord as LunarSkyCoord
 
             axes_icrs = LunarSkyCoord(
