@@ -458,7 +458,12 @@ b) Creating and writing out point catalog
 
   >>> # works for any point component type
   >>> write_file = os.path.join(".", "zen_source.txt" )
-  >>> sm.write_text_catalog(write_file)
+  >>> sm.write_skyh5(write_file)
+
+Note that this particular catalog could also be written to a text file, but we
+prefer skyh5 files because they can fully support all types of SkyModel objects.
+Text files do not support diffuse maps or subband type catalogs or catalogs
+with extended_model_groups or catalogs with units other than Jy.
 
 SkyModel: Selecting data
 ------------------------
