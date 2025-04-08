@@ -1,15 +1,14 @@
-#! /usr/bin/env python
-# Copyright (c) 2024 Radio Astronomy Software Group
+# Copyright (c) 2019 Radio Astronomy Software Group
 # Licensed under the 2-clause BSD License
-
-"""Utility function for making noiselike EoR models."""
+"""Command line scripts."""
 
 import argparse
 
+import astropy.units as units
 import numpy as np
-from astropy import units
 from astropy.cosmology import Planck15
 
+import pyradiosky.utils as utils
 from pyradiosky import SkyModel
 
 f21 = 1.420405751e9
@@ -121,13 +120,56 @@ def flat_spectrum_skymodel(
     )
 
 
-if __name__ == "__main__":
-    # When run as a script, construct a noiselike skymodel for the MWA frequency
-    # channels.
-
+def download_gleam(argv=None):
+    """Download the GLEAM vot table from Vizier."""
     parser = argparse.ArgumentParser(
-        description="A command-line script to generate a SkyModel containing a "
-        "flat spectrum noise-like EoR signal."
+        description="A command-line script to download the GLEAM vot table from Vizier."
+    )
+    parser.add_argument(
+        "--path", type=str, help="Folder location to save catalog to.", default="."
+    )
+    parser.add_argument(
+        "--filename", type=str, help="Filename to save catalog to.", default="gleam.vot"
+    )
+    parser.add_argument(
+        "--overwrite",
+        help="Download file even if it already exists",
+        default=False,
+        action="store_true",
+    )
+    parser.add_argument(
+        "--row_limit",
+        type=int,
+        help="Max number of rows (sources) to download, default is to download "
+        "all rows.",
+        default=None,
+    )
+    parser.add_argument(
+        "--for_testing",
+        help="Download a file to use for unit tests. If True, some additional "
+        "columns are included, the rows are limited to 50, the path and filename "
+        "are set to put the file in the correct location and the overwrite "
+        "keyword is set to True.",
+        default=False,
+        action="store_true",
+    )
+
+    args = parser.parse_args(argv)
+
+    utils.download_gleam(
+        path=args.path,
+        filename=args.filename,
+        overwrite=args.overwrite,
+        row_limit=args.row_limit,
+        for_testing=args.for_testing,
+    )
+
+
+def make_flat_spectrum_eor(argv=None):
+    """Generate a noise-like SkyModel with a flat P(k) cosmological power spectrum."""
+    parser = argparse.ArgumentParser(
+        description="A command-line script to generate a noise-like EoR SkyModel "
+        "with a flat P(k) cosmological power spectrum"
     )
     parser.add_argument(
         "-v",
@@ -185,7 +227,7 @@ if __name__ == "__main__":
         f" and variance {var} K^2 at channel {args.ref_chan}."
     )
 
-    sky = flat_spectrum_skymodel(
+    sky = utils.flat_spectrum_skymodel(
         var, nside, freqs=freq_array, ref_chan=args.ref_chan, frame=frame
     )
     sky.check()

@@ -8,7 +8,7 @@ import pytest
 from astropy.coordinates import Angle
 from astropy.time import Time
 
-from pyradiosky import SkyModel, utils as skyutils
+from pyradiosky import SkyModel, cli, utils as skyutils
 
 
 def test_tee_ra_loop():
@@ -73,27 +73,32 @@ def test_stokes_tofrom_coherency():
 
 
 @pytest.mark.parametrize("stype", ["subband", "spectral_index", "flat"])
-def test_download_gleam(tmp_path, stype):
+def test_download_gleam(tmp_path, stype, capsys):
     pytest.importorskip("astroquery")
     import requests  # a dependency of astroquery
 
     fname = "gleam_cat.vot"
     filename = os.path.join(tmp_path, fname)
+    n_src = 10
 
     try:
-        skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=10)
+        cli.download_gleam(
+            ["--path", str(tmp_path), "--filename", fname, "--row_limit", str(n_src)]
+        )
+        captured = capsys.readouterr()
+        assert captured.out.startswith("GLEAM catalog downloaded and saved to")
     except requests.exceptions.ConnectionError:
         pytest.skip("Connection error w/ Vizier")
 
     sky = SkyModel()
     sky.read_gleam_catalog(filename, spectral_type=stype)
-    assert sky.Ncomponents == 10
+    assert sky.Ncomponents == n_src
 
     # check there's not an error if the file exists and overwrite is False
     # and that the file is not replaced
     skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=5)
     sky.read_gleam_catalog(filename, spectral_type=stype)
-    assert sky.Ncomponents == 10
+    assert sky.Ncomponents == n_src
 
     # check that the file is replaced if overwrite is True
     try:
