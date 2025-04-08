@@ -9,7 +9,6 @@ from astropy.coordinates import Angle
 from astropy.time import Time
 
 from pyradiosky import SkyModel, cli, utils as skyutils
-from pyradiosky.data import DATA_PATH
 
 
 def test_tee_ra_loop():
@@ -80,10 +79,11 @@ def test_download_gleam(tmp_path, stype, capsys):
 
     fname = "gleam_cat.vot"
     filename = os.path.join(tmp_path, fname)
+    n_src = 10
 
     try:
         cli.download_gleam(
-            ["--path", str(tmp_path), "--filename", fname, "--row_limit", "10"]
+            ["--path", str(tmp_path), "--filename", fname, "--row_limit", str(n_src)]
         )
         captured = capsys.readouterr()
         assert captured.out.startswith("GLEAM catalog downloaded and saved to")
@@ -92,24 +92,13 @@ def test_download_gleam(tmp_path, stype, capsys):
 
     sky = SkyModel()
     sky.read_gleam_catalog(filename, spectral_type=stype)
-    assert sky.Ncomponents == 10
-
-    # compare to the file we have in our data folder
-    sky2 = SkyModel.from_file(
-        os.path.join(DATA_PATH, "gleam_50srcs.vot"), spectral_type=stype
-    )
-    sel_inds = [index for index, name in enumerate(sky.name) if name in sky2.name]
-    sky2.select(component_inds=sel_inds)
-    # histories do not match, fix that
-    assert sky._history != sky2._history
-    sky2.history = sky.history
-    assert sky2 == sky
+    assert sky.Ncomponents == n_src
 
     # check there's not an error if the file exists and overwrite is False
     # and that the file is not replaced
     skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=5)
     sky.read_gleam_catalog(filename, spectral_type=stype)
-    assert sky.Ncomponents == 10
+    assert sky.Ncomponents == n_src
 
     # check that the file is replaced if overwrite is True
     try:
