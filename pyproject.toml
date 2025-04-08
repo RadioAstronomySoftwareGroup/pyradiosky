@@ -52,15 +52,11 @@ dev = ["pyradiosky[all,test,doc]"]
 Repository = "https://github.com/RadioAstronomySoftwareGroup/pyradiosky"
 Documentation = "https://pyradiosky.readthedocs.io/"
 
-# Note that this approach is "discouraged" in favor of [project.scripts], but
-# that requires entry-point functions, which would require some refactoring.
-[tool.setuptools]
-script-files = ["scripts/download_gleam.py", "scripts/make_flat_spectrum_eor.py"]
+[project.scripts]
+download_gleam = "cli:download_gleam"
+make_flat_spectrum_eor = "cli:make_flat_spectrum_eor"
 
 [tool.setuptools_scm]
-
-[darglint]
-docstring_style = "numpy"
 
 [tool.pytest.ini_options]
 addopts = "--ignore=scripts"
