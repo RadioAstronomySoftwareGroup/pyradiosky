@@ -294,20 +294,12 @@ def download_gleam(
     if for_testing:  # pragma: no cover
         desired_columns.extend(["Fpwide", "e_Fp076"])
 
-    # There is a bug that causes astroquery to only download the first 14-16 specified
-    # columns if you pass it a long list of columns.
-    # The workaround is to download all columns and then remove the ones we don't need.
-    # This is not ideal because it substantially increases the download time, but seems
-    # to be required for now.
-    Vizier.columns = ["all"]
+    Vizier.columns = desired_columns
     catname = "VIII/100/gleamegc"
     table = Vizier.get_catalogs(catname)[0]
 
     for col in desired_columns:
         assert col in table.colnames, f"column {col} not in downloaded table."
-
-    columns_to_remove = list(set(table.colnames) - set(desired_columns))
-    table.remove_columns(columns_to_remove)
 
     table.write(opath, format="votable", overwrite=overwrite)
 
