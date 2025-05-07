@@ -1219,6 +1219,7 @@ def test_calc_basis_rotation_matrix(time_location, moon_time_location, telescope
     This tests whether the 3-D rotation matrix from RA/Dec to Alt/Az is
     actually a rotation matrix (R R^T = R^T R = I)
     """
+    from spiceypy.utils.exceptions import SpiceUNKNOWNFRAME
 
     if telescope_frame == "itrs":
         time, telescope_location = time_location
@@ -1233,9 +1234,12 @@ def test_calc_basis_rotation_matrix(time_location, moon_time_location, telescope
         stokes=[1.0, 0.0, 0.0, 0.0] * units.Jy,
         spectral_type="flat",
     )
-    source.update_positions(time, telescope_location)
 
-    basis_rot_matrix = source._calc_average_rotation_matrix()
+    try:
+        source.update_positions(time, telescope_location)
+        basis_rot_matrix = source._calc_average_rotation_matrix()
+    except SpiceUNKNOWNFRAME as err:
+        pytest.skip("SpiceUNKNOWNFRAME error: " + str(err))
 
     assert np.allclose(np.matmul(basis_rot_matrix, basis_rot_matrix.T), np.eye(3))
     assert np.allclose(np.matmul(basis_rot_matrix.T, basis_rot_matrix), np.eye(3))
