@@ -332,9 +332,8 @@ def flat_spectrum_skymodel(
     redshifts: numpy.ndarray
         Redshifts at which to generate maps. Ignored if freqs is provided.
     freqs: numpy.ndarray
-        Frequencies in Hz. Overrides redshifts, setting them to be
-        the redshifts of the 21 cm line corresponding with these frequencies.
-        Optional if redshifts is provided.
+        Frequencies in Hz, not required if redshifts is passed. Overrides
+        redshifts if passed.
 
     Returns
     -------
@@ -350,9 +349,12 @@ def flat_spectrum_skymodel(
     from pyradiosky import SkyModel
 
     if freqs is not None:
-        if np.any(np.diff(freqs) < 0):
+        if not isinstance(freqs, units.Quantity):
+            freqs *= units.Hz
+
+        if np.any(np.diff(freqs.value) < 0):
             raise ValueError("freqs must be in ascending order.")
-        redshifts = f21 / freqs - 1
+        redshifts = f21 / freqs.to("Hz").value - 1
         ref_z = redshifts[ref_chan]
         # must sort so that redshifts go in ascending order (opposite freq order)
         z_order = np.argsort(redshifts)
@@ -360,9 +362,9 @@ def flat_spectrum_skymodel(
         freqs = freqs[z_order]
         ref_zbin = np.where(np.isclose(redshifts, ref_z))[0][0]
     elif redshifts is not None:
-        freqs = f21 / (redshifts + 1)
         if np.any(np.diff(redshifts) < 0):
             raise ValueError("redshifts must be in ascending order.")
+        freqs = (f21 / (redshifts + 1)) * units.Hz
     else:
         raise ValueError("Either redshifts or freqs must be set.")
 
@@ -396,9 +398,6 @@ def flat_spectrum_skymodel(
     f_order = np.argsort(freqs)
     freqs = freqs[f_order]
     stokes = stokes[:, f_order]
-
-    if not isinstance(freqs, units.Quantity):
-        freqs *= units.Hz
 
     # The true power spectrum amplitude is variance * reference voxel volume.
     pspec_amp = variance * voxvols[ref_zbin]
