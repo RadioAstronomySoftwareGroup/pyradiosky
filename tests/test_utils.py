@@ -145,8 +145,10 @@ def test_jy_to_ksr():
     assert np.allclose(conv0, conv1)
 
 
-@pytest.mark.parametrize("fspec", ["freqs", "redshifts"])
-def test_flat_spectrum_skymodel(fspec, tmp_path, capsys):
+@pytest.mark.parametrize(
+    ("fspec", "use_cli"), [("freqs", True), ("freqs", False), ("redshifts", False)]
+)
+def test_flat_spectrum_skymodel(fspec, use_cli, tmp_path, capsys):
     n_freq = 20
     freqs = np.linspace(150e6, 180e6, n_freq)
     nside = 256
@@ -156,13 +158,7 @@ def test_flat_spectrum_skymodel(fspec, tmp_path, capsys):
     z_order = np.argsort(redshifts)
     redshifts = redshifts[z_order]
 
-    fspec_kwargs = {}
-    if fspec == "freqs":
-        fspec_kwargs = {"freqs": freqs}
-    else:
-        fspec_kwargs = {"redshifts": redshifts, "ref_zbin": n_freq - 1}
-
-    if fspec == "freqs":
+    if use_cli:
         # cli only accepts frequencies
         file_name = str(tmp_path) + "test_flat_spectrum.skyh5"
         cli.make_flat_spectrum_eor(
@@ -188,6 +184,12 @@ def test_flat_spectrum_skymodel(fspec, tmp_path, capsys):
         )
         sky = SkyModel.from_file(file_name)
     else:
+        fspec_kwargs = {}
+        if fspec == "freqs":
+            fspec_kwargs = {"freqs": freqs * units.Hz}
+        else:
+            fspec_kwargs = {"redshifts": redshifts, "ref_zbin": n_freq - 1}
+
         sky = skyutils.flat_spectrum_skymodel(
             variance=variance, nside=nside, **fspec_kwargs
         )
