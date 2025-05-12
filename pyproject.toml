@@ -58,9 +58,6 @@ make_flat_spectrum_eor = "cli:make_flat_spectrum_eor"
 
 [tool.setuptools_scm]
 
-[tool.pytest.ini_options]
-addopts = "--ignore=scripts"
-
 [tool.ruff.lint]
 select = [
     "E", # pycodestyle

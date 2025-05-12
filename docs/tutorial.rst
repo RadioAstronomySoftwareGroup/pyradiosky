@@ -123,6 +123,26 @@ described in the `SkyH5 memo <https://github.com/RadioAstronomySoftwareGroup/pyr
   >>> # an empty object, optionally specify the file type.
   >>> sm = SkyModel.from_file(filename)
 
+
+f) Creating a Skymodel with a noise-like Healpix map
+****************************************************
+
+This can be useful for simulating rudimentary EoR HI power spectrum signal maps,
+although they are noise-like so do not contain the real bubble structures.
+
+.. code-block:: python
+
+  >>> import os
+  >>> import numpy as np
+  >>> from pyradiosky import utils
+  >>> sm = utils.flat_spectrum_skymodel(
+  ...     variance=1e-6, nside=256, freqs=np.linspace(150e6, 180e6, 20)
+  ... )
+  >>> # the expect power spectrum amplitude is recorded in the history
+  >>> print(sm.history[0:74])
+  Generated flat-spectrum model, with spectral amplitude 0.037 K$^2$ Mpc$^3$
+
+
 SkyModel: Plotting
 ------------------
 
@@ -284,7 +304,7 @@ c) Plotting Healpix maps, converting to pixel type and changing coordinate frame
   >>> # First plot the pixel locations on a flat RA/Dec grid.
   >>> ra, dec = sm.get_lon_lat()
   >>> _ = plt.scatter(ra, dec)
-  >>> _ = plt.xlim(max(sm.ra.value), min(sm.ra.value))
+  >>> _ = plt.xlim(max(ra.value), min(ra.value))
   >>> plt.autoscale()
   >>> _ = plt.xlabel("RA (deg)")
   >>> _ = plt.ylabel("Dec (deg)")
@@ -958,7 +978,8 @@ map components to point components. In this method, the flux density for each ma
 multiplied by the pixel area to get the fluxes for the new point components. If the
 healpix map is in temperature units, the units can be optionally converted to Jy.
 This is useful for some simulators that only accept point-like source components.
-An example using this method is shown in :ref:`plotting_healpix_maps`.
+An example using this method is shown below and an interesting effect related to
+changing the coordinate frame is shown in :ref:`plotting_healpix_maps`.
 
 Similarly, the :meth:`pyradiosky.SkyModel.assign_to_healpix` method can be used to assign
 point components to their nearest healpix pixel. Caution is advised for this method as it
