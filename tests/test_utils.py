@@ -6,9 +6,10 @@ import astropy.units as units
 import numpy as np
 import pytest
 from astropy.coordinates import Angle
+from astropy.cosmology import Planck15
 from astropy.time import Time
 
-from pyradiosky import SkyModel, utils as skyutils
+from pyradiosky import SkyModel, cli, utils as skyutils
 
 
 def test_tee_ra_loop():
@@ -73,27 +74,32 @@ def test_stokes_tofrom_coherency():
 
 
 @pytest.mark.parametrize("stype", ["subband", "spectral_index", "flat"])
-def test_download_gleam(tmp_path, stype):
+def test_download_gleam(tmp_path, stype, capsys):
     pytest.importorskip("astroquery")
     import requests  # a dependency of astroquery
 
     fname = "gleam_cat.vot"
     filename = os.path.join(tmp_path, fname)
+    n_src = 10
 
     try:
-        skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=10)
+        cli.download_gleam(
+            ["--path", str(tmp_path), "--filename", fname, "--row_limit", str(n_src)]
+        )
+        captured = capsys.readouterr()
+        assert captured.out.startswith("GLEAM catalog downloaded and saved to")
     except requests.exceptions.ConnectionError:
         pytest.skip("Connection error w/ Vizier")
 
     sky = SkyModel()
     sky.read_gleam_catalog(filename, spectral_type=stype)
-    assert sky.Ncomponents == 10
+    assert sky.Ncomponents == n_src
 
     # check there's not an error if the file exists and overwrite is False
     # and that the file is not replaced
     skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=5)
     sky.read_gleam_catalog(filename, spectral_type=stype)
-    assert sky.Ncomponents == 10
+    assert sky.Ncomponents == n_src
 
     # check that the file is replaced if overwrite is True
     try:
@@ -137,3 +143,87 @@ def test_jy_to_ksr():
     conv1 = jy2ksr_nonastropy(freqs) * units.K * units.sr / units.Jy
 
     assert np.allclose(conv0, conv1)
+
+
+@pytest.mark.parametrize(
+    ("fspec", "use_cli"), [("freqs", True), ("freqs", False), ("redshifts", False)]
+)
+def test_flat_spectrum_skymodel(fspec, use_cli, tmp_path, capsys):
+    n_freq = 20
+    freqs = np.linspace(150e6, 180e6, n_freq)
+    nside = 256
+    variance = 1e-6
+
+    redshifts = skyutils.f21 / freqs - 1
+    z_order = np.argsort(redshifts)
+    redshifts = redshifts[z_order]
+
+    if use_cli:
+        # cli only accepts frequencies
+        file_name = str(tmp_path) + "test_flat_spectrum.skyh5"
+        cli.make_flat_spectrum_eor(
+            [
+                "-v",
+                str(variance),
+                "--nside",
+                str(nside),
+                "--filename",
+                file_name,
+                "-s",
+                str(freqs[0]),
+                "-e",
+                str(freqs[-1]),
+                "-N",
+                str(n_freq),
+            ]
+        )
+        captured = capsys.readouterr()
+        assert captured.out.startswith(
+            "Generating sky model, nside 256, and variance 1e-06 K^2 at channel 0.\n"
+            "Generated flat-spectrum model, with spectral amplitude 0.037 K$^2$ Mpc$^3$"
+        )
+        sky = SkyModel.from_file(file_name)
+    else:
+        fspec_kwargs = {}
+        if fspec == "freqs":
+            fspec_kwargs = {"freqs": freqs * units.Hz}
+        else:
+            fspec_kwargs = {"redshifts": redshifts, "ref_zbin": n_freq - 1}
+
+        sky = skyutils.flat_spectrum_skymodel(
+            variance=variance, nside=nside, **fspec_kwargs
+        )
+
+    npix = 12 * nside**2
+    assert sky.Ncomponents == npix
+    np.testing.assert_allclose(sky.freq_array.value, freqs)
+    calc_var = np.var(sky.stokes, axis=2)
+
+    dz = redshifts[-1] - redshifts[-2]
+    omega = 4 * np.pi / npix
+    vol = (
+        Planck15.differential_comoving_volume(redshifts[-1]).to_value("Mpc^3/sr")
+        * dz
+        * omega
+    )
+
+    pspec_amp = variance * vol
+    assert f"{pspec_amp:.3f} " + r"K$^2$ Mpc$^3$" in sky.history
+
+    assert np.isclose(calc_var[0, 0].value, variance)
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "msg"),
+    [
+        ({}, "Either redshifts or freqs must be set."),
+        ({"freqs": np.linspace(180e6, 150e6, 10)}, "freqs must be in ascending order."),
+        (
+            {"redshifts": skyutils.f21 / np.linspace(150e6, 180e6, 10) - 1},
+            "redshifts must be in ascending order.",
+        ),
+    ],
+)
+def test_flat_spectrum_skymodel_errors(kwargs, msg):
+    with pytest.raises(ValueError, match=msg):
+        skyutils.flat_spectrum_skymodel(variance=1e-6, nside=256, **kwargs)

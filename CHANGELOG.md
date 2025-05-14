@@ -6,6 +6,8 @@
 - An option to skip optional parameters when reading in skyh5 files.
 
 ### Changed
+- Converted scripts to entry points to be better aligned with the pyproject.toml
+approach.
 - Only import lunarsky if needed.
 - Use the new pyuvdata analytic short dipole beam for polarized source testing.
 - Updated minimum dependency versions: pyuvdata>=3.1.0

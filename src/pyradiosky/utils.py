@@ -9,10 +9,13 @@ import erfa
 import numpy as np
 from astropy.coordinates import Angle
 from astropy.coordinates.builtin_frames.utils import get_jd12
+from astropy.cosmology import Planck15
 from astropy.time import Time
 from astropy.units import Quantity
 
 from pyradiosky.data import DATA_PATH as SKY_DATA_PATH
+
+f21 = 1.420405751e9
 
 
 # The frame radio astronomers call the apparent or current epoch is the
@@ -294,21 +297,121 @@ def download_gleam(
     if for_testing:  # pragma: no cover
         desired_columns.extend(["Fpwide", "e_Fp076"])
 
-    # There is a bug that causes astroquery to only download the first 14-16 specified
-    # columns if you pass it a long list of columns.
-    # The workaround is to download all columns and then remove the ones we don't need.
-    # This is not ideal because it substantially increases the download time, but seems
-    # to be required for now.
-    Vizier.columns = ["all"]
+    Vizier.columns = desired_columns
     catname = "VIII/100/gleamegc"
     table = Vizier.get_catalogs(catname)[0]
 
     for col in desired_columns:
         assert col in table.colnames, f"column {col} not in downloaded table."
 
-    columns_to_remove = list(set(table.colnames) - set(desired_columns))
-    table.remove_columns(columns_to_remove)
-
     table.write(opath, format="votable", overwrite=overwrite)
 
     print("GLEAM catalog downloaded and saved to " + opath)
+
+
+def flat_spectrum_skymodel(
+    *, variance, nside, ref_chan=0, ref_zbin=0, redshifts=None, freqs=None, frame="icrs"
+):
+    """
+    Generate a full-frequency SkyModel of a flat-spectrum (noiselike) EoR signal.
+
+    The amplitude of this signal is variance * vol(ref_chan), where vol() gives
+    the voxel volume and ref_chan is a chosen reference point. The generated
+    SkyModel has healpix component type.
+
+    Parameters
+    ----------
+    variance: float
+        Variance of the signal, in Kelvin^2, at the reference channel.
+    nside: int
+        HEALPix NSIDE parameter. Must be a power of 2.
+    ref_chan: int
+        Frequency channel to set as reference, if using freqs.
+    ref_zbin: int
+        Redshift bin number to use as reference, if using redshifts.
+    redshifts: numpy.ndarray
+        Redshifts at which to generate maps. Ignored if freqs is provided.
+    freqs: numpy.ndarray
+        Frequencies in Hz, not required if redshifts is passed. Overrides
+        redshifts if passed.
+
+    Returns
+    -------
+    pyradiosky.SkyModel
+        A SkyModel instance corresponding a white noise-like EoR signal.
+
+    Notes
+    -----
+    Either redshifts or freqs must be provided.
+    The history string of the returned SkyModel gives the expected amplitude.
+    """
+    # import here to avoid circular imports
+    from pyradiosky import SkyModel
+
+    if freqs is not None:
+        if not isinstance(freqs, units.Quantity):
+            freqs *= units.Hz
+
+        if np.any(np.diff(freqs.value) < 0):
+            raise ValueError("freqs must be in ascending order.")
+        redshifts = f21 / freqs.to("Hz").value - 1
+        ref_z = redshifts[ref_chan]
+        # must sort so that redshifts go in ascending order (opposite freq order)
+        z_order = np.argsort(redshifts)
+        redshifts = redshifts[z_order]
+        freqs = freqs[z_order]
+        ref_zbin = np.where(np.isclose(redshifts, ref_z))[0][0]
+    elif redshifts is not None:
+        if np.any(np.diff(redshifts) < 0):
+            raise ValueError("redshifts must be in ascending order.")
+        freqs = (f21 / (redshifts + 1)) * units.Hz
+    else:
+        raise ValueError("Either redshifts or freqs must be set.")
+
+    npix = 12 * nside**2
+    nfreqs = freqs.size
+    omega = 4 * np.pi / npix
+
+    # Make some noise.
+    stokes = np.zeros((4, npix, nfreqs))
+    stokes[0, :, :] = np.random.normal(0.0, np.sqrt(variance), (npix, nfreqs))
+
+    voxvols = np.zeros(nfreqs)
+    for zi in range(nfreqs - 1):
+        dz = redshifts[zi + 1] - redshifts[zi]
+
+        vol = (
+            Planck15.differential_comoving_volume(redshifts[zi]).to_value("Mpc^3/sr")
+            * dz
+            * omega
+        )
+        voxvols[zi] = vol
+    voxvols[nfreqs - 1] = (
+        vol  # Assume the last redshift bin is the same width as the next-to-last.
+    )
+
+    scale = np.sqrt(voxvols / voxvols[ref_zbin])
+    stokes /= scale
+    stokes = np.swapaxes(stokes, 1, 2)  # Put npix in last place again.
+
+    # sort back to freq order
+    f_order = np.argsort(freqs)
+    freqs = freqs[f_order]
+    stokes = stokes[:, f_order]
+
+    # The true power spectrum amplitude is variance * reference voxel volume.
+    pspec_amp = variance * voxvols[ref_zbin]
+    history_string = (
+        f"Generated flat-spectrum model, with spectral amplitude {pspec_amp:.3f} "
+    )
+    history_string += r"K$^2$ Mpc$^3$"
+
+    return SkyModel(
+        freq_array=freqs,
+        hpx_inds=np.arange(npix),
+        spectral_type="full",
+        nside=nside,
+        stokes=stokes * units.K,
+        history=history_string,
+        frame=frame,
+    )
