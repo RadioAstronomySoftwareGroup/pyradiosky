@@ -35,10 +35,11 @@ def download_gleam(argv=None):
     )
     parser.add_argument(
         "--for_testing",
-        help="Download a file to use for unit tests. If True, some additional "
-        "columns are included, the rows are limited to 50, the path and filename "
-        "are set to put the file in the correct location and the overwrite "
-        "keyword is set to True.",
+        help="Download a file to use for unit tests. If True, all columns that "
+        "are ever used are included (e.g. for different spectral types and errors), "
+        "the rows are limited to 50, the path and filename are set to put the "
+        "file in the correct location for the unit tests and the overwrite keyword "
+        "is set to True.",
         default=False,
         action="store_true",
     )
@@ -81,13 +82,29 @@ def make_flat_spectrum_eor(argv=None):
         "start frequency.",
     )
     parser.add_argument(
-        "-s", "--start_freq", type=float, required=True, help="Start frequency (in Hz)"
+        "-s",
+        "--start_freq",
+        type=float,
+        required=True,
+        help="Start frequency (in Hz), used to set up the frequency array as "
+        "freq_array = np.linspace(start_freq, end_freq, Nfreqs).",
     )
     parser.add_argument(
-        "-e", "--end_freq", type=float, required=True, help="End frequency (in Hz)"
+        "-e",
+        "--end_freq",
+        type=float,
+        required=True,
+        help="End frequency (in Hz), used to set up the frequency array as "
+        "freq_array = np.linspace(start_freq, end_freq, Nfreqs) (will be the "
+        "last included frequency).",
     )
     parser.add_argument(
-        "-N", "--nfreqs", type=int, required=True, help="Number of frequencies"
+        "-N",
+        "--nfreqs",
+        type=int,
+        required=True,
+        help="Number of frequencies, used to set up the frequency array as "
+        "freq_array = np.linspace(start_freq, end_freq, Nfreqs).",
     )
     parser.add_argument(
         "--filename", type=str, help="Output file name", default="noise_sky.hdf5"
