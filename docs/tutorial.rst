@@ -138,7 +138,7 @@ although they are noise-like so do not contain the real bubble structures.
   >>> sm = utils.flat_spectrum_skymodel(
   ...     variance=1e-6, nside=256, freqs=np.linspace(150e6, 180e6, 20)
   ... )
-  >>> # the expect power spectrum amplitude is recorded in the history
+  >>> # the expected power spectrum amplitude is recorded in the history
   >>> print(sm.history[0:74])
   Generated flat-spectrum model, with spectral amplitude 0.037 K$^2$ Mpc$^3$
 
