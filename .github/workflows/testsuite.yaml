@@ -21,7 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@main
         with:
@@ -69,7 +69,7 @@ jobs:
   min_deps:
     env:
       ENV_NAME: min_deps
-      PYTHON: "3.11"
+      PYTHON: "3.13"
     name: Min Deps Testing
     runs-on: ubuntu-latest
     strategy:
@@ -122,7 +122,7 @@ jobs:
   min_versions:
     env:
       ENV_NAME: min_versions
-      PYTHON: "3.10"
+      PYTHON: "3.11"
     name: Min Versions Testing
     runs-on: ubuntu-latest
     strategy:
@@ -175,7 +175,7 @@ jobs:
   # Use pip for diversity
   warning_test:
     env:
-      PYTHON: "3.11"
+      PYTHON: "3.12"
     name: Warning Test
     runs-on: ubuntu-latest
     steps:
@@ -217,7 +217,7 @@ jobs:
   docs_test:
       env:
         ENV_NAME: full_deps
-        PYTHON: "3.11"
+        PYTHON: "3.12"
       name: Tutorial Testing
       runs-on: ubuntu-latest
       defaults:

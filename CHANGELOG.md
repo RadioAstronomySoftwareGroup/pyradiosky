@@ -6,6 +6,7 @@
 - An option to skip optional parameters when reading in skyh5 files.
 
 ### Changed
+- Updated minimum dependency versions: python>=3.11
 - Converted scripts to entry points to be better aligned with the pyproject.toml
 approach.
 - Only import lunarsky if needed.
