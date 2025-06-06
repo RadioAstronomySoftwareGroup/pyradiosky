@@ -4,11 +4,11 @@ channels:
 dependencies:
   - astropy>=6.0
   - coverage
-  - h5py>=3.4
+  - h5py>=3.7
   - numpy>=1.23
   - pytest
   - pytest-cov
   - pyuvdata>=3.1.0
-  - scipy>=1.8
+  - scipy>=1.9
   - setuptools_scm>=8.1
   - pip
