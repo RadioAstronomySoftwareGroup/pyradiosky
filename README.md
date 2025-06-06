@@ -67,9 +67,9 @@ following packages before installing `pyradiosky`:
 Required:
 
 * astropy>=6.0
-* h5py>=3.4
+* h5py>=3.7
 * numpy>=1.23
-* scipy>=1.8
+* scipy>=1.9
 * python>=3.11
 * pyuvdata>=3.1.0
 * setuptools_scm>=8.1

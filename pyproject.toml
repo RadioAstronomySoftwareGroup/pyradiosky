@@ -19,10 +19,10 @@ readme = "README.md"
 dynamic = ["version"]
 dependencies = [
     "astropy>=6.0",
-    "h5py>=3.4",
+    "h5py>=3.7",
     "numpy>=1.23",
     "pyuvdata>=3.1.0",
-    "scipy>=1.8",
+    "scipy>=1.9",
     "setuptools>=64",
     "setuptools_scm>=8.1",
 ]
