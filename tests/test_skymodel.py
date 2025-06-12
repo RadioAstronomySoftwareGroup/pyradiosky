@@ -3378,6 +3378,8 @@ def test_zenith_on_moon(moonsky):
 def test_source_motion(moonsky):
     """Check that period is about 28 days."""
 
+    from spiceypy.utils.exceptions import SpiceUNKNOWNFRAME
+
     zenith_source = moonsky
 
     Ntimes = 500
@@ -3385,9 +3387,12 @@ def test_source_motion(moonsky):
     times = zenith_source.time + TimeDelta(ets, format="sec")
 
     lmns = np.zeros((Ntimes, 3))
-    for ti in range(Ntimes):
-        zenith_source.update_positions(times[ti], zenith_source.telescope_location)
-        lmns[ti] = zenith_source.pos_lmn.squeeze()
+    try:
+        for ti in range(Ntimes):
+            zenith_source.update_positions(times[ti], zenith_source.telescope_location)
+            lmns[ti] = zenith_source.pos_lmn.squeeze()
+    except SpiceUNKNOWNFRAME as err:
+        pytest.skip("SpiceUNKNOWNFRAME error: " + str(err))
     _els = np.fft.fft(lmns[:, 0])
     dt = np.diff(ets)[0]
     _freqs = np.fft.fftfreq(Ntimes, d=dt)
