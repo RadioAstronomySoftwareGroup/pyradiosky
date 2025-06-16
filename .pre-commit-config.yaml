@@ -26,4 +26,4 @@ repos:
     rev: 1.8.4
     hooks:
       - id: bandit
-        args: [--skip, "B101", --recursive, pyuvdata]
+        args: [--skip, "B101", --recursive, pyradiosky]
