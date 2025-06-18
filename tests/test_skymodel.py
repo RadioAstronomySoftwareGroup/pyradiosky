@@ -780,6 +780,7 @@ def test_jansky_to_kelvin_loop(spec_type):
     skyobj = SkyModel.from_file(
         GLEAM_vot, spectral_type=spec_type, with_error=True, filetype="gleam"
     )
+    skyobj.select(non_nan=True, non_negative=True)
 
     stokes_expected = np.zeros_like(skyobj.stokes.value) * units.K * units.sr
     if spec_type == "subband":
@@ -2162,6 +2163,37 @@ def test_healpix_positions(tmp_path, time_location):
     assert np.isclose(src_lmn[2][ipix], src_n)
 
 
+def test_cut_nan_neg():
+    with check_warnings(UserWarning, match="Some stokes I values are negative"):
+        skyobj = SkyModel.from_file(GLEAM_vot, with_error=True)
+
+    # add some NaNs. These exist in full GLEAM catalog but not in our small test file
+    skyobj.stokes[0, 0:2, 0] = np.nan  # no low freq support
+    skyobj.stokes[0, 10:11, 1] = np.nan  # missing freqs in middle
+    skyobj.stokes[0, -2:, 2] = np.nan  # no high freq support
+    skyobj.stokes[0, :, 3] = np.nan  # all NaNs
+
+    with check_warnings(
+        UserWarning,
+        match=["Some stokes I values are negative", "Some stokes values are NaNs."],
+    ):
+        skyobj.check()
+
+    skyobj2 = skyobj.select(non_nan=True, non_negative=True, inplace=False)
+
+    with check_warnings(None):
+        skyobj2.check()
+
+    assert skyobj2.Ncomponents == 29
+
+    skyobj3 = skyobj.select(
+        component_inds=np.arange(10), non_nan=True, non_negative=True, inplace=False
+    )
+
+    assert skyobj3.Ncomponents == 4
+
+
+@pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
 @pytest.mark.filterwarnings("ignore:The `source_cuts` method is deprecated")
 def test_flux_source_cuts():
     # Check that min/max flux limits in test params work.
