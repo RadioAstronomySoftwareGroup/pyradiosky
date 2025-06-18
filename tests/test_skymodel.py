@@ -418,7 +418,11 @@ def test_init_error_freqparams(zenith_skycoord, spec_type):
 
 
 def test_check_errors():
-    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, with_error=True)
+    with check_warnings(None, match=""):
+        skyobj = SkyModel.from_gleam_catalog(
+            GLEAM_vot, with_error=True, run_check=False
+        )
+
     skyobj2 = skyobj.copy()
 
     # Change units on stokes_error
@@ -442,23 +446,33 @@ def test_check_errors():
     skyobj2 = skyobj.copy()
     skyobj2.freq_edge_array = None
     with check_warnings(
-        DeprecationWarning,
-        match="freq_edge_array is not set. Cannot calculate it from the freq_array "
-        "because freq_array spacing is not constant. This will become an error in "
-        "version 0.5",
+        [DeprecationWarning, UserWarning],
+        match=[
+            "freq_edge_array is not set. Cannot calculate it from the freq_array "
+            "because freq_array spacing is not constant. This will become an error in "
+            "version 0.5",
+            "Some stokes I values are negative.",
+        ],
     ):
         skyobj2.check()
 
     skyobj2.freq_array = (np.arange(skyobj2.Nfreqs) * 1e7 + 1e8) * units.Hz
     skyobj2.freq_edge_array = None
     with check_warnings(
-        DeprecationWarning,
-        match="freq_edge_array is not set. Calculating it from the freq_array. This "
-        "will become an error in version 0.5",
+        [DeprecationWarning, UserWarning],
+        match=[
+            "freq_edge_array is not set. Calculating it from the freq_array. This "
+            "will become an error in version 0.5",
+            "Some stokes I values are negative.",
+        ],
     ):
         skyobj2.check()
 
-    skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type="spectral_index")
+    with check_warnings(
+        UserWarning,
+        match=["Some spectral index values are NaN", "Some stokes values are NaN"],
+    ):
+        skyobj = SkyModel.from_gleam_catalog(GLEAM_vot, spectral_type="spectral_index")
     skyobj2 = skyobj.copy()
     skyobj2.reference_frequency = skyobj2.reference_frequency / units.sr
     with pytest.raises(
@@ -758,6 +772,9 @@ def test_skymodel_init_errors(zenith_skycoord):
         sky.check()
 
 
+@pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
+@pytest.mark.filterwarnings("ignore:Some spectral index values are NaN")
+@pytest.mark.filterwarnings("ignore:Some stokes values are NaNs")
 @pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index"])
 def test_jansky_to_kelvin_loop(spec_type):
     skyobj = SkyModel.from_file(
@@ -916,6 +933,7 @@ def test_healpix_to_point_loop(
     sky.check()
 
 
+@pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
 def test_extra_columns_errors():
     skyobj = SkyModel.from_file(GLEAM_vot, with_error=True)
 
@@ -1112,6 +1130,9 @@ def test_assign_to_healpix_errors(assign_hpx_data):
         sky.assign_to_healpix(nside)
 
 
+@pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
+@pytest.mark.filterwarnings("ignore:Some spectral index values are NaN")
+@pytest.mark.filterwarnings("ignore:Some stokes values are NaNs")
 @pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index"])
 def test_assign_to_healpix_gleam_simple(spec_type):
     """
@@ -1131,6 +1152,9 @@ def test_assign_to_healpix_gleam_simple(spec_type):
     assert hpx_sky._stokes == sky._stokes
 
 
+@pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
+@pytest.mark.filterwarnings("ignore:Some spectral index values are NaN")
+@pytest.mark.filterwarnings("ignore:Some stokes values are NaNs")
 @pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index"])
 def test_assign_to_healpix_gleam_multi(spec_type):
     """
@@ -1582,6 +1606,9 @@ def test_polarized_source_smooth_visibilities(
         assert np.all(imag_stokes == 0)
 
 
+@pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
+@pytest.mark.filterwarnings("ignore:Some spectral index values are NaN")
+@pytest.mark.filterwarnings("ignore:Some stokes values are NaNs")
 @pytest.mark.parametrize(
     "comp_type, spec_type",
     [
@@ -1859,6 +1886,9 @@ def test_concat_optional_params(param, healpix_disk_new):
     assert skyobj_new == skyobj_full
 
 
+@pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
+@pytest.mark.filterwarnings("ignore:Some spectral index values are NaN")
+@pytest.mark.filterwarnings("ignore:Some stokes values are NaNs")
 @pytest.mark.parametrize("comp_type", ["point", "healpix"])
 def test_concat_overlap_errors(comp_type, healpix_disk_new):
     if comp_type == "point":
@@ -1881,6 +1911,9 @@ def test_concat_overlap_errors(comp_type, healpix_disk_new):
         skyobj1.concat(skyobj2)
 
 
+@pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
+@pytest.mark.filterwarnings("ignore:Some spectral index values are NaN")
+@pytest.mark.filterwarnings("ignore:Some stokes values are NaNs")
 def test_concat_compatibility_errors(healpix_disk_new, time_location):
     skyobj_gleam_subband = SkyModel.from_file(GLEAM_vot, spectral_type="subband")
     skyobj_gleam_specindex = SkyModel.from_file(
@@ -2163,6 +2196,7 @@ def test_flux_source_cuts():
     assert skyobj2 == skyobj3
 
 
+@pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
 def test_select(time_location):
     time, array_location = time_location
 
@@ -2187,6 +2221,7 @@ def test_select(time_location):
     assert skyobj == skyobj2
 
 
+@pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
 def test_select_none():
     skyobj = SkyModel.from_file(GLEAM_vot, with_error=True)
 
@@ -2764,6 +2799,7 @@ def test_get_frame_comp_cols(frame1, frame2, frame_col):
         skymodel._get_frame_comp_cols(component_fieldnames)
 
 
+@pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
 @pytest.mark.parametrize("spec_type", ["flat", "subband"])
 def test_read_gleam(spec_type):
     skyobj = SkyModel.from_file(GLEAM_vot, spectral_type=spec_type, with_error=True)
@@ -3149,6 +3185,9 @@ def test_catalog_file_writer(tmp_path, time_location, frame):
 
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 @pytest.mark.filterwarnings("ignore:The reference_frequency is aliased as `frequency`")
+@pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
+@pytest.mark.filterwarnings("ignore:Some spectral index values are NaN")
+@pytest.mark.filterwarnings("ignore:Some stokes values are NaNs")
 @pytest.mark.parametrize("spec_type", ["flat", "spectral_index", "full"])
 @pytest.mark.parametrize("with_error", [False, True])
 @pytest.mark.parametrize("rise_set_lsts", [False, True])
@@ -3210,6 +3249,7 @@ def test_text_catalog_loop_other_freqs(tmp_path, freq_mult):
     assert skyobj == skyobj2
 
 
+@pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
 def test_write_text_catalog_errors(tmp_path, healpix_disk_new):
     fname = os.path.join(tmp_path, "temp_cat.txt")
 
@@ -3307,6 +3347,7 @@ def test_pyuvsim_mock_catalog_read():
     assert mock_sky.name.tolist() == expected_names
 
 
+@pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
 def test_read_text_errors(tmp_path):
     skyobj = SkyModel.from_file(GLEAM_vot, spectral_type="subband", with_error=True)
     skyobj.at_frequencies(skyobj.freq_array)
@@ -3463,6 +3504,11 @@ def test_at_frequencies_interp_errors(mock_point_skies):
     with pytest.raises(ValueError, match="nan_handling must be one of "):
         sky.at_frequencies(sky.freq_array, nan_handling="foo")
 
+    sky2 = mock_point_skies("spectral_index")
+    sky2.spectral_index[0] = np.nan
+    with pytest.raises(ValueError, match="Some spectral index values are NaNs."):
+        sky2.at_frequencies(sky.freq_array)
+
 
 @pytest.mark.filterwarnings("ignore:recarray flux columns will no longer be labeled")
 @pytest.mark.parametrize("coherency", [True, False])
@@ -3483,6 +3529,7 @@ def test_at_frequencies_tol(tmpdir, mock_point_skies, coherency):
     assert new == sky2
 
 
+@pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
 @pytest.mark.parametrize("nan_handling", ["propagate", "interp", "clip"])
 def test_at_frequencies_nan_handling(nan_handling):
     skyobj = SkyModel.from_file(GLEAM_vot)
@@ -3531,6 +3578,9 @@ def test_at_frequencies_nan_handling(nan_handling):
             message[3] += "Using the stokes value at the lowest frequency "
     message[0] += (
         " You can change the way NaNs are handled using the `nan_handling` keyword."
+    )
+    message.extend(
+        ["Some stokes I values are negative.", "Some stokes values are NaNs."]
     )
     with check_warnings(UserWarning, match=message):
         skyobj2_interp = skyobj2.at_frequencies(
@@ -3643,6 +3693,7 @@ def test_at_frequencies_nan_handling(nan_handling):
     assert np.allclose(skyobj2_interp.stokes[:, :, 7:], skyobj_interp.stokes[:, :, 7:])
 
 
+@pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
 @pytest.mark.parametrize("nan_handling", ["propagate", "interp", "clip"])
 def test_at_frequencies_nan_handling_allsrc(nan_handling):
     skyobj = SkyModel.from_file(GLEAM_vot)
@@ -3662,6 +3713,7 @@ def test_at_frequencies_nan_handling_allsrc(nan_handling):
     message[0] += (
         " You can change the way NaNs are handled using the `nan_handling` keyword."
     )
+    message.append("Some stokes values are NaNs.")
     with check_warnings(UserWarning, match=message):
         skyobj2_interp = skyobj2.at_frequencies(
             interp_freqs, inplace=False, nan_handling=nan_handling
@@ -3720,6 +3772,9 @@ def test_skyh5_file_loop(mock_point_skies, time_location, stype, frame, tmpdir):
     assert sky2 == sky
 
 
+@pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
+@pytest.mark.filterwarnings("ignore:Some spectral index values are NaN")
+@pytest.mark.filterwarnings("ignore:Some stokes values are NaNs")
 @pytest.mark.parametrize("spec_type", ["flat", "subband", "spectral_index"])
 def test_skyh5_file_loop_gleam(spec_type, tmpdir):
     sky = SkyModel.from_file(GLEAM_vot, spectral_type=spec_type, with_error=True)
@@ -3864,6 +3919,7 @@ def test_skyh5_units(tmpdir):
     assert sky2 == sky
 
 
+@pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
 @pytest.mark.parametrize(
     ["include_frame", "cat_source"], [[True, "GLEAM"], [False, "fhd"]]
 )
@@ -3886,6 +3942,8 @@ def test_skyh5_backwards_compatibility(tmpdir, include_frame, cat_source):
         "by an older version of pyradiosky. Consider re-writing this file to ensure "
         "future compatibility"
     ]
+    if cat_source == "GLEAM":
+        err_msg.append("Some stokes I values are negative.")
 
     with h5py.File(testfile, "r+") as h5f:
         del h5f["/Header/skycoord"]
@@ -4349,6 +4407,7 @@ def test_healpix_transform_full_sky(healpix_disk_new):
     assert healpix_disk_new.Ncomponents == hp_obj.npix
 
 
+@pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
 def test_old_skyh5_reading_ra_dec():
     testfile = os.path.join(SKY_DATA_PATH, "old_skyh5_point_sources.skyh5")
     with check_warnings(
@@ -4356,6 +4415,7 @@ def test_old_skyh5_reading_ra_dec():
         match=[
             "Parameter skycoord not found in skyh5 file.",
             "No freq_edge_array in this file and frequencies are not evenly spaced",
+            "Some stokes I values are negative.",
         ],
     ):
         sky = SkyModel.from_file(testfile)
