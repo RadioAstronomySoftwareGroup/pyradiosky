@@ -478,6 +478,9 @@ class SkyModel(UVBase):
         extra_column_dict=None,
         history="",
         filename=None,
+        run_check=True,
+        check_extra=True,
+        run_check_acceptability=True,
     ):
         # standard angle tolerance: 1 mas in radians.
         self.angle_tol = Angle(1e-3, units.arcsec)
@@ -1051,7 +1054,11 @@ class SkyModel(UVBase):
             ):
                 self.history += self.pyradiosky_version_str
 
-            self.check()
+            if run_check:
+                self.check(
+                    check_extra=check_extra,
+                    run_check_acceptability=run_check_acceptability,
+                )
 
     def __getattr__(self, name):
         """Handle references to frame coordinates (ra/dec/gl/gb, etc.)."""
@@ -3655,12 +3662,12 @@ class SkyModel(UVBase):
             )
             init_params["frame"] = "icrs"
 
-        self.__init__(**init_params)
-
-        if run_check:
-            self.check(
-                check_extra=check_extra, run_check_acceptability=run_check_acceptability
-            )
+        self.__init__(
+            **init_params,
+            run_check=run_check,
+            check_extra=check_extra,
+            run_check_acceptability=run_check_acceptability,
+        )
 
     @classmethod
     @copy_replace_short_description(read_skyh5, style=DocstringStyle.NUMPYDOC)
@@ -3912,12 +3919,10 @@ class SkyModel(UVBase):
             stokes_error=stokes_error,
             history=history,
             filename=os.path.basename(votable_file),
+            run_check=run_check,
+            check_extra=check_extra,
+            run_check_acceptability=run_check_acceptability,
         )
-
-        if run_check:
-            self.check(
-                check_extra=check_extra, run_check_acceptability=run_check_acceptability
-            )
 
         return
 
@@ -4079,12 +4084,10 @@ class SkyModel(UVBase):
             reference_frequency=reference_frequency,
             spectral_index_column=spectral_index_column,
             flux_error_columns=flux_error_columns,
+            run_check=run_check,
+            check_extra=check_extra,
+            run_check_acceptability=run_check_acceptability,
         )
-
-        if run_check:
-            self.check(
-                check_extra=check_extra, run_check_acceptability=run_check_acceptability
-            )
 
         return
 
@@ -4292,12 +4295,10 @@ class SkyModel(UVBase):
             spectral_index=spectral_index,
             stokes_error=stokes_error,
             filename=os.path.basename(catalog_csv),
+            run_check=run_check,
+            check_extra=check_extra,
+            run_check_acceptability=run_check_acceptability,
         )
-
-        if run_check:
-            self.check(
-                check_extra=check_extra, run_check_acceptability=run_check_acceptability
-            )
 
         return
 
@@ -4467,12 +4468,10 @@ class SkyModel(UVBase):
             beam_amp=beam_amp,
             extended_model_group=extended_model_group,
             filename=os.path.basename(filename_sav),
+            run_check=run_check,
+            check_extra=check_extra,
+            run_check_acceptability=run_check_acceptability,
         )
-
-        if run_check:
-            self.check(
-                check_extra=check_extra, run_check_acceptability=run_check_acceptability
-            )
 
         return
 
