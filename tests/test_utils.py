@@ -73,6 +73,9 @@ def test_stokes_tofrom_coherency():
     )
 
 
+@pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
+@pytest.mark.filterwarnings("ignore:Some spectral index values are NaN")
+@pytest.mark.filterwarnings("ignore:Some stokes values are NaNs")
 @pytest.mark.parametrize("stype", ["subband", "spectral_index", "flat"])
 def test_download_gleam(tmp_path, stype, capsys):
     pytest.importorskip("astroquery")
@@ -149,6 +152,7 @@ def test_jy_to_ksr():
     assert np.allclose(conv0, conv1)
 
 
+@pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
 @pytest.mark.parametrize(
     ("fspec", "use_cli"), [("freqs", True), ("freqs", False), ("redshifts", False)]
 )
