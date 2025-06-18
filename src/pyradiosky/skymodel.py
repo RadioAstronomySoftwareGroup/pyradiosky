@@ -1275,6 +1275,18 @@ class SkyModel(UVBase):
                 "reference_frequency must have a unit that can be converted to Hz."
             )
 
+        if run_check_acceptability:
+            if self.spectral_type == "spectral_index" and np.any(
+                np.isnan(self.spectral_index)
+            ):
+                warnings.warn("Some spectral index values are NaNs.")
+
+            if np.any(np.isnan(self.stokes)):
+                warnings.warn("Some stokes values are NaNs.")
+
+            if np.any(self.stokes[0, :, :] < 0):
+                warnings.warn("Some stokes I values are negative.")
+
         return True
 
     def __eq__(
@@ -2092,6 +2104,8 @@ class SkyModel(UVBase):
             atol = self.freq_tol
 
         if self.spectral_type == "spectral_index":
+            if np.any(np.isnan(self.spectral_index)):
+                raise ValueError("Some spectral index values are NaNs.")
             sky.stokes = (
                 self.stokes
                 * (freqs[:, None].to("Hz") / self.reference_frequency[None, :].to("Hz"))
