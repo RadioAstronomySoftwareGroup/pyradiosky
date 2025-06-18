@@ -32,9 +32,6 @@ from pyradiosky.data import DATA_PATH as SKY_DATA_PATH
 
 GLEAM_vot = os.path.join(SKY_DATA_PATH, "gleam_50srcs.vot")
 
-# ignore new numpy 1.20 warning emitted from h5py
-pytestmark = pytest.mark.filterwarnings("ignore:Passing None into shape arguments")
-
 
 @pytest.fixture
 def time_location():
