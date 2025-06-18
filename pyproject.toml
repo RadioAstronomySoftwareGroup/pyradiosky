@@ -99,6 +99,7 @@ max-line-length = 88
 [tool.ruff.lint.isort]
 combine-as-imports = true
 known-first-party = ["pyradiosky"]
+split-on-trailing-comma = false
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
