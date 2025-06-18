@@ -3082,6 +3082,8 @@ class SkyModel(UVBase):
         min_brightness=None,
         max_brightness=None,
         brightness_freq_range=None,
+        non_nan=False,
+        non_negative=False,
         inplace=True,
         run_check=True,
         check_extra=True,
@@ -3114,6 +3116,11 @@ class SkyModel(UVBase):
             Frequency range over which the min and max brightness tests should be
             performed. Must be length 2. If None, use the range over which the object
             is defined.
+        non_nan : bool
+            Only keep components that do not have any missing or NaN values in
+            the `stokes` parameter.
+        non_negative : bool
+            Only keep components that do not have any negative Stokes I values.
         run_check : bool
             Option to check for the existence and proper shapes of parameters
             after downselecting data on this object (the default is True,
@@ -3145,10 +3152,28 @@ class SkyModel(UVBase):
             and lon_range is None
             and min_brightness is None
             and max_brightness is None
+            and non_nan is False
+            and non_negative is False
         ):
             if not inplace:
                 return skyobj
             return
+
+        if non_nan:
+            non_nan_inds = np.nonzero(~np.any(np.isnan(skyobj.stokes), axis=(0, 1)))[0]
+            if component_inds is not None:
+                component_inds = np.intersect1d(component_inds, non_nan_inds)
+            else:
+                component_inds = non_nan_inds
+
+        if non_negative:
+            non_neg_inds = np.nonzero(~np.any(skyobj.stokes[0] < 0, axis=0))[0]
+            if np.any(skyobj.stokes[0, :, :] < 0):
+                assert non_neg_inds.size < skyobj.Ncomponents
+            if component_inds is not None:
+                component_inds = np.intersect1d(component_inds, non_neg_inds)
+            else:
+                component_inds = non_neg_inds
 
         if component_inds is None:
             component_inds = np.arange(skyobj.Ncomponents)
