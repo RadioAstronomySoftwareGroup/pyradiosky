@@ -2179,10 +2179,14 @@ def test_cut_nan_neg():
     ):
         skyobj.check()
 
-    skyobj2 = skyobj.select(non_nan=True, non_negative=True, inplace=False)
+    with check_warnings(UserWarning, match=["Some stokes I values are negative"]):
+        skyobj.select(non_nan=True, inplace=False)
+
+    with check_warnings(UserWarning, match=["Some stokes values are NaNs."]):
+        skyobj.select(non_negative=True, inplace=False)
 
     with check_warnings(None):
-        skyobj2.check()
+        skyobj2 = skyobj.select(non_nan=True, non_negative=True, inplace=False)
 
     assert skyobj2.Ncomponents == 29
 

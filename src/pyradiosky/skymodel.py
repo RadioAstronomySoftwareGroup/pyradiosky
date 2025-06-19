@@ -3168,8 +3168,6 @@ class SkyModel(UVBase):
 
         if non_negative:
             non_neg_inds = np.nonzero(~np.any(skyobj.stokes[0] < 0, axis=0))[0]
-            if np.any(skyobj.stokes[0, :, :] < 0):
-                assert non_neg_inds.size < skyobj.Ncomponents
             if component_inds is not None:
                 component_inds = np.intersect1d(component_inds, non_neg_inds)
             else:
