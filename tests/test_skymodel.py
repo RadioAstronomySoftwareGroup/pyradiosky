@@ -2361,6 +2361,7 @@ def test_select_flux(spec_type, init_kwargs, cut_kwargs, cut_type):
         min_brightness=minI_cut,
         max_brightness=maxI_cut,
         brightness_freq_range=freq_range,
+        non_nan=None,
     )
 
     if (
