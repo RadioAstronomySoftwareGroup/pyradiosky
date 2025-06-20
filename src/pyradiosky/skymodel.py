@@ -5,6 +5,7 @@
 import os
 import re
 import warnings
+from typing import Literal
 
 import astropy.units as units
 import h5py
@@ -478,6 +479,9 @@ class SkyModel(UVBase):
         extra_column_dict=None,
         history="",
         filename=None,
+        run_check=True,
+        check_extra=True,
+        run_check_acceptability=True,
     ):
         # standard angle tolerance: 1 mas in radians.
         self.angle_tol = Angle(1e-3, units.arcsec)
@@ -1051,7 +1055,11 @@ class SkyModel(UVBase):
             ):
                 self.history += self.pyradiosky_version_str
 
-            self.check()
+            if run_check:
+                self.check(
+                    check_extra=check_extra,
+                    run_check_acceptability=run_check_acceptability,
+                )
 
     def __getattr__(self, name):
         """Handle references to frame coordinates (ra/dec/gl/gb, etc.)."""
@@ -1267,6 +1275,18 @@ class SkyModel(UVBase):
             raise ValueError(
                 "reference_frequency must have a unit that can be converted to Hz."
             )
+
+        if run_check_acceptability:
+            if self.spectral_type == "spectral_index" and np.any(
+                np.isnan(self.spectral_index)
+            ):
+                warnings.warn("Some spectral index values are NaNs.")
+
+            if np.any(np.isnan(self.stokes)):
+                warnings.warn("Some stokes values are NaNs.")
+
+            if np.any(self.stokes[0, :, :] < 0):
+                warnings.warn("Some stokes I values are negative.")
 
         return True
 
@@ -2085,6 +2105,8 @@ class SkyModel(UVBase):
             atol = self.freq_tol
 
         if self.spectral_type == "spectral_index":
+            if np.any(np.isnan(self.spectral_index)):
+                raise ValueError("Some spectral index values are NaNs.")
             sky.stokes = (
                 self.stokes
                 * (freqs[:, None].to("Hz") / self.reference_frequency[None, :].to("Hz"))
@@ -3055,16 +3077,18 @@ class SkyModel(UVBase):
     )
     def select(
         self,
-        component_inds=None,
-        lat_range=None,
-        lon_range=None,
-        min_brightness=None,
-        max_brightness=None,
-        brightness_freq_range=None,
-        inplace=True,
-        run_check=True,
-        check_extra=True,
-        run_check_acceptability=True,
+        component_inds: list[int] | np.ndarray[int] | None = None,
+        lat_range: Latitude | None = None,
+        lon_range: Longitude | None = None,
+        min_brightness: Quantity | None = None,
+        max_brightness: Quantity | None = None,
+        brightness_freq_range: Quantity | None = None,
+        non_nan: Literal["any", "all"] = "all",
+        non_negative: bool = False,
+        inplace: bool = True,
+        run_check: bool = True,
+        check_extra: bool = True,
+        run_check_acceptability: bool = True,
     ):
         """
         Downselect sources based on various criteria.
@@ -3093,6 +3117,12 @@ class SkyModel(UVBase):
             Frequency range over which the min and max brightness tests should be
             performed. Must be length 2. If None, use the range over which the object
             is defined.
+        non_nan : string or None
+            Option to only keep components that do not have NaN values in the
+            `stokes` parameter at "any" or "all" frequencies. Options are "any",
+            "all" or None (for no cuts), default is "all".
+        non_negative : bool
+            Only keep components that do not have any negative Stokes I values.
         run_check : bool
             Option to check for the existence and proper shapes of parameters
             after downselecting data on this object (the default is True,
@@ -3124,10 +3154,41 @@ class SkyModel(UVBase):
             and lon_range is None
             and min_brightness is None
             and max_brightness is None
+            and non_nan is None
+            and non_negative is False
         ):
             if not inplace:
                 return skyobj
             return
+
+        if non_nan is not None:
+            allowed_vals = ["any", "all"]
+            if non_nan not in allowed_vals:
+                raise ValueError(
+                    f"If set, non_nan can only be set to one of: {allowed_vals}"
+                )
+            if non_nan == "any":
+                # exclude components with any nans
+                non_nan_inds = np.nonzero(
+                    ~np.any(np.isnan(skyobj.stokes), axis=(0, 1))
+                )[0]
+            else:
+                # exclude components with nans at all frequencies (take any over
+                # the pol axis then all over the freq axis)
+                non_nan_inds = np.nonzero(
+                    ~np.all(np.any(np.isnan(skyobj.stokes), axis=0), axis=0)
+                )[0]
+            if component_inds is not None:
+                component_inds = np.intersect1d(component_inds, non_nan_inds)
+            else:
+                component_inds = non_nan_inds
+
+        if non_negative:
+            non_neg_inds = np.nonzero(~np.any(skyobj.stokes[0] < 0, axis=0))[0]
+            if component_inds is not None:
+                component_inds = np.intersect1d(component_inds, non_neg_inds)
+            else:
+                component_inds = non_neg_inds
 
         if component_inds is None:
             component_inds = np.arange(skyobj.Ncomponents)
@@ -3655,12 +3716,12 @@ class SkyModel(UVBase):
             )
             init_params["frame"] = "icrs"
 
-        self.__init__(**init_params)
-
-        if run_check:
-            self.check(
-                check_extra=check_extra, run_check_acceptability=run_check_acceptability
-            )
+        self.__init__(
+            **init_params,
+            run_check=run_check,
+            check_extra=check_extra,
+            run_check_acceptability=run_check_acceptability,
+        )
 
     @classmethod
     @copy_replace_short_description(read_skyh5, style=DocstringStyle.NUMPYDOC)
@@ -3912,12 +3973,10 @@ class SkyModel(UVBase):
             stokes_error=stokes_error,
             history=history,
             filename=os.path.basename(votable_file),
+            run_check=run_check,
+            check_extra=check_extra,
+            run_check_acceptability=run_check_acceptability,
         )
-
-        if run_check:
-            self.check(
-                check_extra=check_extra, run_check_acceptability=run_check_acceptability
-            )
 
         return
 
@@ -4079,12 +4138,10 @@ class SkyModel(UVBase):
             reference_frequency=reference_frequency,
             spectral_index_column=spectral_index_column,
             flux_error_columns=flux_error_columns,
+            run_check=run_check,
+            check_extra=check_extra,
+            run_check_acceptability=run_check_acceptability,
         )
-
-        if run_check:
-            self.check(
-                check_extra=check_extra, run_check_acceptability=run_check_acceptability
-            )
 
         return
 
@@ -4292,12 +4349,10 @@ class SkyModel(UVBase):
             spectral_index=spectral_index,
             stokes_error=stokes_error,
             filename=os.path.basename(catalog_csv),
+            run_check=run_check,
+            check_extra=check_extra,
+            run_check_acceptability=run_check_acceptability,
         )
-
-        if run_check:
-            self.check(
-                check_extra=check_extra, run_check_acceptability=run_check_acceptability
-            )
 
         return
 
@@ -4467,12 +4522,10 @@ class SkyModel(UVBase):
             beam_amp=beam_amp,
             extended_model_group=extended_model_group,
             filename=os.path.basename(filename_sav),
+            run_check=run_check,
+            check_extra=check_extra,
+            run_check_acceptability=run_check_acceptability,
         )
-
-        if run_check:
-            self.check(
-                check_extra=check_extra, run_check_acceptability=run_check_acceptability
-            )
 
         return
 
