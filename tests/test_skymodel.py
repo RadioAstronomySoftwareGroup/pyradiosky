@@ -780,7 +780,7 @@ def test_jansky_to_kelvin_loop(spec_type):
     skyobj = SkyModel.from_file(
         GLEAM_vot, spectral_type=spec_type, with_error=True, filetype="gleam"
     )
-    skyobj.select(non_nan=True, non_negative=True)
+    skyobj.select(non_negative=True)
 
     stokes_expected = np.zeros_like(skyobj.stokes.value) * units.K * units.sr
     if spec_type == "subband":
@@ -1645,15 +1645,19 @@ def test_concat(comp_type, spec_type, healpix_disk_new):
         dtype=[float, int, str],
     )
     skyobj1 = skyobj_full.select(
-        component_inds=np.arange(skyobj_full.Ncomponents // 3), inplace=False
+        non_nan=None,
+        component_inds=np.arange(skyobj_full.Ncomponents // 3),
+        inplace=False,
     )
     skyobj2 = skyobj_full.select(
+        non_nan=None,
         component_inds=np.arange(
             skyobj_full.Ncomponents // 3, 2 * skyobj_full.Ncomponents // 3
         ),
         inplace=False,
     )
     skyobj3 = skyobj_full.select(
+        non_nan=None,
         component_inds=np.arange(
             2 * skyobj_full.Ncomponents // 3, skyobj_full.Ncomponents
         ),
@@ -2167,6 +2171,9 @@ def test_cut_nan_neg():
     with check_warnings(UserWarning, match="Some stokes I values are negative"):
         skyobj = SkyModel.from_file(GLEAM_vot, with_error=True)
 
+    with check_warnings(None):
+        skyobj.check(run_check_acceptability=False)
+
     # add some NaNs. These exist in full GLEAM catalog but not in our small test file
     skyobj.stokes[0, 0:2, 0] = np.nan  # no low freq support
     skyobj.stokes[0, 10:11, 1] = np.nan  # missing freqs in middle
@@ -2180,18 +2187,32 @@ def test_cut_nan_neg():
         skyobj.check()
 
     with check_warnings(UserWarning, match=["Some stokes I values are negative"]):
-        skyobj.select(non_nan=True, inplace=False)
+        skyobj2 = skyobj.select(non_nan="any", inplace=False)
+    assert skyobj2.Ncomponents == 46
+
+    with check_warnings(
+        UserWarning,
+        match=["Some stokes I values are negative", "Some stokes values are NaNs."],
+    ):
+        skyobj2 = skyobj.select(non_nan="all", inplace=False)
+    assert skyobj2.Ncomponents == 49
 
     with check_warnings(UserWarning, match=["Some stokes values are NaNs."]):
-        skyobj.select(non_negative=True, inplace=False)
+        skyobj2 = skyobj.select(non_nan=None, non_negative=True, inplace=False)
+    assert skyobj2.Ncomponents == 32
+
+    with check_warnings(UserWarning, match=["Some stokes values are NaNs."]):
+        skyobj2 = skyobj.select(non_nan="all", non_negative=True, inplace=False)
+
+    assert skyobj2.Ncomponents == 31
 
     with check_warnings(None):
-        skyobj2 = skyobj.select(non_nan=True, non_negative=True, inplace=False)
+        skyobj2 = skyobj.select(non_nan="any", non_negative=True, inplace=False)
 
     assert skyobj2.Ncomponents == 29
 
     skyobj3 = skyobj.select(
-        component_inds=np.arange(10), non_nan=True, non_negative=True, inplace=False
+        component_inds=np.arange(10), non_nan="any", non_negative=True, inplace=False
     )
 
     assert skyobj3.Ncomponents == 4
@@ -2261,10 +2282,10 @@ def test_select(time_location):
 def test_select_none():
     skyobj = SkyModel.from_file(GLEAM_vot, with_error=True)
 
-    skyobj2 = skyobj.select(component_inds=None, inplace=False)
+    skyobj2 = skyobj.select(non_nan=None, component_inds=None, inplace=False)
     assert skyobj2 == skyobj
 
-    skyobj.select(component_inds=None)
+    skyobj.select(non_nan=None, component_inds=None)
     assert skyobj2 == skyobj
 
 
@@ -2304,8 +2325,8 @@ def test_select_flux(spec_type, init_kwargs, cut_kwargs, cut_type):
     ids = [f"src{i}" for i in range(Nsrcs)]
     ras = Longitude(np.linspace(0, 360.0, Nsrcs), units.deg)
     decs = Latitude(np.linspace(-90, 90, Nsrcs), units.deg)
-    stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
     if spec_type == "flat":
+        stokes = np.zeros((4, 1, Nsrcs)) * units.Jy
         stokes[0, :, :] = np.linspace(minflux, maxflux, Nsrcs) * units.Jy
     else:
         stokes = np.zeros((4, 2, Nsrcs)) * units.Jy
@@ -2360,6 +2381,13 @@ def test_select_flux(spec_type, init_kwargs, cut_kwargs, cut_type):
 @pytest.mark.parametrize(
     "spec_type, init_kwargs, cut_kwargs, error_category, error_message",
     [
+        (
+            "subband",
+            {"freq_array": np.array([1e8, 1.5e8]) * units.Hz},
+            {"non_nan": True},
+            ValueError,
+            re.escape("If set, non_nan can only be set to one of: ['any', 'all']"),
+        ),
         (
             "spectral_index",
             {
@@ -2437,11 +2465,13 @@ def test_select_flux_cut_error(
     minI_cut *= units.Jy
     maxI_cut *= units.Jy
     freq_range = cut_kwargs.get("freq_range", None)
+    non_nan = cut_kwargs.get("non_nan", "all")
     with pytest.raises(error_category, match=error_message):
         skyobj.select(
             min_brightness=minI_cut,
             max_brightness=maxI_cut,
             brightness_freq_range=freq_range,
+            non_nan=non_nan,
         )
 
 

@@ -5,6 +5,7 @@
 import os
 import re
 import warnings
+from typing import Literal
 
 import astropy.units as units
 import h5py
@@ -3076,18 +3077,18 @@ class SkyModel(UVBase):
     )
     def select(
         self,
-        component_inds=None,
-        lat_range=None,
-        lon_range=None,
-        min_brightness=None,
-        max_brightness=None,
-        brightness_freq_range=None,
-        non_nan=False,
-        non_negative=False,
-        inplace=True,
-        run_check=True,
-        check_extra=True,
-        run_check_acceptability=True,
+        component_inds: list[int] | np.ndarray[int] | None = None,
+        lat_range: Latitude | None = None,
+        lon_range: Longitude | None = None,
+        min_brightness: Quantity | None = None,
+        max_brightness: Quantity | None = None,
+        brightness_freq_range: Quantity | None = None,
+        non_nan: Literal["any", "all"] = "all",
+        non_negative: bool = False,
+        inplace: bool = True,
+        run_check: bool = True,
+        check_extra: bool = True,
+        run_check_acceptability: bool = True,
     ):
         """
         Downselect sources based on various criteria.
@@ -3116,9 +3117,10 @@ class SkyModel(UVBase):
             Frequency range over which the min and max brightness tests should be
             performed. Must be length 2. If None, use the range over which the object
             is defined.
-        non_nan : bool
-            Only keep components that do not have any missing or NaN values in
-            the `stokes` parameter.
+        non_nan : string or None
+            Option to only keep components that do not have NaN values in the
+            `stokes` parameter at "any" or "all" frequencies. Options are "any",
+            "all" or None (for no cuts), default is "all".
         non_negative : bool
             Only keep components that do not have any negative Stokes I values.
         run_check : bool
@@ -3152,15 +3154,30 @@ class SkyModel(UVBase):
             and lon_range is None
             and min_brightness is None
             and max_brightness is None
-            and non_nan is False
+            and non_nan is None
             and non_negative is False
         ):
             if not inplace:
                 return skyobj
             return
 
-        if non_nan:
-            non_nan_inds = np.nonzero(~np.any(np.isnan(skyobj.stokes), axis=(0, 1)))[0]
+        if non_nan is not None:
+            allowed_vals = ["any", "all"]
+            if non_nan not in allowed_vals:
+                raise ValueError(
+                    f"If set, non_nan can only be set to one of: {allowed_vals}"
+                )
+            if non_nan == "any":
+                # exclude components with any nans
+                non_nan_inds = np.nonzero(
+                    ~np.any(np.isnan(skyobj.stokes), axis=(0, 1))
+                )[0]
+            else:
+                # exclude components with nans at all frequencies (take any over
+                # the pol axis then all over the freq axis)
+                non_nan_inds = np.nonzero(
+                    ~np.all(np.any(np.isnan(skyobj.stokes), axis=0), axis=0)
+                )[0]
             if component_inds is not None:
                 component_inds = np.intersect1d(component_inds, non_nan_inds)
             else:

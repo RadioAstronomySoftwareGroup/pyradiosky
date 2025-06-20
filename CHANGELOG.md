@@ -3,8 +3,8 @@
 ## [Unreleased]
 
 ### Added
-- New option to `SkyModel.select` to select components with no NaNs in their
-Stokes values.
+- New option to `SkyModel.select` to select components that do not have NaN
+values in the `stokes` parameter at either any or all frequencies.
 - New option to `SkyModel.select` to select components with no negative Stokes I
 values.
 - New check warnings about NaN stokes and spectral index values and negative
