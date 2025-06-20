@@ -3146,28 +3146,9 @@ class SkyModel(UVBase):
         if np.asarray(component_inds).size == 0:
             raise ValueError("Select would result in an empty object.")
 
-        new_ncomponents = np.asarray(component_inds).size
-
         skyobj.history += "  Downselected to specific components using pyradiosky."
 
-        skyobj.Ncomponents = new_ncomponents
-        for param in skyobj.ncomponent_length_params:
-            attr = getattr(skyobj, param)
-            param_name = attr.name
-            if attr.value is not None:
-                setattr(skyobj, param_name, attr.value[component_inds])
-
-        skyobj.stokes = skyobj.stokes[:, :, component_inds]
-        if skyobj.frame_coherency is not None:
-            skyobj.frame_coherency = skyobj.frame_coherency[:, :, :, component_inds]
-        if skyobj.stokes_error is not None:
-            skyobj.stokes_error = skyobj.stokes_error[:, :, component_inds]
-        if skyobj.beam_amp is not None:
-            skyobj.beam_amp = skyobj.beam_amp[:, :, component_inds]
-        if skyobj.alt_az is not None:
-            skyobj.alt_az = skyobj.alt_az[:, component_inds]
-        if skyobj.pos_lmn is not None:
-            skyobj.pos_lmn = skyobj.pos_lmn[:, component_inds]
+        skyobj._select_along_param_axis({"Ncomponents": component_inds})
 
         if run_check:
             skyobj.check(
