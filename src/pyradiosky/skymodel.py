@@ -1280,13 +1280,27 @@ class SkyModel(UVBase):
             if self.spectral_type == "spectral_index" and np.any(
                 np.isnan(self.spectral_index)
             ):
-                warnings.warn("Some spectral index values are NaNs.")
+                warnings.warn(
+                    "Some spectral index values are NaNs. If this is a GLEAM-based "
+                    "sky model, consider using the 'subband' spectral type to"
+                    "avoid this error (GLEAM assigns NaN spectral indices for "
+                    "sources that are not well-fit by a power law, this can include "
+                    "bright sources)."
+                )
 
             if np.any(np.isnan(self.stokes)):
-                warnings.warn("Some stokes values are NaNs.")
+                warnings.warn(
+                    "Some Stokes values are NaNs. Use the select method with the"
+                    "'non_nan' parameter to remove sources with NaN values at "
+                    "any or all frequencies."
+                )
 
             if np.any(self.stokes[0, :, :] < 0):
-                warnings.warn("Some stokes I values are negative.")
+                warnings.warn(
+                    "Some Stokes I values are negative. Use the select method "
+                    "with the 'non_negative' parameter to remove sources with "
+                    "negative Stokes I values."
+                )
 
         return True
 
@@ -2151,10 +2165,10 @@ class SkyModel(UVBase):
                         f"nan_handling must be one of {allowed_nan_handling}"
                     )
 
-                message = "Some stokes values are NaNs."
+                message = "Some Stokes values are NaNs."
                 if nan_handling == "propagate":
                     message += (
-                        " All output stokes values for sources with any NaN values "
+                        " All output Stokes values for sources with any NaN values "
                         "will be NaN."
                     )
                 else:
@@ -2265,46 +2279,46 @@ class SkyModel(UVBase):
                             continue
                     if len(wh_all_nan) > 0:
                         warnings.warn(
-                            f"{len(wh_all_nan)} components had all NaN stokes values. "
-                            "Output stokes for these components will all be NaN."
+                            f"{len(wh_all_nan)} components had all NaN Stokes values. "
+                            "Output Stokes for these components will all be NaN."
                         )
                     if len(wh_nan_high) > 0:
                         message = (
-                            f"{len(wh_nan_high)} components had all NaN stokes values "
+                            f"{len(wh_nan_high)} components had all NaN Stokes values "
                             "above one or more of the requested frequencies. "
                         )
                         if nan_handling == "interp":
                             message += (
-                                "The stokes for these components at these frequencies "
+                                "The Stokes for these components at these frequencies "
                                 "will be NaN."
                             )
                         else:
                             message += (
-                                "Using the stokes value at the highest frequency "
+                                "Using the Stokes value at the highest frequency "
                                 "without a NaN for these components at these "
                                 "frequencies."
                             )
                         warnings.warn(message)
                     if len(wh_nan_low) > 0:
                         message = (
-                            f"{len(wh_nan_low)} components had all NaN stokes "
+                            f"{len(wh_nan_low)} components had all NaN Stokes "
                             "values below one or more of the requested frequencies. "
                         )
                         if nan_handling == "interp":
                             message += (
-                                "The stokes for these components at these frequencies "
+                                "The Stokes for these components at these frequencies "
                                 "will be NaN."
                             )
                         else:
                             message += (
-                                "Using the stokes value at the lowest frequency "
+                                "Using the Stokes value at the lowest frequency "
                                 "without a NaN for these components at these "
                                 "frequencies."
                             )
                         warnings.warn(message)
                     if len(wh_nan_many) > 0:
                         warnings.warn(
-                            f"{len(wh_nan_many)} components had too few non-NaN stokes "
+                            f"{len(wh_nan_many)} components had too few non-NaN Stokes "
                             "values for chosen interpolation. Using linear "
                             "interpolation for these components instead."
                         )
@@ -3083,7 +3097,7 @@ class SkyModel(UVBase):
         min_brightness: Quantity | None = None,
         max_brightness: Quantity | None = None,
         brightness_freq_range: Quantity | None = None,
-        non_nan: Literal["any", "all"] = "all",
+        non_nan: Literal["any", "all"] | None = None,
         non_negative: bool = False,
         inplace: bool = True,
         run_check: bool = True,
@@ -3120,7 +3134,7 @@ class SkyModel(UVBase):
         non_nan : string or None
             Option to only keep components that do not have NaN values in the
             `stokes` parameter at "any" or "all" frequencies. Options are "any",
-            "all" or None (for no cuts), default is "all".
+            "all" or None (for no cuts), default is None.
         non_negative : bool
             Only keep components that do not have any negative Stokes I values.
         run_check : bool
@@ -3206,6 +3220,11 @@ class SkyModel(UVBase):
 
         if np.asarray(component_inds).size == 0:
             raise ValueError("Select would result in an empty object.")
+        if np.asarray(component_inds).size == skyobj.Ncomponents:
+            # nothing removed.
+            if not inplace:
+                return skyobj
+            return
 
         new_ncomponents = np.asarray(component_inds).size
 
@@ -3990,16 +4009,22 @@ class SkyModel(UVBase):
 
     def read_gleam_catalog(
         self,
-        gleam_file,
-        spectral_type="subband",
-        with_error=False,
-        use_paper_freqs=False,
-        run_check=True,
-        check_extra=True,
-        run_check_acceptability=True,
+        gleam_file: str,
+        spectral_type: Literal["flat", "subband", "spectral_index"] = "subband",
+        with_error: bool = False,
+        use_paper_freqs: bool = False,
+        run_check: bool = True,
+        check_extra: bool = True,
+        run_check_acceptability: bool = True,
     ):
         """
         Read the GLEAM votable catalog file into this object.
+
+        Note that when using spectral_type="spectral_index", the spectral indices
+        for some sources are set to NaNs when the source fluxes were not well fit
+        with a power law. Even some bright sources have NaNs for spectral indices.
+        With a "subband" spectral type, GLEAM also has sources that have NaNs and
+        negatives in their Stokes I values for some or all frequencies.
 
         Note that the GLEAM paper specifies that the 30.72 MHz bandwidth is subdivided
         into four 7.68 MHz sub-channels. But that clashes with the frequencies and

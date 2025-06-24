@@ -42,6 +42,31 @@ a) FHD files
 
 b) GLEAM catalog
 ****************
+The GLEAM catalog can be read in with several different spectral types:
+
+  - **subband**: This is the default because it best matches the way the catalog
+  was taken, with source fluxes measured at a number of different frequencies.
+  Note that some (generally fainter) sources have NaNs and negatives in their
+  Stokes I values for some or all frequencies. See :ref:`selecting_data` for
+  ways to remove them.
+
+  - **spectral_index**: This reads in the fitted flux density at 200 MHz and the
+  fitted spectral index. Note that the spectral indices for some sources are set
+  to NaNs because the source flux densities were not well-fit with a power law.
+  Even some bright sources have NaNs for spectral indices. These sources also
+  have NaNs for their fitted flux densities at 200 MHz.
+
+  - **flat**: This reads in the wide band integrated flux density for each source.
+  It does not have any sources with NaNs or negatives in their Stokes I values but
+  also contains no information about how the flux densities evolve with frequency.
+
+  Note that the GLEAM paper specifies that the 30.72 MHz bandwidth is subdivided
+  into four 7.68 MHz sub-channels. But that clashes with the frequencies and
+  edges listed in the catalog documentation which are spaced by exactly 8MHz.
+  By default, this method uses the catalog frequency values. To use our best
+  guess of the real values (which are not specified in the paper), set
+  ``use_paper_freqs=True``. This option only has an effect if spectral_type="subband".
+
 .. code-block:: python
 
   >>> import os
@@ -49,13 +74,11 @@ b) GLEAM catalog
   >>> from pyradiosky.data import DATA_PATH
   >>> sm = SkyModel()
 
-  >>> # Use the `read` method, optionally specify the file type. GLEAM defaults: spectral_type="subband", with_error=False.
   >>> filename = os.path.join(DATA_PATH, "gleam_50srcs.vot")
-  >>> sm.read(filename)
 
   >>> # Use the `from_file` method to create SkyModel object without initalizing
   >>> # an empty object, optionally specify the file type.
-  >>> # GLEAM defaults: spectral_type="subband", with_error=False.
+  >>> # GLEAM defaults: spectral_type="subband", with_error=False
   >>> sm = SkyModel.from_file(filename)
 
 c) VOTable files
@@ -258,13 +281,12 @@ b) Plotting fluxes with error bars
   >>> from pyradiosky import SkyModel
   >>> from pyradiosky.data import DATA_PATH
   >>> import matplotlib.pyplot as plt
-  >>> sm = SkyModel()
 
   >>> # This files contains the first 50 sources from the GLEAM catalog.
   >>> filename = os.path.join(DATA_PATH, "gleam_50srcs.vot")
   >>> # Set the `with_error` parameter to True to read in the flux errors to the
   >>> # `stokes_error` attribute
-  >>> sm.read_gleam_catalog(filename, with_error = True)
+  >>> sm = SkyModel.from_file(filename, with_error = True)
 
   >>> # Plot the fluxes as a function of frequencies with error bars
   >>> # flux for stokes parameter = 0 (stokes I or unpolarized), Nfreqs index = : (all frequencies),
@@ -485,6 +507,9 @@ prefer skyh5 files because they can fully support all types of SkyModel objects.
 Text files do not support diffuse maps or subband type catalogs or catalogs
 with extended_model_groups or catalogs with units other than Jy.
 
+
+.. _selecting_data:
+
 SkyModel: Selecting data
 ------------------------
 
@@ -539,7 +564,10 @@ b) Select
 
 The :meth:`pyradiosky.SkyModel.select` method lets you select components to keep on the
 object while removing others. Selections can be specified by coordinate or flux ranges
-or by component index number.
+or by component index number. The ``non_nan`` option allows for removing components
+with NaN Stokes values at some (``non_nan="any"``) or all (``non_nan="all"``)
+frequencies. The ``non_negative`` allows for removing components with negative
+Stokes I values.
 
 .. code-block:: python
 
@@ -550,10 +578,9 @@ or by component index number.
   >>> from pyradiosky.data import DATA_PATH
   >>> from astropy import units
   >>> from astropy.coordinates import Longitude, Latitude
-  >>> sm = SkyModel()
 
   >>> filename = os.path.join(DATA_PATH, "gleam_50srcs.vot")
-  >>> sm.read_gleam_catalog(filename)
+  >>> sm = SkyModel.from_file(filename)
 
   >>> # First just plot the source locations and fluxes
   >>> # pick a single frequency to plot fluxes for:
@@ -845,7 +872,8 @@ spectral type of the SkyModel. For ``'spectral_index'`` type components, the cal
 just :math:`I=I_0 \frac{f}{f_0}^{\alpha}`, where :math:`I_0` is the flux at the
 reference_frequency :math:`f_0`` and :math:`\alpha`` is the spectral_index. For ``'subband'``
 type components, the flux is interpolated from the subband central frequencies (The type
-of interpolation can be specified with the ``freq_interp_kind`` parameter). For ``'flat'``
+of interpolation can be specified with the ``freq_interp_kind`` parameter, the way
+NaNs are handled can be specied with the ``nan_handling`` parameter). For ``'flat'``
 type components, the flux does not depend on frequency. SkyModel objects that have the
 ``'full'`` spectral type do not have a well defined spectral model so the
 :meth:`pyradiosky.SkyModel.at_frequencies` can only be used to select specific
