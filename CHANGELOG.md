@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2025-06-26
+
 ### Added
 - New option to `SkyModel.select` to select components that do not have NaN
 values in the `stokes` parameter at either any or all frequencies.
