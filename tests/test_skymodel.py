@@ -2974,7 +2974,46 @@ def test_read_deprecated_votable():
 
 @pytest.mark.filterwarnings("ignore:freq_edge_array not set, calculating it from")
 @pytest.mark.filterwarnings("ignore:freq_array not set, calculating it from")
-def test_read_votable_errors():
+@pytest.mark.parametrize(
+    ("update_dict", "col_drop", "msg"),
+    [
+        (
+            {"reference_frequency": 200e6 * units.Hz},
+            ["freq_array", "freq_edge_array"],
+            "Frequency information must be provided with multiple flux columns.",
+        ),
+        (
+            {
+                "freq_array": [150e6, 200e6] * units.Hz,
+                "flux_columns": ["Fintwide", "Fpwide"],
+            },
+            ["freq_edge_array"],
+            "All flux columns must have compatible units",
+        ),
+        (
+            {},
+            ["freq_edge_array"],
+            "freq_edge_array must be provided for multiple flux columns if "
+            "freq_array is not regularly spaced.",
+        ),
+        (
+            {
+                "flux_columns": ["Fint076", "Fint084"],
+                "flux_error_columns": ["e_Fp076", "e_Fint084"],
+                "freq_edge_array": np.asarray([[72, 80], [80, 88]]) * units.Hz,
+            },
+            ["freq_array"],
+            "All flux error columns must have units compatible with",
+        ),
+        ({}, ["table_name"], "table_name is required when reading vot files."),
+        ({}, ["id_column"], "id_column is required when reading vot files."),
+        ({}, ["lon_column"], "lon_column is required when reading vot files."),
+        ({}, ["lat_column"], "lat_column is required when reading vot files."),
+        ({}, ["frame"], "frame is required when reading vot files."),
+        ({}, ["flux_columns"], "flux_columns is required when reading vot files."),
+    ],
+)
+def test_read_votable_errors(update_dict, col_drop, msg):
     # fmt: off
     flux_columns = [
         "Fint076", "Fint084", "Fint092", "Fint099", "Fint107",
@@ -3004,70 +3043,24 @@ def test_read_votable_errors():
         (freq_lower[np.newaxis, :], freq_upper[np.newaxis, :]), axis=0,
     )
     # fmt: on
-    with pytest.raises(
-        ValueError,
-        match="Frequency information must be provided with multiple flux columns.",
-    ):
-        SkyModel.from_file(
-            GLEAM_vot,
-            filetype="vot",
-            table_name="GLEAM",
-            id_column="GLEAM",
-            lon_column="RAJ2000",
-            lat_column="DEJ2000",
-            frame="fk5",
-            flux_columns=flux_columns,
-            reference_frequency=200e6 * units.Hz,
-            flux_error_columns=flux_error_columns,
-        )
-
-    with pytest.raises(ValueError, match="All flux columns must have compatible units"):
-        SkyModel.from_file(
-            GLEAM_vot,
-            filetype="vot",
-            table_name="GLEAM",
-            id_column="GLEAM",
-            lon_column="RAJ2000",
-            lat_column="DEJ2000",
-            frame="fk5",
-            flux_columns=["Fintwide", "Fpwide"],
-            freq_array=[150e6, 200e6] * units.Hz,
-        )
-
-    with pytest.raises(
-        ValueError,
-        match="freq_edge_array must be provided for multiple flux columns if "
-        "freq_array is not regularly spaced.",
-    ):
-        SkyModel.from_file(
-            GLEAM_vot,
-            filetype="vot",
-            table_name="GLEAM",
-            id_column="GLEAM",
-            lon_column="RAJ2000",
-            lat_column="DEJ2000",
-            frame="fk5",
-            flux_columns=flux_columns,
-            flux_error_columns=flux_error_columns,
-            freq_array=freq_array,
-        )
-
-    flux_error_columns[0] = "e_Fp076"
-    with pytest.raises(
-        ValueError, match="All flux error columns must have units compatible with"
-    ):
-        SkyModel.from_file(
-            GLEAM_vot,
-            filetype="vot",
-            table_name="GLEAM",
-            id_column="GLEAM",
-            lon_column="RAJ2000",
-            lat_column="DEJ2000",
-            frame="fk5",
-            flux_columns=flux_columns,
-            flux_error_columns=flux_error_columns,
-            freq_edge_array=freq_edge_array,
-        )
+    input_dict = {
+        "filename": GLEAM_vot,
+        "filetype": "vot",
+        "table_name": "GLEAM",
+        "id_column": "GLEAM",
+        "lon_column": "RAJ2000",
+        "lat_column": "DEJ2000",
+        "frame": "fk5",
+        "flux_columns": flux_columns,
+        "flux_error_columns": flux_error_columns,
+        "freq_array": freq_array,
+        "freq_edge_array": freq_edge_array,
+    }
+    for col in col_drop:
+        del input_dict[col]
+    input_dict.update(update_dict)
+    with pytest.raises(ValueError, match=msg):
+        SkyModel.from_file(**input_dict)
 
 
 @pytest.mark.parametrize("fname", ["catalog", "source_array"])

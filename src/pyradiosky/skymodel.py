@@ -4742,13 +4742,25 @@ class SkyModel(UVBase):
                 run_check_acceptability=run_check_acceptability,
             )
         elif filetype == "vot":
+            required_params = {
+                "table_name": table_name,
+                "id_column": id_column,
+                "lon_column": lon_column,
+                "lat_column": lat_column,
+                "flux_columns": flux_columns,
+                "frame": frame,
+            }
+            for name, val in required_params.items():
+                if val is None:
+                    raise ValueError(f"{name} is required when reading vot files.")
+
             self.read_votable_catalog(
                 filename,
-                table_name,
-                id_column,
-                lon_column,
-                lat_column,
-                flux_columns,
+                table_name=table_name,
+                id_column=id_column,
+                lon_column=lon_column,
+                lat_column=lat_column,
+                flux_columns=flux_columns,
                 frame=frame,
                 reference_frequency=reference_frequency,
                 freq_array=freq_array,
