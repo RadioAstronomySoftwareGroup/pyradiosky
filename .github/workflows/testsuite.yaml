@@ -34,6 +34,7 @@ jobs:
           python-version: ${{ env.PYTHON }}
           environment-file: ci/${{ env.ENV_NAME }}.yaml
           activate-environment: ${{ env.ENV_NAME }}
+          conda-remove-defaults: "true"
 
       - name: Conda Info
         run: |
@@ -90,6 +91,7 @@ jobs:
           python-version: ${{ env.PYTHON }}
           environment-file: ci/${{ env.ENV_NAME }}.yaml
           activate-environment: ${{ env.ENV_NAME }}
+          conda-remove-defaults: "true"
 
       - name: Conda Info
         run: |
@@ -143,6 +145,7 @@ jobs:
           python-version: ${{ env.PYTHON }}
           environment-file: ci/${{ env.ENV_NAME }}.yaml
           activate-environment: ${{ env.ENV_NAME }}
+          conda-remove-defaults: "true"
 
       - name: Conda Info
         run: |
@@ -239,6 +242,7 @@ jobs:
             python-version: ${{ env.PYTHON }}
             environment-file: ci/${{ env.ENV_NAME }}.yaml
             activate-environment: ${{ env.ENV_NAME }}
+            conda-remove-defaults: "true"
 
         - name: Conda Info
           run: |
