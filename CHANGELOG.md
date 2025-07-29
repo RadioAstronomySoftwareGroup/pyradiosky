@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Changed
+- Updated minimum dependency versions: pyuvdata>=3.2.3
+- Use `pyuvdata.UVBase._select_along_param_axis` rather than custom logic in
+`SkyModel.select`.
+
 ## [1.1.0] - 2025-06-26
 
 ### Added
