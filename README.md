@@ -71,7 +71,7 @@ Required:
 * numpy>=1.23
 * scipy>=1.9
 * python>=3.11
-* pyuvdata>=3.1.0
+* pyuvdata>=3.2.3
 * setuptools_scm>=8.1
 
 Optional:
