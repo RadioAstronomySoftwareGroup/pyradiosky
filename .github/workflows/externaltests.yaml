@@ -46,8 +46,10 @@ jobs:
           fi
 
       - name: run pyuvsim tests
+        # install pyradiosky with dependencies to account for any difference in
+        # minimum versions between pyradiosky and pyuvsim's conda yaml
         run: |
-          pip install --no-deps .
+          pip install .
           cd ../
           cd pyuvsim
           pip install --no-deps .
