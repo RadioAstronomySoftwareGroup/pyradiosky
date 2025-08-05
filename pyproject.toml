@@ -53,8 +53,8 @@ Repository = "https://github.com/RadioAstronomySoftwareGroup/pyradiosky"
 Documentation = "https://pyradiosky.readthedocs.io/"
 
 [project.scripts]
-download_gleam = "cli:download_gleam"
-make_flat_spectrum_eor = "cli:make_flat_spectrum_eor"
+download_gleam = "pyradiosky.cli:download_gleam"
+make_flat_spectrum_eor = "pyradiosky.cli:make_flat_spectrum_eor"
 
 [tool.setuptools_scm]
 
