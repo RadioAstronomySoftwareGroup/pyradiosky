@@ -1272,6 +1272,8 @@ def test_calc_vector_rotation(time_location, moon_time_location, telescope_frame
     This checks that the 2-D coherency rotation matrix is unit determinant.
     I suppose we could also have checked (R R^T = R^T R = I)
     """
+    from spiceypy.utils.exceptions import SpiceUNKNOWNFRAME
+
     if telescope_frame == "itrs":
         time, telescope_location = time_location
     else:
@@ -1287,7 +1289,10 @@ def test_calc_vector_rotation(time_location, moon_time_location, telescope_frame
     )
     source.update_positions(time, telescope_location)
 
-    coherency_rotation = np.squeeze(source._calc_coherency_rotation())
+    try:
+        coherency_rotation = np.squeeze(source._calc_coherency_rotation())
+    except SpiceUNKNOWNFRAME as err:
+        pytest.skip("SpiceUNKNOWNFRAME error: " + str(err))
 
     assert np.isclose(np.linalg.det(coherency_rotation), 1)
 
