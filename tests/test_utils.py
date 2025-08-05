@@ -1,6 +1,7 @@
 # Copyright (c) 2019 Radio Astronomy Software Group
 # Licensed under the 2-clause BSD License
 import os
+import subprocess  # nosec
 
 import astropy.units as units
 import numpy as np
@@ -9,7 +10,7 @@ from astropy.coordinates import Angle
 from astropy.cosmology import Planck15
 from astropy.time import Time
 
-from pyradiosky import SkyModel, cli, utils as skyutils
+from pyradiosky import SkyModel, utils as skyutils
 
 
 def test_tee_ra_loop():
@@ -77,7 +78,7 @@ def test_stokes_tofrom_coherency():
 @pytest.mark.filterwarnings("ignore:Some spectral index values are NaN")
 @pytest.mark.filterwarnings("ignore:Some stokes values are NaNs")
 @pytest.mark.parametrize("stype", ["subband", "spectral_index", "flat"])
-def test_download_gleam(tmp_path, stype, capsys):
+def test_download_gleam(tmp_path, stype):
     pytest.importorskip("astroquery")
     import requests  # a dependency of astroquery
 
@@ -86,11 +87,20 @@ def test_download_gleam(tmp_path, stype, capsys):
     n_src = 50
 
     try:
-        cli.download_gleam(
-            ["--path", str(tmp_path), "--filename", fname, "--row_limit", str(n_src)]
+        output = subprocess.check_output(  # nosec
+            [
+                "download_gleam",
+                "--path",
+                str(tmp_path),
+                "--filename",
+                fname,
+                "--row_limit",
+                str(n_src),
+            ]
         )
-        captured = capsys.readouterr()
-        assert captured.out.startswith("GLEAM catalog downloaded and saved to")
+        assert output.decode("utf-8").startswith(
+            "GLEAM catalog downloaded and saved to"
+        )
     except requests.exceptions.ConnectionError:
         pytest.skip("Connection error w/ Vizier")
 
@@ -156,7 +166,7 @@ def test_jy_to_ksr():
 @pytest.mark.parametrize(
     ("fspec", "use_cli"), [("freqs", True), ("freqs", False), ("redshifts", False)]
 )
-def test_flat_spectrum_skymodel(fspec, use_cli, tmp_path, capsys):
+def test_flat_spectrum_skymodel(fspec, use_cli, tmp_path):
     n_freq = 20
     freqs = np.linspace(150e6, 180e6, n_freq)
     nside = 256
@@ -169,8 +179,9 @@ def test_flat_spectrum_skymodel(fspec, use_cli, tmp_path, capsys):
     if use_cli:
         # cli only accepts frequencies
         file_name = str(tmp_path) + "test_flat_spectrum.skyh5"
-        cli.make_flat_spectrum_eor(
+        output = subprocess.check_output(  # nosec
             [
+                "make_flat_spectrum_eor",
                 "-v",
                 str(variance),
                 "--nside",
@@ -185,8 +196,7 @@ def test_flat_spectrum_skymodel(fspec, use_cli, tmp_path, capsys):
                 str(n_freq),
             ]
         )
-        captured = capsys.readouterr()
-        assert captured.out.startswith(
+        assert output.decode("utf-8").startswith(
             "Generating sky model, nside 256, and variance 1e-06 K^2 at channel 0.\n"
             "Generated flat-spectrum model, with spectral amplitude 0.037 K$^2$ Mpc$^3$"
         )

@@ -7,6 +7,9 @@
 - Use `pyuvdata.UVBase._select_along_param_axis` rather than custom logic in
 `SkyModel.select`.
 
+### Fixed
+- Entry point scripts are now properly installed.
+
 ## [1.1.0] - 2025-06-26
 
 ### Added
