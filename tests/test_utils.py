@@ -197,9 +197,13 @@ def test_flat_spectrum_skymodel(fspec, use_cli, tmp_path):
             ]
         )
         assert output.decode("utf-8").startswith(
-            "Generating sky model, nside 256, and variance 1e-06 K^2 at channel 0.\n"
-            "Generated flat-spectrum model, with spectral amplitude 0.037 K$^2$ Mpc$^3$"
+            "Generating sky model, nside 256, and variance 1e-06 K^2 at channel 0."
         )
+        assert (
+            "Generated flat-spectrum model, with spectral amplitude 0.037 K$^2$ Mpc$^3$"
+            in output.decode("utf-8")
+        )
+
         sky = SkyModel.from_file(file_name)
     else:
         fspec_kwargs = {}
