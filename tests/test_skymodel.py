@@ -482,24 +482,31 @@ def test_check_errors():
         skyobj2.check()
 
 
-def test_source_zenith_from_icrs(time_location):
-    """Test single source position at zenith constructed using icrs."""
+def test_source_zenith_from_tete(time_location):
+    """
+    Test single source position at zenith constructed using TETE frame.
+
+    The frame radio astronomers call the apparent or current epoch is the
+    "true equator & equinox" frame, notated E_upsilon in the USNO circular
+    astropy calls this the TETE frame (true equinox and true equator).
+
+    Zenith should be given by the apparent LST and the telescope latitude in
+    this frame.
+
+    """
     time, array_location = time_location
 
     lst = time.sidereal_time("apparent")
 
-    tee_ra = lst
-    cirs_ra = skyutils._tee_to_cirs_ra(tee_ra, time)
-
-    cirs_source_coord = SkyCoord(
-        ra=cirs_ra,
+    tete_cood = SkyCoord(
+        ra=lst,
         dec=array_location.lat,
         obstime=time,
-        frame="cirs",
+        frame="tete",
         location=array_location,
     )
 
-    icrs_coord = cirs_source_coord.transform_to("icrs")
+    icrs_coord = tete_cood.transform_to("icrs")
 
     zenith_source = SkyModel(
         name="icrs_zen",
@@ -511,7 +518,8 @@ def test_source_zenith_from_icrs(time_location):
 
     zenith_source.update_positions(time, array_location)
     zenith_source_lmn = zenith_source.pos_lmn.squeeze()
-    assert np.allclose(zenith_source_lmn, np.array([0, 0, 1]), atol=1e-5)
+    # not sure why it's not better precision than this:
+    np.testing.assert_allclose(zenith_source_lmn, np.array([0, 0, 1]), atol=1e-6)
 
 
 def test_source_zenith(time_location, zenith_skymodel):

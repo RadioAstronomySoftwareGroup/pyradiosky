@@ -5,76 +5,13 @@
 import os
 
 import astropy.units as units
-import erfa
 import numpy as np
-from astropy.coordinates import Angle
-from astropy.coordinates.builtin_frames.utils import get_jd12
 from astropy.cosmology import Planck15
-from astropy.time import Time
 from astropy.units import Quantity
 
 from pyradiosky.data import DATA_PATH as SKY_DATA_PATH
 
 f21 = 1.420405751e9
-
-
-# The frame radio astronomers call the apparent or current epoch is the
-# "true equator & equinox" frame, notated E_upsilon in the USNO circular
-# astropy doesn't have this frame but it's pretty easy to adapt the CIRS frame
-# by modifying the ra to reflect the difference between
-# GAST (Grenwich Apparent Sidereal Time) and the earth rotation angle (theta)
-def _tee_to_cirs_ra(tee_ra, time):
-    """
-    Convert from the true equator & equinox frame to the CIRS frame.
-
-    The frame radio astronomers call the apparent or current epoch is the
-    "true equator & equinox" frame, notated E_upsilon in the USNO circular
-    astropy doesn't have this frame but it's pretty easy to adapt the CIRS frame
-    by modifying the ra to reflect the difference between
-    GAST (Grenwich Apparent Sidereal Time) and the earth rotation angle (theta)
-
-    Parameters
-    ----------
-    tee_ra : :class:`astropy.Angle`
-        Current epoch RA (RA in the true equator and equinox frame).
-    time : :class:`astropy.Time`
-        Time object for the epoch of the `tee_ra`.
-    """
-    era = erfa.era00(*get_jd12(time, "ut1"))
-    theta_earth = Angle(era, unit="rad")
-
-    assert isinstance(time, Time)
-    assert isinstance(tee_ra, Angle)
-    gast = time.sidereal_time("apparent", longitude=0)
-    cirs_ra = tee_ra - (gast - theta_earth)
-    return cirs_ra
-
-
-def _cirs_to_tee_ra(cirs_ra, time):
-    """
-    Convert from CIRS frame to the true equator & equinox frame.
-
-    The frame radio astronomers call the apparent or current epoch is the
-    "true equator & equinox" frame, notated E_upsilon in the USNO circular
-    astropy doesn't have this frame but it's pretty easy to adapt the CIRS frame
-    by modifying the ra to reflect the difference between
-    GAST (Grenwich Apparent Sidereal Time) and the earth rotation angle (theta)
-
-    Parameters
-    ----------
-    cirs_ra : :class:`astropy.Angle`
-        CIRS RA.
-    time : :class:`astropy.Time`
-        Time object for time to convert to the "true equator & equinox" frame.
-    """
-    era = erfa.era00(*get_jd12(time, "ut1"))
-    theta_earth = Angle(era, unit="rad")
-
-    assert isinstance(time, Time)
-    assert isinstance(cirs_ra, Angle)
-    gast = time.sidereal_time("apparent", longitude=0)
-    tee_ra = cirs_ra + (gast - theta_earth)
-    return tee_ra
 
 
 def stokes_to_coherency(stokes_arr):
