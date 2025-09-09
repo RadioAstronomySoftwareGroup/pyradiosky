@@ -61,7 +61,7 @@ jobs:
           ls
           cat coverage.xml
 
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v5
         if: success()
         with:
           token: ${{ secrets.CODECOV_TOKEN }} #required
@@ -115,7 +115,7 @@ jobs:
           ls
           cat coverage.xml
 
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v5
         if: success()
         with:
           token: ${{secrets.CODECOV_TOKEN}} #required
@@ -169,7 +169,7 @@ jobs:
           ls
           cat coverage.xml
 
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v5
         if: success()
         with:
           token: ${{secrets.CODECOV_TOKEN}} #required
@@ -211,7 +211,7 @@ jobs:
           ls
           cat coverage.xml
 
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v5
         if: success()
         with:
           token: ${{secrets.CODECOV_TOKEN}} #required
