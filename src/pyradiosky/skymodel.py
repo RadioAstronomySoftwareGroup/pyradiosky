@@ -4407,11 +4407,12 @@ class SkyModel(UVBase):
 
     def read_fhd_catalog(
         self,
-        filename_sav,
-        expand_extended=True,
-        run_check=True,
-        check_extra=True,
-        run_check_acceptability=True,
+        filename_sav: str,
+        expand_extended: bool = True,
+        extra_columns: dict | None = None,
+        run_check: bool = True,
+        check_extra: bool = True,
+        run_check_acceptability: bool = True,
     ):
         """
         Read in an FHD style catalog file.
@@ -4424,6 +4425,9 @@ class SkyModel(UVBase):
             Path to IDL .sav file.
         expand_extended: bool
             If True, include extended source components.
+        extra_columns : dict, optional
+            Dict giving structure tags to store in extra columns. Keys are idl
+            structure tags, values are keys for extra_columns entries.
         run_check : bool
             Option to check for the existence and proper shapes of parameters
             after downselecting data on this object (the default is True,
@@ -4486,6 +4490,21 @@ class SkyModel(UVBase):
                 ids[wh_id_rep] = np.arange(wh_id_rep.size) + (ids.max() + 1)
         ids = ids.astype(str)
 
+        known_cols = ["id", "ra", "dec", "freq", "alpha", "flux", "beam", "extend"]
+        known_cols = [col.upper() for col in known_cols]
+        extra_cols_cat = list(set(catalog.dtype.names).difference(known_cols))
+
+        extra_col_dict = {}
+        if extra_columns is not None:
+            for key, value in extra_columns.items():
+                if key.upper() in extra_cols_cat:
+                    extra_col_dict[value] = catalog[key.upper()]
+                else:
+                    raise KeyError(
+                        f"{key} in extra_columns not available in catalog. "
+                        f"Available extra_columns are: {extra_cols_cat}"
+                    )
+
         if expand_extended:
             ext_inds = np.where(
                 [catalog["extend"][ind] is not None for ind in range(Nsrcs)]
@@ -4505,6 +4524,11 @@ class SkyModel(UVBase):
                     extended_model_group = np.delete(extended_model_group, use_index)
                     if use_beam_amps:
                         beam_amp = np.delete(beam_amp, use_index, axis=1)
+                    if len(extra_col_dict) > 0:
+                        for key in extra_col_dict:
+                            extra_col_dict[key] = np.delete(
+                                extra_col_dict[key], use_index
+                            )
                     # Add component information
                     src = catalog[catalog_index]["extend"]
                     Ncomps = len(src)
@@ -4520,6 +4544,11 @@ class SkyModel(UVBase):
                     stokes_ext = Quantity(np.zeros((4, Ncomps)), "Jy")
                     if use_beam_amps:
                         beam_amp_ext = np.zeros((4, Ncomps))
+                    if len(extra_col_dict) > 0:
+                        for key, value in extra_columns.items():
+                            extra_col_dict[value] = np.insert(
+                                extra_col_dict[value], use_index, src[key.upper()]
+                            )
                     for comp in range(Ncomps):
                         stokes_ext[0, comp] = src["flux"][comp]["I"][0] * units.Jy
                         stokes_ext[1, comp] = src["flux"][comp]["Q"][0] * units.Jy
@@ -4549,6 +4578,8 @@ class SkyModel(UVBase):
                     )
                     spectral_index = np.insert(spectral_index, use_index, src["alpha"])
 
+        if len(extra_col_dict) == 0:
+            extra_col_dict = None
         ra = Longitude(ra, units.deg)
         dec = Latitude(dec, units.deg)
         stokes = stokes[:, np.newaxis, :]  # Add frequency axis
@@ -4565,6 +4596,7 @@ class SkyModel(UVBase):
             spectral_index=spectral_index,
             beam_amp=beam_amp,
             extended_model_group=extended_model_group,
+            extra_column_dict=extra_col_dict,
             filename=os.path.basename(filename_sav),
             run_check=run_check,
             check_extra=check_extra,
@@ -4597,6 +4629,7 @@ class SkyModel(UVBase):
         use_paper_freqs: bool = False,
         # fhd
         expand_extended: bool = True,
+        extra_columns: dict | None = None,
         # skyH5
         skip_params: str | list[str] | bool = False,
         # VOTable
@@ -4666,6 +4699,9 @@ class SkyModel(UVBase):
         ---
         expand_extended: bool
             If True, include the extended source components in FHD files.
+        extra_columns : dict, optional
+            Dict giving structure tags to store in extra columns. Keys are idl
+            structure tags, values are keys for extra_columns entries.
 
         SkyH5
         -----
@@ -4803,6 +4839,7 @@ class SkyModel(UVBase):
             self.read_fhd_catalog(
                 filename,
                 expand_extended=expand_extended,
+                extra_columns=extra_columns,
                 run_check=run_check,
                 check_extra=check_extra,
                 run_check_acceptability=run_check_acceptability,
