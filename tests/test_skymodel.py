@@ -898,7 +898,7 @@ def test_healpix_to_point_loop(
     if order == "nested":
         skyobj.hpx_order = "nested"
 
-        # also add a length Ncomponent parameter.
+        # also add some extra_columns.
         # Don't need a separate parametrize for this
         skyobj.add_extra_columns(
             names="foo", values=np.arange(skyobj.Ncomponents, dtype=float)
@@ -910,12 +910,16 @@ def test_healpix_to_point_loop(
             names="bar", values=np.arange(skyobj.Ncomponents, dtype=int)
         )
         skyobj.add_extra_columns(
+            names="bar2", values=np.arange(skyobj.Ncomponents, dtype=int)
+        )
+        skyobj.add_extra_columns(
             names=["blah", "bleg"],
             values=[
                 np.arange(skyobj.Ncomponents, dtype=complex),
                 np.full(skyobj.Ncomponents, "", dtype=str),
             ],
         )
+        skyobj.remove_extra_columns(names="bar2")
 
     else:
         run_check = False
@@ -982,6 +986,14 @@ def test_extra_columns_errors():
                 np.arange(skyobj.Ncomponents, dtype=int),
             ],
             dtype="foo",
+        )
+
+    skyobj.add_extra_columns(names=["foo"], values=np.arange(skyobj.Ncomponents))
+    with pytest.raises(
+        ValueError, match="foo column already exists, use a different name."
+    ):
+        skyobj.add_extra_columns(
+            names=["foo"], values=np.arange(skyobj.Ncomponents, dtype=float)
         )
 
 

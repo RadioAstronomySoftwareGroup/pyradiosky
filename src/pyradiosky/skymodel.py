@@ -27,6 +27,7 @@ from astropy.io import votable
 from astropy.time import Time
 from astropy.units import Quantity
 from docstring_parser import DocstringStyle
+from numpy.typing import NDArray
 from pyuvdata.docstrings import copy_replace_short_description
 from pyuvdata.parameter import SkyCoordParameter, UVParameter
 from pyuvdata.uvbase import UVBase
@@ -1131,7 +1132,13 @@ class SkyModel(UVBase):
         """List of strings giving the time & position specific parameters."""
         return ["time", "telescope_location", "alt_az", "pos_lmn", "above_horizon"]
 
-    def add_extra_columns(self, *, names, values, dtype=None):
+    def add_extra_columns(
+        self,
+        *,
+        names: str | list[str],
+        values: NDArray | list[NDArray],
+        dtype: str | list[str] | None = None,
+    ):
         """
         Add one or more length Ncomponent attributes to the object.
 
@@ -1161,6 +1168,12 @@ class SkyModel(UVBase):
                     )
             else:
                 dtype = [dtype]
+        if self.extra_columns is not None:
+            for name in names:
+                if name in self.extra_columns.dtype.names:
+                    raise ValueError(
+                        f"{name} column already exists, use a different name."
+                    )
         for index, val in enumerate(values):
             if val.shape != (self.Ncomponents,):
                 raise ValueError(
@@ -1178,6 +1191,28 @@ class SkyModel(UVBase):
                 (self.extra_columns, new_recarray), asrecarray=True, flatten=True
             )
             self.extra_columns = combined_recarray
+        expected_dtype = [
+            self.extra_columns.dtype[name].type
+            for name in self.extra_columns.dtype.names
+        ]
+
+        self._extra_columns.expected_type = expected_dtype
+
+    def remove_extra_columns(self, names: str | list[str]):
+        """
+        Remove one or more length Ncomponent attributes to the object.
+
+        Parameters
+        ----------
+        name : str or list of str
+            The name(s) of the column(s) to remove.
+
+        """
+        new_recarray = np.lib.recfunctions.rec_drop_fields(
+            self.extra_columns, drop_names=names
+        )
+        self.extra_columns = new_recarray
+
         expected_dtype = [
             self.extra_columns.dtype[name].type
             for name in self.extra_columns.dtype.names

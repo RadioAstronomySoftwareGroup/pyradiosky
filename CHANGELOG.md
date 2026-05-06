@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- New `SkyModel.remove_extra_columns` method to allow for removal of extra columns.
+
 ### Changed
 - Updated minimum dependency versions: pyuvdata>=3.2.3
 - Use `pyuvdata.UVBase._select_along_param_axis` rather than custom logic in
