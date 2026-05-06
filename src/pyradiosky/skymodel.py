@@ -4422,7 +4422,6 @@ class SkyModel(UVBase):
         ----------
         filename_sav: str
             Path to IDL .sav file.
-
         expand_extended: bool
             If True, include extended source components.
         run_check : bool
@@ -4449,7 +4448,7 @@ class SkyModel(UVBase):
                 f"File {filename_sav} does not contain a known catalog name. "
                 f"File variables include {list(catalog.keys())}"
             )
-        ids = catalog["id"].astype(str)
+        ids = catalog["id"]
         ra = catalog["ra"]
         dec = catalog["dec"]
         # FHD catalogs frequencies are in MHz
@@ -4475,13 +4474,17 @@ class SkyModel(UVBase):
                 beam_amp[2, src] = np.abs(catalog["beam"][src]["XY"][0])
                 beam_amp[3, src] = np.abs(catalog["beam"][src]["YX"][0])
 
-        if len(np.unique(ids)) != len(ids):
+        unique_ids, cts = np.unique(ids, return_counts=True)
+        if cts.max() > 1:
             warnings.warn("Source IDs are not unique. Defining unique IDs.")
-            unique_ids, counts = np.unique(ids, return_counts=True)
-            for repeat_id in unique_ids[np.where(counts > 1)[0]]:
-                fix_id_inds = np.where(np.array(ids) == repeat_id)[0]
-                for append_val, id_ind in enumerate(fix_id_inds):
-                    ids[id_ind] = f"{ids[id_ind]}-{append_val + 1}"
+            rep_ids = unique_ids[np.nonzero(cts > 1)]
+            for this_id in rep_ids:
+                # find places to replace, leave the first instance of this id alone
+                # use max to ensure all new ids are unique
+                # (might not all be contiguous)
+                wh_id_rep = np.nonzero(ids == this_id)[0][1:]
+                ids[wh_id_rep] = np.arange(wh_id_rep.size) + (ids.max() + 1)
+        ids = ids.astype(str)
 
         if expand_extended:
             ext_inds = np.where(
