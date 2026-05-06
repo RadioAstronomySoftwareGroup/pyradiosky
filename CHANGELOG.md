@@ -6,6 +6,7 @@
 - New `SkyModel.remove_extra_columns` method to allow for removal of extra columns.
 
 ### Changed
+- Improved logic for duplicate source IDs in FHD catalogs.
 - Updated minimum dependency versions: pyuvdata>=3.2.3
 - Use `pyuvdata.UVBase._select_along_param_axis` rather than custom logic in
 `SkyModel.select`.
