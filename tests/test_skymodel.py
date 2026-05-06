@@ -3097,8 +3097,15 @@ def test_fhd_catalog_reader(fname):
             UserWarning, match="Source IDs are not unique. Defining unique IDs."
         ):
             skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
+        assert skyobj.extra_columns is None
     else:
-        skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
+        skyobj = SkyModel.from_fhd_catalog(
+            catfile,
+            expand_extended=False,
+            extra_columns={"x": "image_x", "y": "image_y"},
+        )
+        assert skyobj.extra_columns is not None
+        assert skyobj.extra_columns.dtype.names == ("image_x", "image_y")
 
     assert skyobj.filename == [f"fhd_{fname}.sav"]
     catalog = scipy.io.readsav(catfile)[fname]
@@ -3119,7 +3126,12 @@ def test_fhd_catalog_reader_extended_sources(extended):
     with check_warnings(
         UserWarning, match="Source IDs are not unique. Defining unique IDs."
     ):
-        skyobj.read_fhd_catalog(catfile, expand_extended=True, run_check=False)
+        skyobj.read_fhd_catalog(
+            catfile,
+            expand_extended=True,
+            extra_columns={"x": "image_x", "y": "image_y"},
+            run_check=False,
+        )
 
     catalog = scipy.io.readsav(catfile)["catalog"]
     ext_inds = np.where(
@@ -3189,11 +3201,20 @@ def test_fhd_catalog_reader_labeling_extended_sources():
         assert skyobj.name[comp] == expected_name[comp]
 
 
+@pytest.mark.filterwarnings("ignore:Source IDs are not unique. Defining unique IDs.")
 def test_fhd_catalog_reader_errors():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog_bad.sav")
 
     with pytest.raises(KeyError, match="does not contain a known catalog name. "):
         SkyModel.from_fhd_catalog(catfile)
+
+    catfile = os.path.join(SKY_DATA_PATH, "extended_source_test.sav")
+    with pytest.raises(
+        KeyError,
+        match="foo in extra_columns not available in catalog. Available "
+        "extra_columns are:",
+    ):
+        SkyModel.from_fhd_catalog(catfile, extra_columns={"foo": "foo"})
 
 
 def test_point_catalog_reader():
