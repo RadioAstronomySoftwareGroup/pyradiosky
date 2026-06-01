@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-06-01
+
 ### Added
 - New option when reading FHD catalogs to include available columns in extra_keywords.
 - New `SkyModel.remove_extra_columns` method to allow for removal of extra columns.
