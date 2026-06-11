@@ -3,7 +3,13 @@
 ## [Unreleased]
 
 ### Changed
+- If no extended models remain after a select, the `extended_model_group` parameter
+is set to `None` after the select.
 - Updated minimum optional dependency versions: lunarsky>=1.0 (to drop spiceypy requirement)
+
+### Fixed
+- A bug where the `extended_model_group` was set to an array of empty strings
+when reading in FHD catalogs with no extended models.
 
 ### Removed
 - Spiceypy error catching in tests
