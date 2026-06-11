@@ -2295,6 +2295,7 @@ def test_select(time_location):
     skyobj.select(component_inds=np.arange(10), run_check=False)
 
     assert skyobj == skyobj2
+    assert skyobj.extended_model_group is None
 
 
 @pytest.mark.filterwarnings("ignore:Some Stokes I values are negative")
@@ -3140,6 +3141,11 @@ def test_fhd_catalog_reader_extended_sources(extended):
     ext_Ncomps = [len(catalog[ext]["extend"]) for ext in ext_inds]
     assert skyobj.Ncomponents == len(catalog) - len(ext_inds) + sum(ext_Ncomps)
 
+    if not extended:
+        assert skyobj.extended_model_group is None
+    else:
+        assert skyobj.extended_model_group is not None
+
 
 def test_fhd_catalog_reader_beam_values():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog_with_beam_values.sav")
@@ -3155,6 +3161,8 @@ def test_fhd_catalog_reader_beam_values():
     beam_vals = beam_vals[:, np.newaxis, :]
 
     assert np.min(np.abs(skyobj.beam_amp - beam_vals)) == 0
+
+    assert skyobj.extended_model_group is None
 
 
 def test_fhd_catalog_reader_beam_values_extended():

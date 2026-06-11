@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed
+- If no extended models remain after a select, the `extended_model_group` parameter
+is set to `None` after the select.
+
+### Fixed
+- A bug where the `extended_model_group` was set to an array of empty strings
+when reading in FHD catalogs with no extended models.
+
 ## [1.1.1] - 2026-06-01
 
 ### Added
