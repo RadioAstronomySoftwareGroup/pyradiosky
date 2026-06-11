@@ -3265,6 +3265,13 @@ class SkyModel(UVBase):
 
         skyobj._select_along_param_axis({"Ncomponents": component_inds})
 
+        # if all extended models were removed in select, set extended_model_group
+        # to None
+        if skyobj.extended_model_group is not None:
+            extended_comps = np.nonzero(skyobj.extended_model_group != "")[0]
+            if extended_comps.size == 0:
+                skyobj.extended_model_group = None
+
         if run_check:
             skyobj.check(
                 check_extra=check_extra, run_check_acceptability=run_check_acceptability
@@ -4440,7 +4447,6 @@ class SkyModel(UVBase):
             downselecting data on this object (the default is True, meaning the
             acceptable range check will be done).
 
-
         """
         catalog = scipy.io.readsav(filename_sav)
         if "catalog" in catalog:
@@ -4577,6 +4583,10 @@ class SkyModel(UVBase):
                         source_freqs, use_index, src["freq"] * 1e6 * units.Hz
                     )
                     spectral_index = np.insert(spectral_index, use_index, src["alpha"])
+            else:
+                extended_model_group = None
+        else:
+            extended_model_group = None
 
         if len(extra_col_dict) == 0:
             extra_col_dict = None
