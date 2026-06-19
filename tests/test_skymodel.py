@@ -85,7 +85,6 @@ def moonsky():
     pytest.importorskip("lunarsky")
 
     from lunarsky import MoonLocation, SkyCoord as LunarSkyCoord
-    from spiceypy.utils.exceptions import SpiceUNKNOWNFRAME
 
     # Tranquility base
     array_location = MoonLocation(lat="00d41m15s", lon="23d26m00s", height=0.0)
@@ -106,10 +105,7 @@ def moonsky():
     zenith_source = SkyModel(
         name=names, skycoord=icrs_coord, stokes=stokes, spectral_type="flat"
     )
-    try:
-        zenith_source.update_positions(time, array_location)
-    except SpiceUNKNOWNFRAME as err:
-        pytest.skip("SpiceUNKNOWNFRAME error: " + str(err))
+    zenith_source.update_positions(time, array_location)
 
     yield zenith_source
 
@@ -1260,8 +1256,6 @@ def test_calc_basis_rotation_matrix(time_location, moon_time_location, telescope
     This tests whether the 3-D rotation matrix from RA/Dec to Alt/Az is
     actually a rotation matrix (R R^T = R^T R = I)
     """
-    from spiceypy.utils.exceptions import SpiceUNKNOWNFRAME
-
     if telescope_frame == "itrs":
         time, telescope_location = time_location
     else:
@@ -1276,11 +1270,8 @@ def test_calc_basis_rotation_matrix(time_location, moon_time_location, telescope
         spectral_type="flat",
     )
 
-    try:
-        source.update_positions(time, telescope_location)
-        basis_rot_matrix = source._calc_average_rotation_matrix()
-    except SpiceUNKNOWNFRAME as err:
-        pytest.skip("SpiceUNKNOWNFRAME error: " + str(err))
+    source.update_positions(time, telescope_location)
+    basis_rot_matrix = source._calc_average_rotation_matrix()
 
     assert np.allclose(np.matmul(basis_rot_matrix, basis_rot_matrix.T), np.eye(3))
     assert np.allclose(np.matmul(basis_rot_matrix.T, basis_rot_matrix), np.eye(3))
@@ -1292,8 +1283,6 @@ def test_calc_vector_rotation(time_location, moon_time_location, telescope_frame
     This checks that the 2-D coherency rotation matrix is unit determinant.
     I suppose we could also have checked (R R^T = R^T R = I)
     """
-    from spiceypy.utils.exceptions import SpiceUNKNOWNFRAME
-
     if telescope_frame == "itrs":
         time, telescope_location = time_location
     else:
@@ -1309,10 +1298,7 @@ def test_calc_vector_rotation(time_location, moon_time_location, telescope_frame
     )
     source.update_positions(time, telescope_location)
 
-    try:
-        coherency_rotation = np.squeeze(source._calc_coherency_rotation())
-    except SpiceUNKNOWNFRAME as err:
-        pytest.skip("SpiceUNKNOWNFRAME error: " + str(err))
+    coherency_rotation = np.squeeze(source._calc_coherency_rotation())
 
     assert np.isclose(np.linalg.det(coherency_rotation), 1)
 
@@ -3525,8 +3511,6 @@ def test_zenith_on_moon(moonsky):
 def test_source_motion(moonsky):
     """Check that period is about 28 days."""
 
-    from spiceypy.utils.exceptions import SpiceUNKNOWNFRAME
-
     zenith_source = moonsky
 
     Ntimes = 500
@@ -3534,12 +3518,9 @@ def test_source_motion(moonsky):
     times = zenith_source.time + TimeDelta(ets, format="sec")
 
     lmns = np.zeros((Ntimes, 3))
-    try:
-        for ti in range(Ntimes):
-            zenith_source.update_positions(times[ti], zenith_source.telescope_location)
-            lmns[ti] = zenith_source.pos_lmn.squeeze()
-    except SpiceUNKNOWNFRAME as err:
-        pytest.skip("SpiceUNKNOWNFRAME error: " + str(err))
+    for ti in range(Ntimes):
+        zenith_source.update_positions(times[ti], zenith_source.telescope_location)
+        lmns[ti] = zenith_source.pos_lmn.squeeze()
     _els = np.fft.fft(lmns[:, 0])
     dt = np.diff(ets)[0]
     _freqs = np.fft.fftfreq(Ntimes, d=dt)

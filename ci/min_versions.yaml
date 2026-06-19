@@ -14,4 +14,4 @@ dependencies:
   - pyuvdata==3.2.3
   - pip
   - pip:
-      - lunarsky==0.2.5
+      - lunarsky==1.0.1.post2
