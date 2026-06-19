@@ -78,7 +78,7 @@ Optional:
 
 * astropy-healpix>=1.0.2 (for working with beams in HEALPix formats)
 * astroquery>=0.4.4 (for downloading GLEAM and other VizieR catalogs)
-* lunarsky>=0.2.5 (for supporting telescope locations on the moon)
+* lunarsky>=1.0 (for supporting telescope locations on the moon)
 
 We suggest using conda to install all the dependencies. To install
 pyuvdata, astropy-healpix and astroquery, you'll need to add conda-forge as a channel

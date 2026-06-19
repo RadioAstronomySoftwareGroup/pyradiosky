@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+- Updated minimum optional dependency versions: lunarsky>=1.0 (to drop spiceypy requirement)
+
+### Removed
+- Spiceypy error catching in tests
+
 ## [1.1.1] - 2026-06-01
 
 ### Added

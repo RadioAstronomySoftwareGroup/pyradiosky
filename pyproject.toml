@@ -42,7 +42,7 @@ classifiers = [
 [project.optional-dependencies]
 healpix = ["astropy-healpix>=1.0.2"]
 astroquery = ["astroquery>=0.4.4"]
-lunarsky = ["lunarsky>=0.2.5"]
+lunarsky = ["lunarsky>=1.0"]
 all = ["pyradiosky[healpix,astroquery,lunarsky]"]
 test = ["coverage", "pre-commit", "pytest", "pytest-cov"]
 doc = ["matplotlib", "pypandoc", "sphinx"]
