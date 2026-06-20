@@ -5,6 +5,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
+permissions: {}
+
 jobs:
   pyuvsim:
     name: pyuvsim
@@ -18,9 +20,10 @@ jobs:
       PYTHON: "3.12"
 
     steps:
-      - uses: actions/checkout@main
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: clone pyuvsim
         run: |
@@ -29,7 +32,7 @@ jobs:
           cd pyradiosky
 
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v3
+        uses: conda-incubator/setup-miniconda@8ee1f361103df19b6f8c8655fd3967a8ecb162d5 # v4.0.1
         with:
           miniforge-version: latest
           python-version: ${{ env.PYTHON }}
@@ -42,7 +45,7 @@ jobs:
           conda info -a
           conda list
           PYVER=`python -c "import sys; print('{:d}.{:d}'.format(sys.version_info.major, sys.version_info.minor))"`
-          if [[ $PYVER != ${{ env.PYTHON }} ]]; then
+          if [[ $PYVER != $PYTHON ]]; then
             exit 1;
           fi
 
