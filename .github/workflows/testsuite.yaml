@@ -69,6 +69,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }} #required
           files: ./coverage.xml #optional
+          fail_ci_if_error: true
 
   min_deps:
     env:
@@ -124,6 +125,7 @@ jobs:
         with:
           token: ${{secrets.CODECOV_TOKEN}} #required
           files: ./coverage.xml #optional
+          fail_ci_if_error: true
 
   min_versions:
     env:
@@ -179,6 +181,7 @@ jobs:
         with:
           token: ${{secrets.CODECOV_TOKEN}} #required
           files: ./coverage.xml #optional
+          fail_ci_if_error: true
 
   # Use pip for diversity
   warning_test:
@@ -222,6 +225,7 @@ jobs:
         with:
           token: ${{secrets.CODECOV_TOKEN}} #required
           files: ./coverage.xml #optional
+          fail_ci_if_error: true
 
   docs_test:
     env:
