@@ -4458,8 +4458,8 @@ class SkyModel(UVBase):
                 f"File variables include {list(catalog.keys())}"
             )
         ids = catalog["id"]
-        ra = catalog["ra"]
-        dec = catalog["dec"]
+        ra = catalog["ra"].astype(np.float64)
+        dec = catalog["dec"].astype(np.float64)
         # FHD catalogs frequencies are in MHz
         source_freqs = catalog["freq"] * 1e6 * units.Hz
         spectral_index = catalog["alpha"]
@@ -4544,8 +4544,8 @@ class SkyModel(UVBase):
                     extended_model_group = np.insert(
                         extended_model_group, use_index, np.full(Ncomps, source_id)
                     )
-                    ra = np.insert(ra, use_index, src["ra"])
-                    dec = np.insert(dec, use_index, src["dec"])
+                    ra = np.insert(ra, use_index, src["ra"].astype(np.float64))
+                    dec = np.insert(dec, use_index, src["dec"].astype(np.float64))
                     stokes_ext = Quantity(np.zeros((4, Ncomps)), "Jy")
                     if use_beam_amps:
                         beam_amp_ext = np.zeros((4, Ncomps))

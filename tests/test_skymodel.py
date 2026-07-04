@@ -3132,6 +3132,8 @@ def test_fhd_catalog_reader_extended_sources(extended):
     else:
         assert skyobj.extended_model_group is not None
 
+    assert skyobj.frame == "fk5"
+
 
 def test_fhd_catalog_reader_beam_values():
     catfile = os.path.join(SKY_DATA_PATH, "fhd_catalog_with_beam_values.sav")
