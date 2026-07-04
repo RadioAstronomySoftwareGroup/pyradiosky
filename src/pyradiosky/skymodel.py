@@ -1364,7 +1364,6 @@ class SkyModel(UVBase):
         ----------
         frame : str, `BaseCoordinateFrame` class or instance.
             The frame to transform this coordinate into.
-            Currently frame must be one of ["galactic", "icrs"].
 
         """
         if self.component_type == "healpix":
@@ -4599,7 +4598,7 @@ class SkyModel(UVBase):
             name=ids,
             ra=ra,
             dec=dec,
-            frame="icrs",
+            frame="fk5",
             stokes=stokes,
             spectral_type="spectral_index",
             reference_frequency=source_freqs,
