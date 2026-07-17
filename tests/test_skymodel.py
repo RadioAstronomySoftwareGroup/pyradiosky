@@ -3076,19 +3076,20 @@ def test_read_votable_errors(update_dict, col_drop, msg):
 
 
 @pytest.mark.parametrize("fname", ["catalog", "source_array"])
-def test_fhd_catalog_reader(fname):
+@pytest.mark.parametrize("extended", [True, False])
+def test_fhd_catalog_reader(fname, extended):
     catfile = os.path.join(SKY_DATA_PATH, f"fhd_{fname}.sav")
 
     if fname == "catalog":
         with check_warnings(
             UserWarning, match="Source IDs are not unique. Defining unique IDs."
         ):
-            skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=False)
+            skyobj = SkyModel.from_fhd_catalog(catfile, expand_extended=extended)
         assert skyobj.extra_columns is None
     else:
         skyobj = SkyModel.from_fhd_catalog(
             catfile,
-            expand_extended=False,
+            expand_extended=extended,
             extra_columns={
                 "x": "image_x",
                 "y": "image_y",
@@ -3109,8 +3110,12 @@ def test_fhd_catalog_reader(fname):
         assert np.issubdtype(skyobj.extra_columns["flux_xy"].dtype, np.complexfloating)
 
     assert skyobj.filename == [f"fhd_{fname}.sav"]
+
     catalog = scipy.io.readsav(catfile)[fname]
-    assert skyobj.Ncomponents == len(catalog)
+    if extended:
+        assert skyobj.Ncomponents > len(catalog)
+    else:
+        assert skyobj.Ncomponents == len(catalog)
 
     assert np.all(skyobj.reference_frequency > 50 * units.MHz)
 
