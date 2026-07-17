@@ -4503,10 +4503,10 @@ class SkyModel(UVBase):
         if use_extra_flux:
             extra_flux_cols = {}
             for pol_i, pol in enumerate(inst_pols):
-                if np.issubdtype(catalog["flux"][0][pol].dtype, np.floating):
-                    dtype_use = float
-                elif np.issubdtype(catalog["flux"][0][pol].dtype, np.complexfloating):
+                if np.issubdtype(catalog["flux"][0][pol].dtype, np.complexfloating):
                     dtype_use = complex
+                else:
+                    dtype_use = float
                 extra_flux_cols[extra_cols_flux[pol_i]] = (
                     np.zeros((Nsrcs,), dtype=dtype_use) * units.Jy
                 )
@@ -4607,7 +4607,7 @@ class SkyModel(UVBase):
                             )
                     if use_extra_beam:
                         extra_beam_cols_ext = {}
-                        for (pi,) in range(len(stokes_pols)):
+                        for pi in range(len(stokes_pols)):
                             extra_beam_cols_ext[extra_cols_beam[pi]] = np.zeros(
                                 (Ncomps,), dtype=float
                             )
@@ -4647,7 +4647,8 @@ class SkyModel(UVBase):
                                     use_index,
                                     extra_flux_cols_ext[key],
                                 )
-                            elif key in extra_beam_cols:
+                            else:
+                                # must be in extra_beam_cols_ext by construction
                                 extra_col_dict[value] = np.insert(
                                     extra_col_dict[value],
                                     use_index,
