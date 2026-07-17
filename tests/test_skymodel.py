@@ -3089,10 +3089,24 @@ def test_fhd_catalog_reader(fname):
         skyobj = SkyModel.from_fhd_catalog(
             catfile,
             expand_extended=False,
-            extra_columns={"x": "image_x", "y": "image_y"},
+            extra_columns={
+                "x": "image_x",
+                "y": "image_y",
+                "flux_xx": "flux_xx",
+                "flux_xy": "flux_xy",
+                "beam_i": "beam_i",
+            },
         )
         assert skyobj.extra_columns is not None
-        assert skyobj.extra_columns.dtype.names == ("image_x", "image_y")
+        assert skyobj.extra_columns.dtype.names == (
+            "image_x",
+            "image_y",
+            "flux_xx",
+            "flux_xy",
+            "beam_i",
+        )
+        assert np.issubdtype(skyobj.extra_columns["flux_xx"].dtype, np.floating)
+        assert np.issubdtype(skyobj.extra_columns["flux_xy"].dtype, np.complexfloating)
 
     assert skyobj.filename == [f"fhd_{fname}.sav"]
     catalog = scipy.io.readsav(catfile)[fname]
@@ -3116,7 +3130,7 @@ def test_fhd_catalog_reader_extended_sources(extended):
         skyobj.read_fhd_catalog(
             catfile,
             expand_extended=True,
-            extra_columns={"x": "image_x", "y": "image_y"},
+            extra_columns={"x": "image_x", "y": "image_y", "flux_xx": "flux_xx"},
             run_check=False,
         )
 
