@@ -2,12 +2,18 @@
 
 ## [Unreleased]
 
+### Added
+- Ability to read in instrumental fluxes and stokes beam amplitudes from FHD catalogs
+into extra_columns.
+
 ### Changed
+- Promote RA/Dec values from FHD catalogs to float32.
 - If no extended models remain after a select, the `extended_model_group` parameter
 is set to `None` after the select.
 - Updated minimum optional dependency versions: lunarsky>=1.0 (to drop spiceypy requirement)
 
 ### Fixed
+- A bug where the frame for FHD catalogs was set to ICRS when it should have been FK5.
 - A bug where the `extended_model_group` was set to an array of empty strings
 when reading in FHD catalogs with no extended models.
 
@@ -17,7 +23,7 @@ when reading in FHD catalogs with no extended models.
 ## [1.1.1] - 2026-06-01
 
 ### Added
-- New option when reading FHD catalogs to include available columns in extra_keywords.
+- New option when reading FHD catalogs to include available columns in extra_columns.
 - New `SkyModel.remove_extra_columns` method to allow for removal of extra columns.
 
 ### Changed
