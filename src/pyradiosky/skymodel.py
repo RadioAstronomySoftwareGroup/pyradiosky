@@ -4471,17 +4471,68 @@ class SkyModel(UVBase):
         else:
             use_beam_amps = False
             beam_amp = None
+
         stokes = Quantity(np.zeros((4, Nsrcs)), "Jy")
+        pol_names = catalog["flux"][0].dtype.names
+        stokes_pols = [pn for pn in pol_names if pn.upper() in ["I", "Q", "U", "V"]]
+        inst_pols = [pn for pn in pol_names if pn.upper() in ["XX", "YY", "XY", "YX"]]
+
+        known_cols = ["id", "ra", "dec", "freq", "alpha", "flux", "beam", "extend"]
+        extra_cols_flux = [f"flux_{pol.lower()}" for pol in inst_pols]
+        if use_beam_amps:
+            extra_cols_beam = [f"beam_{pol.lower()}" for pol in stokes_pols]
+        else:
+            extra_cols_beam = []
+        extra_cols_cat = (
+            list({name.lower() for name in catalog.dtype.names}.difference(known_cols))
+            + extra_cols_flux
+            + extra_cols_beam
+        )
+
+        use_extra_flux = False
+        use_extra_beam = False
+        if extra_columns is not None:
+            if len(set(extra_columns).intersection(extra_cols_flux)) > 0:
+                use_extra_flux = True
+            if (
+                use_beam_amps
+                and len(set(extra_columns).intersection(extra_cols_beam)) > 0
+            ):
+                use_extra_beam = True
+
+        if use_extra_flux:
+            extra_flux_cols = {}
+            for pol_i, pol in enumerate(inst_pols):
+                if np.issubdtype(catalog["flux"][0][pol].dtype, np.floating):
+                    dtype_use = float
+                elif np.issubdtype(catalog["flux"][0][pol].dtype, np.complexfloating):
+                    dtype_use = complex
+                extra_flux_cols[extra_cols_flux[pol_i]] = (
+                    np.zeros((Nsrcs,), dtype=dtype_use) * units.Jy
+                )
+        if use_extra_beam:
+            extra_beam_cols = {}
+            for pol_i in range(len(stokes_pols)):
+                extra_beam_cols[extra_cols_beam[pol_i]] = np.zeros(
+                    (Nsrcs,), dtype=float
+                )
         for src in range(Nsrcs):
-            stokes[0, src] = catalog["flux"][src]["I"][0] * units.Jy
-            stokes[1, src] = catalog["flux"][src]["Q"][0] * units.Jy
-            stokes[2, src] = catalog["flux"][src]["U"][0] * units.Jy
-            stokes[3, src] = catalog["flux"][src]["V"][0] * units.Jy
+            for pi, pol in enumerate(stokes_pols):
+                stokes[pi, src] = catalog["flux"][src][pol][0] * units.Jy
+            if use_extra_flux:
+                for pi, pol in enumerate(inst_pols):
+                    extra_flux_cols[extra_cols_flux[pi]][src] = (
+                        catalog["flux"][src][pol][0] * units.Jy
+                    )
+
             if use_beam_amps:
-                beam_amp[0, src] = catalog["beam"][src]["XX"][0]
-                beam_amp[1, src] = catalog["beam"][src]["YY"][0]
-                beam_amp[2, src] = np.abs(catalog["beam"][src]["XY"][0])
-                beam_amp[3, src] = np.abs(catalog["beam"][src]["YX"][0])
+                for pi, pol in enumerate(inst_pols):
+                    beam_amp[pi, src] = np.abs(catalog["beam"][src][pol][0])
+            if use_extra_beam:
+                for pi, pol in enumerate(stokes_pols):
+                    extra_beam_cols[extra_cols_beam[pi]][src] = catalog["beam"][src][
+                        pol
+                    ][0]
 
         unique_ids, cts = np.unique(ids, return_counts=True)
         if cts.max() > 1:
@@ -4495,15 +4546,15 @@ class SkyModel(UVBase):
                 ids[wh_id_rep] = np.arange(wh_id_rep.size) + (ids.max() + 1)
         ids = ids.astype(str)
 
-        known_cols = ["id", "ra", "dec", "freq", "alpha", "flux", "beam", "extend"]
-        known_cols = [col.upper() for col in known_cols]
-        extra_cols_cat = list(set(catalog.dtype.names).difference(known_cols))
-
         extra_col_dict = {}
         if extra_columns is not None:
             for key, value in extra_columns.items():
-                if key.upper() in extra_cols_cat:
+                if key.upper() in catalog.dtype.names:
                     extra_col_dict[value] = catalog[key.upper()]
+                elif use_extra_flux and key in extra_flux_cols:
+                    extra_col_dict[value] = extra_flux_cols[key]
+                elif use_extra_beam and key in extra_beam_cols:
+                    extra_col_dict[value] = extra_beam_cols[key]
                 else:
                     raise KeyError(
                         f"{key} in extra_columns not available in catalog. "
@@ -4547,24 +4598,63 @@ class SkyModel(UVBase):
                     ra = np.insert(ra, use_index, src["ra"].astype(np.float64))
                     dec = np.insert(dec, use_index, src["dec"].astype(np.float64))
                     stokes_ext = Quantity(np.zeros((4, Ncomps)), "Jy")
+                    if use_extra_flux:
+                        extra_flux_cols_ext = {}
+                        for pi in range(len(inst_pols)):
+                            dtype_use = extra_flux_cols[extra_cols_flux[pi]].dtype
+                            extra_flux_cols_ext[extra_cols_flux[pi]] = (
+                                np.zeros((Ncomps,), dtype=dtype_use) * units.Jy
+                            )
+                    if use_extra_beam:
+                        extra_beam_cols_ext = {}
+                        for (pi,) in range(len(stokes_pols)):
+                            extra_beam_cols_ext[extra_cols_beam[pi]] = np.zeros(
+                                (Ncomps,), dtype=float
+                            )
+
                     if use_beam_amps:
                         beam_amp_ext = np.zeros((4, Ncomps))
+
+                    for comp in range(Ncomps):
+                        for pi, pol in enumerate(stokes_pols):
+                            stokes_ext[pi, comp] = src["flux"][comp][pol][0] * units.Jy
+                        if use_extra_flux:
+                            for pi, pol in enumerate(inst_pols):
+                                extra_flux_cols_ext[extra_cols_flux[pi]][comp] = (
+                                    src["flux"][comp][pol][0] * units.Jy
+                                )
+
+                        if use_beam_amps:
+                            for pi, pol in enumerate(inst_pols):
+                                beam_amp_ext[pi, comp] = np.abs(
+                                    src["beam"][comp][pol][0]
+                                )
+                        if use_extra_beam:
+                            for pi, pol in enumerate(stokes_pols):
+                                extra_beam_cols_ext[extra_cols_beam[pi]][comp] = src[
+                                    "beam"
+                                ][comp][pol][0]
+
                     if len(extra_col_dict) > 0:
                         for key, value in extra_columns.items():
-                            extra_col_dict[value] = np.insert(
-                                extra_col_dict[value], use_index, src[key.upper()]
-                            )
-                    for comp in range(Ncomps):
-                        stokes_ext[0, comp] = src["flux"][comp]["I"][0] * units.Jy
-                        stokes_ext[1, comp] = src["flux"][comp]["Q"][0] * units.Jy
-                        stokes_ext[2, comp] = src["flux"][comp]["U"][0] * units.Jy
-                        stokes_ext[3, comp] = src["flux"][comp]["V"][0] * units.Jy
-                        if use_beam_amps:
-                            beam_amp_ext[0, comp] = src["beam"][comp]["XX"][0]
-                            beam_amp_ext[1, comp] = src["beam"][comp]["YY"][0]
-                            beam_amp_ext[2, comp] = np.abs(src["beam"][comp]["XY"][0])
-                            beam_amp_ext[3, comp] = np.abs(src["beam"][comp]["YX"][0])
-                    # np.insert doesn't work with arrays
+                            if key.upper() in catalog.dtype.names:
+                                extra_col_dict[value] = np.insert(
+                                    extra_col_dict[value], use_index, src[key.upper()]
+                                )
+                            elif key in extra_flux_cols:
+                                extra_col_dict[value] = np.insert(
+                                    extra_col_dict[value],
+                                    use_index,
+                                    extra_flux_cols_ext[key],
+                                )
+                            elif key in extra_beam_cols:
+                                extra_col_dict[value] = np.insert(
+                                    extra_col_dict[value],
+                                    use_index,
+                                    extra_beam_cols_ext[key],
+                                )
+
+                    # np.insert doesn't work with multidimensional arrays
                     stokes_new = Quantity(
                         np.zeros((4, Ncomps + np.shape(stokes)[1])), "Jy"
                     )
@@ -4572,12 +4662,14 @@ class SkyModel(UVBase):
                     stokes_new[:, use_index : use_index + Ncomps] = stokes_ext
                     stokes_new[:, use_index + Ncomps :] = stokes[:, use_index:]
                     stokes = stokes_new
+
                     if use_beam_amps:
                         beam_amp_new = np.zeros((4, Ncomps + np.shape(beam_amp)[1]))
                         beam_amp_new[:, :use_index] = beam_amp[:, :use_index]
                         beam_amp_new[:, use_index : use_index + Ncomps] = beam_amp_ext
                         beam_amp_new[:, use_index + Ncomps :] = beam_amp[:, use_index:]
                         beam_amp = beam_amp_new
+
                     source_freqs = np.insert(
                         source_freqs, use_index, src["freq"] * 1e6 * units.Hz
                     )
