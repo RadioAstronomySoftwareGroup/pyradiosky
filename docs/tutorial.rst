@@ -17,11 +17,19 @@ writing out files as well as various transformations, including calculating full
 polarized coherencies in the local Alt/Az basis (useful for visibility simulators).
 This tutorial should give a basic introduction to all the methods.
 
+Some catalogs contain columns (with per-source values) with information beyond
+what is normally included on on a SkyModel object. These columns can be represented
+on a SkyModel object in the ``extra_columns`` attribute.
+
 SkyModel: Reading in files and creating SkyModel objects
 --------------------------------------------------------
 
 a) FHD files
 ************
+FHD catalog files often contain columns that are not normally read into SkyModel
+objects. You can read them in as extra columns using the ``extra_columns``
+option.
+
 .. code-block:: python
 
   >>> import os
@@ -37,8 +45,17 @@ a) FHD files
 
   >>> # Use the `from_file` method to create SkyModel object without initalizing
   >>> # an empty object, optionally specify the file type.
-  >>> # FHD default: expand_extended=True.
-  >>> sm = SkyModel.from_file(filename)
+  >>> # Read in some extra columns here. Use a dict where the key is the name in
+  >>> # FHD catalog and the value is the name you'd like to use in the SkyModel object.
+  >>> extra_columns = {
+  ...   "x": "image_x",
+  ...   "y": "image_y",
+  ...   "flux_xx": "flux_xx",
+  ...   "flux_xy": "flux_xy",
+  ... }
+  >>> sm = SkyModel.from_file(filename, extra_columns=extra_columns)
+  >>> print(sm.extra_columns.dtype.names)
+  ('image_x', 'image_y', 'flux_xx', 'flux_xy')
 
 b) GLEAM catalog
 ****************
