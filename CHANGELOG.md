@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-08-24
+
 ### Added
 - Ability to read in instrumental fluxes and stokes beam amplitudes from FHD catalogs
 into extra_columns.
