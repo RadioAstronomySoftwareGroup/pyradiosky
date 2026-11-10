@@ -127,7 +127,12 @@ def jy_to_ksr(freqs):
 
 
 def download_gleam(
-    path=".", filename="gleam.vot", overwrite=False, row_limit=None, for_testing=False
+    path=".",
+    filename="gleam.vot",
+    overwrite=False,
+    row_limit=None,
+    for_testing=False,
+    vizier_mirror=None,
 ):
     """
     Download the GLEAM vot table from Vizier.
@@ -147,6 +152,10 @@ def download_gleam(
         Download a file to use for unit tests. If True, some additional columns are
         included, the rows are limited to 50, the path and filename are set to put
         the file in the correct location and the overwrite keyword is set to True.
+    vizier_mirror : str, optional
+        Use a specific Vizier mirror (e.g "vizier.cfa.harvard.edu"). Useful in
+        the event of outages. If None, the default Vizier mirror
+        ("vizier.u-strasbg.fr") is used.
 
     """
     try:
@@ -164,7 +173,11 @@ def download_gleam(
         # We have frequent CI failures with messages like
         #  "Failed to resolve 'vizier.u-strasbg.fr'"
         # Try using a US mirror to see if we have fewer errors
-        Vizier.VIZIER_SERVER = "vizier.cfa.harvard.edu"
+        if vizier_mirror is None:
+            vizier_mirror = "vizier.cfa.harvard.edu"
+
+    if vizier_mirror is not None:
+        Vizier.VIZIER_SERVER = vizier_mirror
 
     opath = os.path.join(path, filename)
     if os.path.exists(opath) and not overwrite:

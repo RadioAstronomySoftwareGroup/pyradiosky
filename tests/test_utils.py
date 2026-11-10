@@ -76,23 +76,40 @@ def test_download_gleam(tmp_path, stype):
     filename = os.path.join(tmp_path, fname)
     n_src = 50
 
+    default_vizier_mirror = "vizier.u-strasbg.fr"
+    vizier_mirror = None
+    path = "/viz-bin/votable"
     try:
-        output = subprocess.check_output(  # nosec
-            [
-                "download_gleam",
-                "--path",
-                str(tmp_path),
-                "--filename",
-                fname,
-                "--row_limit",
-                str(n_src),
-            ]
+        response = requests.head(
+            f"https://{default_vizier_mirror}{path}", timeout=1.0, allow_redirects=True
         )
-        assert output.decode("utf-8").startswith(
-            "GLEAM catalog downloaded and saved to"
+        response.raise_for_status()
+    except (
+        requests.exceptions.RequestException,
+        requests.exceptions.ConnectionError,
+        requests.exceptions.HTTPError,
+    ):
+        vizier_mirror = "vizier.cfa.harvard.edu"
+        try:
+            response = requests.head(
+                f"https://{vizier_mirror}{path}", timeout=1.0, allow_redirects=True
+            )
+            response.raise_for_status()
+        except (
+            requests.exceptions.RequestException,
+            requests.exceptions.ConnectionError,
+            requests.exceptions.HTTPError,
+        ):
+            pytest.skip("Connection error w/ Vizier")
+
+    if vizier_mirror is None:
+        skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=n_src)
+        # explicitly pass the default in later steps to exercise all the code
+        vizier_mirror = default_vizier_mirror
+    else:
+        skyutils.download_gleam(
+            path=tmp_path, filename=fname, row_limit=n_src, vizier_mirror=vizier_mirror
         )
-    except requests.exceptions.ConnectionError:
-        pytest.skip("Connection error w/ Vizier")
 
     sky = SkyModel()
     sky.read_gleam_catalog(filename, spectral_type=stype)
@@ -104,17 +121,29 @@ def test_download_gleam(tmp_path, stype):
 
     # check there's not an error if the file exists and overwrite is False
     # and that the file is not replaced
-    skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=5)
+    skyutils.download_gleam(
+        path=tmp_path, filename=fname, row_limit=n_src, vizier_mirror=vizier_mirror
+    )
+
     sky.read_gleam_catalog(filename, spectral_type=stype)
     assert sky.Ncomponents == n_src
 
     # check that the file is replaced if overwrite is True
-    try:
-        skyutils.download_gleam(
-            path=tmp_path, filename=fname, row_limit=5, overwrite=True
-        )
-    except requests.exceptions.ConnectionError:
-        pytest.skip("Connection error w/ Vizier")
+    cli_args = [
+        "download_gleam",
+        "--path",
+        str(tmp_path),
+        "--filename",
+        fname,
+        "--row_limit",
+        str(5),
+        "--vizier_mirror",
+        vizier_mirror,
+        "--overwrite",
+    ]
+    output = subprocess.check_output(cli_args)  # nosec
+    assert output.decode("utf-8").startswith("GLEAM catalog downloaded and saved to")
+
     sky2 = SkyModel()
     sky2.read_gleam_catalog(filename, spectral_type=stype)
     assert sky2.Ncomponents == 5
