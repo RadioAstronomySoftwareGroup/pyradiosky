@@ -43,6 +43,14 @@ def download_gleam(argv=None):
         default=False,
         action="store_true",
     )
+    parser.add_argument(
+        "--vizier_mirror",
+        type=str,
+        help="Use a specific Vizier mirror (e.g 'vizier.cfa.harvard.edu'). "
+        "Useful in the event of outages. If not set, the default Vizier mirror "
+        "('vizier.u-strasbg.fr') is used.",
+        default=None,
+    )
 
     args = parser.parse_args(argv)
 
@@ -52,6 +60,7 @@ def download_gleam(argv=None):
         overwrite=args.overwrite,
         row_limit=args.row_limit,
         for_testing=args.for_testing,
+        vizier_mirror=args.vizier_mirror,
     )
 
 
