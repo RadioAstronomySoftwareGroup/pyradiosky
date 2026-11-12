@@ -178,6 +178,9 @@ def download_gleam(
 
     if vizier_mirror is not None:
         Vizier.VIZIER_SERVER = vizier_mirror
+    else:  # pragma: no cover
+        # when the default site is down, this isn't covered.
+        pass
 
     opath = os.path.join(path, filename)
     if os.path.exists(opath) and not overwrite:

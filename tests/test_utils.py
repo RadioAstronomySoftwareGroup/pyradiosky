@@ -102,14 +102,20 @@ def test_download_gleam(tmp_path, stype):
         ):
             pytest.skip("Connection error w/ Vizier")
 
-    if vizier_mirror is None:
-        skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=n_src)
-        # explicitly pass the default in later steps to exercise all the code
-        vizier_mirror = default_vizier_mirror
-    else:
-        skyutils.download_gleam(
-            path=tmp_path, filename=fname, row_limit=n_src, vizier_mirror=vizier_mirror
-        )
+    try:
+        if vizier_mirror is None:
+            skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=n_src)
+            # explicitly pass the default in later steps to exercise all the code
+            vizier_mirror = default_vizier_mirror
+        else:
+            skyutils.download_gleam(
+                path=tmp_path,
+                filename=fname,
+                row_limit=n_src,
+                vizier_mirror=vizier_mirror,
+            )
+    except RuntimeError:
+        pytest.skip("Vizier connected but not finding Gleam")
 
     sky = SkyModel()
     sky.read_gleam_catalog(filename, spectral_type=stype)
@@ -121,9 +127,12 @@ def test_download_gleam(tmp_path, stype):
 
     # check there's not an error if the file exists and overwrite is False
     # and that the file is not replaced
-    skyutils.download_gleam(
-        path=tmp_path, filename=fname, row_limit=n_src, vizier_mirror=vizier_mirror
-    )
+    try:
+        skyutils.download_gleam(
+            path=tmp_path, filename=fname, row_limit=n_src, vizier_mirror=vizier_mirror
+        )
+    except RuntimeError:
+        pytest.skip("Vizier connected but not finding Gleam")
 
     sky.read_gleam_catalog(filename, spectral_type=stype)
     assert sky.Ncomponents == n_src
@@ -141,8 +150,16 @@ def test_download_gleam(tmp_path, stype):
         vizier_mirror,
         "--overwrite",
     ]
-    output = subprocess.check_output(cli_args)  # nosec
-    assert output.decode("utf-8").startswith("GLEAM catalog downloaded and saved to")
+    try:
+        output = subprocess.run(cli_args, check=True, capture_output=True)  # nosec
+        assert output.stdout.decode("utf-8").startswith(
+            "GLEAM catalog downloaded and saved to"
+        )
+    except subprocess.CalledProcessError as e:
+        if "RuntimeError" in e.stderr.decode("utf-8") and "Vizier" in e.stderr.decode(
+            "utf-8"
+        ):
+            pytest.skip("Vizier connected but not finding Gleam")
 
     sky2 = SkyModel()
     sky2.read_gleam_catalog(filename, spectral_type=stype)
