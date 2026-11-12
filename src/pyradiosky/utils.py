@@ -155,7 +155,7 @@ def download_gleam(
     vizier_mirror : str, optional
         Use a specific Vizier mirror (e.g "vizier.cfa.harvard.edu"). Useful in
         the event of outages. If None, the default Vizier mirror
-        ("vizier.u-strasbg.fr") is used.
+        (i.e. "vizier.u-strasbg.fr") is used.
 
     """
     try:
@@ -257,6 +257,8 @@ def download_gleam(
         table_list = Vizier.get_catalogs(catname)
 
     if len(table_list) == 0:  # pragma: no cover
+        # clear Vizier cache. This can help with tests & repeated calls
+        Vizier.clear_cache()
         raise RuntimeError(
             f"Vizier mirror {Vizier.VIZIER_SERVER} cannot find the GLEAM catalog. "
             "This may be transient but you can also try another mirror."
@@ -266,6 +268,8 @@ def download_gleam(
     col_test = np.isin(desired_columns, table.colnames)
 
     if not np.all(col_test):  # pragma: no cover
+        # clear Vizier cache. This can help with tests & repeated calls
+        Vizier.clear_cache()
         raise RuntimeError("Vizier returned table does not contain expected columns")
 
     table.write(opath, format="votable", overwrite=overwrite)
