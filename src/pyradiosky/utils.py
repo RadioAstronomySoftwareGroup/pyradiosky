@@ -249,14 +249,31 @@ def download_gleam(
 
     Vizier.columns = desired_columns
     catname = "VIII/100/gleamegc"
-    table = Vizier.get_catalogs(catname)[0]
+    table_list = Vizier.get_catalogs(catname)
 
-    for col in desired_columns:
-        assert col in table.colnames, f"column {col} not in downloaded table."
+    if len(table_list) == 0:  # pragma: no cover
+        # sometimes this can be fixed by clearing the cache. Try this now.
+        Vizier.clear_cache()
+        table_list = Vizier.get_catalogs(catname)
+
+    if len(table_list) == 0:  # pragma: no cover
+        raise RuntimeError(
+            f"Vizier mirror {Vizier.VIZIER_SERVER} cannot find the GLEAM catalog. "
+            "This may be transient but you can also try another mirror."
+        )
+
+    table = table_list[0]
+    col_test = np.isin(desired_columns, table.colnames)
+
+    if not np.all(col_test):  # pragma: no cover
+        raise RuntimeError("Vizier returned table does not contain expected columns")
 
     table.write(opath, format="votable", overwrite=overwrite)
 
     print("GLEAM catalog downloaded and saved to " + opath)
+
+    # clear Vizier cache. This can help with tests & repeated calls
+    Vizier.clear_cache()
 
 
 def flat_spectrum_skymodel(
