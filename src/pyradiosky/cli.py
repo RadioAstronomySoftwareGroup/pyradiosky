@@ -33,6 +33,16 @@ def download_gleam(argv=None):
         "all rows.",
         default=None,
     )
+
+    parser.add_argument(
+        "--vizier_mirror",
+        type=str,
+        help="Use a specific Vizier mirror (e.g 'vizier.cfa.harvard.edu'). "
+        "Useful in the event of outages. If not set, the default Vizier mirror "
+        "('vizier.u-strasbg.fr') is used.",
+        default=None,
+    )
+
     parser.add_argument(
         "--for_testing",
         help="Download a file to use for unit tests. If True, all columns that "
@@ -43,15 +53,6 @@ def download_gleam(argv=None):
         default=False,
         action="store_true",
     )
-    parser.add_argument(
-        "--vizier_mirror",
-        type=str,
-        help="Use a specific Vizier mirror (e.g 'vizier.cfa.harvard.edu'). "
-        "Useful in the event of outages. If not set, the default Vizier mirror "
-        "('vizier.u-strasbg.fr') is used.",
-        default=None,
-    )
-
     args = parser.parse_args(argv)
 
     utils.download_gleam(
