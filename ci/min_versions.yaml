@@ -4,7 +4,7 @@ channels:
 dependencies:
   - astropy==6.0
   - astropy-healpix==1.0.2
-  - astroquery==0.4.4
+  - astroquery==0.4.8
   - h5py==3.7.0
   - numpy==1.23.*
   - scipy==1.9.*

@@ -36,12 +36,13 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Astronomy",
 ]
 
 [project.optional-dependencies]
 healpix = ["astropy-healpix>=1.0.2"]
-astroquery = ["astroquery>=0.4.4"]
+astroquery = ["astroquery>=0.4.8"]
 lunarsky = ["lunarsky>=1.0"]
 all = ["pyradiosky[healpix,astroquery,lunarsky]"]
 test = ["coverage", "pre-commit", "pytest", "pytest-cov"]
