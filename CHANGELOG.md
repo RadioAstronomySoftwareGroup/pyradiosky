@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+- Added a `vizier_mirror` option to the `download_gleam` function to enable
+specifying a vizier mirror to use in the event of outages.
+
+### Changed
+- Updated minimum optional dependency versions: astroquery>=0.4.8
+
 ## [1.1.2] - 2026-08-24
 
 ### Added

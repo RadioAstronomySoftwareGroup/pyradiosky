@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from astropy.cosmology import Planck15
 
-from pyradiosky import SkyModel, utils as skyutils
+from pyradiosky import SkyModel, cli, utils as skyutils
 
 
 def test_stokes_tofrom_coherency():
@@ -68,7 +68,7 @@ def test_stokes_tofrom_coherency():
 @pytest.mark.filterwarnings("ignore:Some spectral index values are NaN")
 @pytest.mark.filterwarnings("ignore:Some stokes values are NaNs")
 @pytest.mark.parametrize("stype", ["subband", "spectral_index", "flat"])
-def test_download_gleam(tmp_path, stype):
+def test_download_gleam(tmp_path, capsys, stype):
     pytest.importorskip("astroquery")
     import requests  # a dependency of astroquery
 
@@ -76,23 +76,46 @@ def test_download_gleam(tmp_path, stype):
     filename = os.path.join(tmp_path, fname)
     n_src = 50
 
+    default_vizier_mirror = "vizier.u-strasbg.fr"
+    vizier_mirror = None
+    path = "/viz-bin/votable"
     try:
-        output = subprocess.check_output(  # nosec
-            [
-                "download_gleam",
-                "--path",
-                str(tmp_path),
-                "--filename",
-                fname,
-                "--row_limit",
-                str(n_src),
-            ]
+        response = requests.head(
+            f"https://{default_vizier_mirror}{path}", timeout=1.0, allow_redirects=True
         )
-        assert output.decode("utf-8").startswith(
-            "GLEAM catalog downloaded and saved to"
-        )
-    except requests.exceptions.ConnectionError:
-        pytest.skip("Connection error w/ Vizier")
+        response.raise_for_status()
+    except (
+        requests.exceptions.RequestException,
+        requests.exceptions.ConnectionError,
+        requests.exceptions.HTTPError,
+    ):
+        vizier_mirror = "vizier.cfa.harvard.edu"
+        try:
+            response = requests.head(
+                f"https://{vizier_mirror}{path}", timeout=1.0, allow_redirects=True
+            )
+            response.raise_for_status()
+        except (
+            requests.exceptions.RequestException,
+            requests.exceptions.ConnectionError,
+            requests.exceptions.HTTPError,
+        ):
+            pytest.skip("Connection error w/ Vizier")
+
+    try:
+        if vizier_mirror is None:
+            skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=n_src)
+            # explicitly pass the default in later steps to exercise all the code
+            vizier_mirror = default_vizier_mirror
+        else:
+            skyutils.download_gleam(
+                path=tmp_path,
+                filename=fname,
+                row_limit=n_src,
+                vizier_mirror=vizier_mirror,
+            )
+    except RuntimeError:
+        pytest.skip("Vizier connected but not finding Gleam")
 
     sky = SkyModel()
     sky.read_gleam_catalog(filename, spectral_type=stype)
@@ -104,17 +127,53 @@ def test_download_gleam(tmp_path, stype):
 
     # check there's not an error if the file exists and overwrite is False
     # and that the file is not replaced
-    skyutils.download_gleam(path=tmp_path, filename=fname, row_limit=5)
+    try:
+        cli_args = [
+            "--path",
+            str(tmp_path),
+            "--filename",
+            fname,
+            "--row_limit",
+            str(n_src),
+            "--vizier_mirror",
+            vizier_mirror,
+        ]
+        cli.download_gleam(cli_args)
+        expected_msg = (
+            f"GLEAM already downloaded to {filename}. Set overwrite=True to "
+            "re-download it."
+        )
+        assert expected_msg in capsys.readouterr().out
+    except RuntimeError:
+        pytest.skip("Vizier connected but not finding Gleam")
+
     sky.read_gleam_catalog(filename, spectral_type=stype)
     assert sky.Ncomponents == n_src
 
     # check that the file is replaced if overwrite is True
+    cli_args = [
+        "download_gleam",
+        "--path",
+        str(tmp_path),
+        "--filename",
+        fname,
+        "--row_limit",
+        str(5),
+        "--vizier_mirror",
+        vizier_mirror,
+        "--overwrite",
+    ]
     try:
-        skyutils.download_gleam(
-            path=tmp_path, filename=fname, row_limit=5, overwrite=True
+        output = subprocess.run(cli_args, check=True, capture_output=True)  # nosec
+        assert output.stdout.decode("utf-8").startswith(
+            "GLEAM catalog downloaded and saved to"
         )
-    except requests.exceptions.ConnectionError:
-        pytest.skip("Connection error w/ Vizier")
+    except subprocess.CalledProcessError as e:
+        if "RuntimeError" in e.stderr.decode("utf-8") and "Vizier" in e.stderr.decode(
+            "utf-8"
+        ):
+            pytest.skip("Vizier connected but not finding Gleam")
+
     sky2 = SkyModel()
     sky2.read_gleam_catalog(filename, spectral_type=stype)
     assert sky2.Ncomponents == 5
@@ -154,9 +213,10 @@ def test_jy_to_ksr():
 
 @pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
 @pytest.mark.parametrize(
-    ("fspec", "use_cli"), [("freqs", True), ("freqs", False), ("redshifts", False)]
+    ("fspec", "call_type"),
+    [("freqs", "shell"), ("freqs", "cli"), ("freqs", "api"), ("redshifts", "api")],
 )
-def test_flat_spectrum_skymodel(fspec, use_cli, tmp_path):
+def test_flat_spectrum_skymodel(capsys, fspec, call_type, tmp_path):
     n_freq = 20
     freqs = np.linspace(150e6, 180e6, n_freq)
     nside = 256
@@ -166,7 +226,7 @@ def test_flat_spectrum_skymodel(fspec, use_cli, tmp_path):
     z_order = np.argsort(redshifts)
     redshifts = redshifts[z_order]
 
-    if use_cli:
+    if call_type == "shell":
         # cli only accepts frequencies
         file_name = str(tmp_path) + "test_flat_spectrum.skyh5"
         output = subprocess.check_output(  # nosec
@@ -192,6 +252,35 @@ def test_flat_spectrum_skymodel(fspec, use_cli, tmp_path):
         assert (
             "Generated flat-spectrum model, with spectral amplitude 0.037 K$^2$ Mpc$^3$"
             in output.decode("utf-8")
+        )
+
+        sky = SkyModel.from_file(file_name)
+    elif call_type == "cli":
+        # cli only accepts frequencies
+        file_name = str(tmp_path) + "test_flat_spectrum.skyh5"
+        cli.make_flat_spectrum_eor(  # nosec
+            [
+                "-v",
+                str(variance),
+                "--nside",
+                str(nside),
+                "--filename",
+                file_name,
+                "-s",
+                str(freqs[0]),
+                "-e",
+                str(freqs[-1]),
+                "-N",
+                str(n_freq),
+            ]
+        )
+        output = capsys.readouterr().out
+        assert output.startswith(
+            "Generating sky model, nside 256, and variance 1e-06 K^2 at channel 0."
+        )
+        assert (
+            "Generated flat-spectrum model, with spectral amplitude 0.037 K$^2$ Mpc$^3$"
+            in output
         )
 
         sky = SkyModel.from_file(file_name)

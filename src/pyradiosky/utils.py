@@ -127,7 +127,12 @@ def jy_to_ksr(freqs):
 
 
 def download_gleam(
-    path=".", filename="gleam.vot", overwrite=False, row_limit=None, for_testing=False
+    path=".",
+    filename="gleam.vot",
+    overwrite=False,
+    row_limit=None,
+    for_testing=False,
+    vizier_mirror=None,
 ):
     """
     Download the GLEAM vot table from Vizier.
@@ -147,6 +152,10 @@ def download_gleam(
         Download a file to use for unit tests. If True, some additional columns are
         included, the rows are limited to 50, the path and filename are set to put
         the file in the correct location and the overwrite keyword is set to True.
+    vizier_mirror : str, optional
+        Use a specific Vizier mirror (e.g "vizier.cfa.harvard.edu"). Useful in
+        the event of outages. If None, the default Vizier mirror
+        (i.e. "vizier.u-strasbg.fr") is used.
 
     """
     try:
@@ -164,7 +173,14 @@ def download_gleam(
         # We have frequent CI failures with messages like
         #  "Failed to resolve 'vizier.u-strasbg.fr'"
         # Try using a US mirror to see if we have fewer errors
-        Vizier.VIZIER_SERVER = "vizier.cfa.harvard.edu"
+        if vizier_mirror is None:
+            vizier_mirror = "vizier.cfa.harvard.edu"
+
+    if vizier_mirror is not None:
+        Vizier.VIZIER_SERVER = vizier_mirror
+    else:  # pragma: no cover
+        # when the default site is down, this isn't covered.
+        pass
 
     opath = os.path.join(path, filename)
     if os.path.exists(opath) and not overwrite:
@@ -236,14 +252,35 @@ def download_gleam(
 
     Vizier.columns = desired_columns
     catname = "VIII/100/gleamegc"
-    table = Vizier.get_catalogs(catname)[0]
+    table_list = Vizier.get_catalogs(catname)
 
-    for col in desired_columns:
-        assert col in table.colnames, f"column {col} not in downloaded table."
+    if len(table_list) == 0:  # pragma: no cover
+        # sometimes this can be fixed by clearing the cache. Try this now.
+        Vizier.clear_cache()
+        table_list = Vizier.get_catalogs(catname)
+
+    if len(table_list) == 0:  # pragma: no cover
+        # clear Vizier cache. This can help with tests & repeated calls
+        Vizier.clear_cache()
+        raise RuntimeError(
+            f"Vizier mirror {Vizier.VIZIER_SERVER} cannot find the GLEAM catalog. "
+            "This may be transient but you can also try another mirror."
+        )
+
+    table = table_list[0]
+    col_test = np.isin(desired_columns, table.colnames)
+
+    if not np.all(col_test):  # pragma: no cover
+        # clear Vizier cache. This can help with tests & repeated calls
+        Vizier.clear_cache()
+        raise RuntimeError("Vizier returned table does not contain expected columns")
 
     table.write(opath, format="votable", overwrite=overwrite)
 
     print("GLEAM catalog downloaded and saved to " + opath)
+
+    # clear Vizier cache. This can help with tests & repeated calls
+    Vizier.clear_cache()
 
 
 def flat_spectrum_skymodel(

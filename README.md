@@ -77,7 +77,7 @@ Required:
 Optional:
 
 * astropy-healpix>=1.0.2 (for working with catalogs in HEALPix formats)
-* astroquery>=0.4.4 (for downloading GLEAM and other VizieR catalogs)
+* astroquery>=0.4.8 (for downloading GLEAM and other VizieR catalogs)
 * lunarsky>=1.0 (for supporting telescope locations on the moon)
 
 We suggest using conda to install all the dependencies. To install
