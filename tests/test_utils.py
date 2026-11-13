@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from astropy.cosmology import Planck15
 
-from pyradiosky import SkyModel, utils as skyutils
+from pyradiosky import SkyModel, cli, utils as skyutils
 
 
 def test_stokes_tofrom_coherency():
@@ -68,7 +68,7 @@ def test_stokes_tofrom_coherency():
 @pytest.mark.filterwarnings("ignore:Some spectral index values are NaN")
 @pytest.mark.filterwarnings("ignore:Some stokes values are NaNs")
 @pytest.mark.parametrize("stype", ["subband", "spectral_index", "flat"])
-def test_download_gleam(tmp_path, stype):
+def test_download_gleam(tmp_path, capsys, stype):
     pytest.importorskip("astroquery")
     import requests  # a dependency of astroquery
 
@@ -128,9 +128,22 @@ def test_download_gleam(tmp_path, stype):
     # check there's not an error if the file exists and overwrite is False
     # and that the file is not replaced
     try:
-        skyutils.download_gleam(
-            path=tmp_path, filename=fname, row_limit=n_src, vizier_mirror=vizier_mirror
+        cli_args = [
+            "--path",
+            str(tmp_path),
+            "--filename",
+            fname,
+            "--row_limit",
+            str(n_src),
+            "--vizier_mirror",
+            vizier_mirror,
+        ]
+        cli.download_gleam(cli_args)
+        expected_msg = (
+            f"GLEAM already downloaded to {filename}. Set overwrite=True to "
+            "re-download it."
         )
+        assert expected_msg in capsys.readouterr().out
     except RuntimeError:
         pytest.skip("Vizier connected but not finding Gleam")
 
@@ -200,9 +213,10 @@ def test_jy_to_ksr():
 
 @pytest.mark.filterwarnings("ignore:Some stokes I values are negative")
 @pytest.mark.parametrize(
-    ("fspec", "use_cli"), [("freqs", True), ("freqs", False), ("redshifts", False)]
+    ("fspec", "call_type"),
+    [("freqs", "shell"), ("freqs", "cli"), ("freqs", "api"), ("redshifts", "api")],
 )
-def test_flat_spectrum_skymodel(fspec, use_cli, tmp_path):
+def test_flat_spectrum_skymodel(capsys, fspec, call_type, tmp_path):
     n_freq = 20
     freqs = np.linspace(150e6, 180e6, n_freq)
     nside = 256
@@ -212,7 +226,7 @@ def test_flat_spectrum_skymodel(fspec, use_cli, tmp_path):
     z_order = np.argsort(redshifts)
     redshifts = redshifts[z_order]
 
-    if use_cli:
+    if call_type == "shell":
         # cli only accepts frequencies
         file_name = str(tmp_path) + "test_flat_spectrum.skyh5"
         output = subprocess.check_output(  # nosec
@@ -238,6 +252,35 @@ def test_flat_spectrum_skymodel(fspec, use_cli, tmp_path):
         assert (
             "Generated flat-spectrum model, with spectral amplitude 0.037 K$^2$ Mpc$^3$"
             in output.decode("utf-8")
+        )
+
+        sky = SkyModel.from_file(file_name)
+    elif call_type == "cli":
+        # cli only accepts frequencies
+        file_name = str(tmp_path) + "test_flat_spectrum.skyh5"
+        cli.make_flat_spectrum_eor(  # nosec
+            [
+                "-v",
+                str(variance),
+                "--nside",
+                str(nside),
+                "--filename",
+                file_name,
+                "-s",
+                str(freqs[0]),
+                "-e",
+                str(freqs[-1]),
+                "-N",
+                str(n_freq),
+            ]
+        )
+        output = capsys.readouterr().out
+        assert output.startswith(
+            "Generating sky model, nside 256, and variance 1e-06 K^2 at channel 0."
+        )
+        assert (
+            "Generated flat-spectrum model, with spectral amplitude 0.037 K$^2$ Mpc$^3$"
+            in output
         )
 
         sky = SkyModel.from_file(file_name)
