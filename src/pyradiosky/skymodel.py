@@ -207,7 +207,10 @@ def _get_frame_obj(frame):
         if frame_class is None:
             raise ValueError(f"Invalid frame name {frame}.")
         frame = frame_class()
-    elif frame is not None:
+    elif frame is not None and (
+        not hasattr(frame, "name")
+        or frame_transform_graph.lookup_name(frame.name) is None
+    ):
         # Note cannot just check if this is a subclass of
         # astropy.coordinates.BaseCoordinateFrame because that
         # errors with a TypeError, which appears to be a bug caused
@@ -215,14 +218,10 @@ def _get_frame_obj(frame):
         # Also see python/cpython#89010
         # Instead check to see if there's a frame name that is in
         # the frame_transform_graph
-        if (
-            not hasattr(frame, "name")
-            or frame_transform_graph.lookup_name(frame.name) is None
-        ):
-            raise ValueError(
-                "Invalid frame object, must be a subclass of "
-                "astropy.coordinates.BaseCoordinateFrame."
-            )
+        raise ValueError(
+            "Invalid frame object, must be a subclass of "
+            "astropy.coordinates.BaseCoordinateFrame."
+        )
     return frame
 
 
