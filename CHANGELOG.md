@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-11-16
+
 ### Added
 - Added a `vizier_mirror` option to the `download_gleam` function to enable
 specifying a vizier mirror to use in the event of outages.
