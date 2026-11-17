@@ -89,10 +89,21 @@ You can install the optional dependencies via pip by specifying an option
 when you install pyradiosky, as in ```pip install .[healpix]```
 which will install all the required packages for using the HEALPix functionality
 in pyradiosky. The options that can be passed in this way are:
-[`healpix`, `astroquery`, `lunarsky`, `all`, `doc`, `test`, `dev`].
-The first three (`healpix`,  `astroquery`, `lunarsky`) enable various specific
-functionality while `all` will install all optional dependencies.
-The last three (`doc`, `test` and `dev`) may be useful for developers of pyradiosky.
+
+- ``healpix``
+- ``astroquery``
+- ``lunarsky``
+- ``all``
+- ``doc``
+- ``test``
+- ``dev``
+
+The first set (``astroquery``, ``healpix`` and ``lunarsky``) enable various specific
+functionality while ``all`` will install all of the above to enable all optional
+functionality. The next two (``test`` and ``doc``) include packages for testing
+and building the docs respectively. Finally, ``dev`` includes everything
+installed with ``all``, ``test`` and ``doc`` so installs everything needed for
+developers of pyradiosky.
 
 ## Developer Installation
 Clone the repository using
