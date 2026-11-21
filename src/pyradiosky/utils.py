@@ -133,6 +133,7 @@ def download_gleam(
     row_limit=None,
     for_testing=False,
     vizier_mirror=None,
+    n_retry=5,
 ):
     """
     Download the GLEAM vot table from Vizier.
@@ -156,6 +157,8 @@ def download_gleam(
         Use a specific Vizier mirror (e.g "vizier.cfa.harvard.edu"). Useful in
         the event of outages. If None, the default Vizier mirror
         (i.e. "vizier.u-strasbg.fr") is used.
+    n_retry : int
+        Number of times to try to get Gleam info from Vizier.
 
     """
     try:
@@ -254,17 +257,18 @@ def download_gleam(
     catname = "VIII/100/gleamegc"
     table_list = Vizier.get_catalogs(catname)
 
-    if len(table_list) == 0:  # pragma: no cover
-        # sometimes this can be fixed by clearing the cache. Try this now.
+    retry_count = 0
+    n_retry = 5
+    while len(table_list) == 0 and retry_count < n_retry:  # pragma: no cover
         Vizier.clear_cache()
         table_list = Vizier.get_catalogs(catname)
+        retry_count += 1
 
     if len(table_list) == 0:  # pragma: no cover
-        # clear Vizier cache. This can help with tests & repeated calls
-        Vizier.clear_cache()
         raise RuntimeError(
-            f"Vizier mirror {Vizier.VIZIER_SERVER} cannot find the GLEAM catalog. "
-            "This may be transient but you can also try another mirror."
+            f"Vizier mirror {Vizier.VIZIER_SERVER} is available but cannot find "
+            "the GLEAM catalog. This may be transient, you can try setting "
+            "n_retry higher or try another mirror."
         )
 
     table = table_list[0]
