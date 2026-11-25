@@ -3,6 +3,7 @@
 """Utility methods."""
 
 import os
+import time
 
 import astropy.units as units
 import numpy as np
@@ -260,6 +261,7 @@ def download_gleam(
     retry_count = 0
     n_retry = 5
     while len(table_list) == 0 and retry_count < n_retry:  # pragma: no cover
+        time.sleep(2)
         Vizier.clear_cache()
         table_list = Vizier.get_catalogs(catname)
         retry_count += 1
