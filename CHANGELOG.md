@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+- Added a `retry` option to the `download_gleam` function to allow for retries on
+getting the GLEAM catalog from Vizier.
+
+
 ## [1.1.3] - 2026-11-16
 
 ### Added
