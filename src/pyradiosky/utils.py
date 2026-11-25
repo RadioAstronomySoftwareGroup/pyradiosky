@@ -159,7 +159,10 @@ def download_gleam(
         the event of outages. If None, the default Vizier mirror
         (i.e. "vizier.u-strasbg.fr") is used.
     n_retry : int
-        Number of times to try to get Gleam info from Vizier.
+        Number of times to try to get Gleam info from Vizier. Sometimes the GLEAM
+        catalog is not found even though the mirror is responsive. We don't know
+        why this happens, but clearing the Vizier cache and retrying sometimes
+        works.
 
     """
     try:
